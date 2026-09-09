@@ -1,0 +1,99 @@
+import type { ClinicalNote, ClinicalNoteDiagnosis, Icd10Code } from "@/lib/consumer/api/types";
+
+export const SOAP_SECTIONS = [
+  { key: "subjective", label: "Subjective", hint: "What the patient reports" },
+  { key: "objective", label: "Objective", hint: "Exam findings, vitals, labs" },
+  { key: "assessment", label: "Assessment", hint: "Working diagnosis" },
+  { key: "plan", label: "Plan", hint: "Treatment and follow-up" },
+] as const;
+
+export type SoapSectionKey = (typeof SOAP_SECTIONS)[number]["key"];
+export type SoapDraft = Record<SoapSectionKey, string>;
+
+export const MAX_DIAGNOSES = 10;
+
+export function emptyDraft(): SoapDraft {
+  return { subjective: "", objective: "", assessment: "", plan: "" };
+}
+
+export function applyNote(note: ClinicalNote): SoapDraft {
+  return {
+    subjective: note.subjective || "",
+    objective: note.objective || "",
+    assessment: note.assessment || "",
+    plan: note.plan || "",
+  };
+}
+
+export function hasSoapContent(draft: SoapDraft, diagnoses: ClinicalNoteDiagnosis[]): boolean {
+  return SOAP_SECTIONS.some((s) => draft[s.key].trim()) || diagnoses.length > 0;
+}
+
+export function shouldAutosave(status: string): boolean {
+  return status !== "finalised";
+}
+
+export function canSearchReference(query: string): boolean {
+  return query.trim().length >= 2;
+}
+
+export function addDiagnosis(
+  current: ClinicalNoteDiagnosis[],
+  code: Icd10Code,
+): ClinicalNoteDiagnosis[] {
+  if (current.some((d) => d.code === code.code) || current.length >= MAX_DIAGNOSES) return current;
+  return [
+    ...current,
+    { code: code.code, description: code.description, is_primary: current.length === 0 },
+  ];
+}
+
+export function removeDiagnosis(current: ClinicalNoteDiagnosis[], code: string): ClinicalNoteDiagnosis[] {
+  const next = current.filter((d) => d.code !== code);
+  if (next.length && !next.some((d) => d.is_primary)) {
+    const first = next[0];
+    if (first) first.is_primary = true;
+  }
+  return next;
+}
+
+export function setPrimary(current: ClinicalNoteDiagnosis[], code: string): ClinicalNoteDiagnosis[] {
+  return current.map((d) => ({ ...d, is_primary: d.code === code }));
+}
+
+export function savePayload(
+  appointmentId: string,
+  draft: SoapDraft,
+  diagnoses: ClinicalNoteDiagnosis[],
+  version: number,
+) {
+  return {
+    appointment_id: appointmentId,
+    ...draft,
+    diagnoses: diagnoses.map((d) => ({ code: d.code, is_primary: Boolean(d.is_primary) })),
+    version,
+  };
+}
+
+export function finalisePayload(version: number) {
+  return { version };
+}
+
+export function amendPayload(
+  draft: SoapDraft,
+  diagnoses: ClinicalNoteDiagnosis[],
+  reason: string,
+  version: number,
+) {
+  return {
+    ...draft,
+    diagnoses: diagnoses.map((d) => ({ code: d.code, is_primary: Boolean(d.is_primary) })),
+    amendment_reason: reason.trim(),
+    version,
+  };
+}
+
+export function amendReasonError(reason: string): string | null {
+  if (reason.trim().length < 3) return "Amendment reason must be at least 3 characters.";
+  return null;
+}

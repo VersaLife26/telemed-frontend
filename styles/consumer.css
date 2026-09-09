@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #015591;
+  --color-primary-light: #69aad8;
+  --color-bg-gray: #f8f8f8;
+  --color-bg-gray-300: #f3f3f3;
+  --color-text-muted: #757575;
+  --color-text-placeholder: #b9b9b9;
+  --color-text-label: #8c8c8c;
+  --color-border: #dfdfdf;
+  --color-border-light: #e8e8e8;
+  --color-border-input: #f3f3f3;
+  --color-border-card: #def1ff;
+  --color-danger: #b80000;
+  --font-manrope: "Manrope", sans-serif;
+  --radius-auth: 38px;
+  --radius-card: 16px;
+  --radius-pill: 32px;
+  --radius-input: 8px;
+  --shadow-soft: 0px 4px 6px rgba(0, 0, 0, 0.02);
+  --shadow-otp: 0px 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    font-family: var(--font-manrope);
+    background: #ffffff;
+    color: #000000;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .text-h1 {
+    font-size: 64px;
+    font-weight: 200;
+    line-height: 1.2;
+    letter-spacing: -1.28px;
+  }
+
+  .text-h2 {
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.8px;
+  }
+
+  .text-h3 {
+    font-size: 32px;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.96px;
+  }
+
+  .text-h4 {
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.48px;
+  }
+
+  .text-h5 {
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.4px;
+  }
+
+  .text-body {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  .text-body-sm {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  .text-caption {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  @media (max-width: 768px) {
+    .text-h1 {
+      font-size: 40px;
+      letter-spacing: -0.8px;
+    }
+    .text-h2 {
+      font-size: 28px;
+    }
+  }
+}

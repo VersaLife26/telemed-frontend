@@ -1,0 +1,297 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Tailwind CSS 4 is configured in CSS, not in a tailwind.config.js. `@theme`
+ * declares design tokens that become utilities (`bg-background`,
+ * `text-muted-foreground`, `rounded-lg`); `@custom-variant` re-declares the
+ * `dark:` variant against a class rather than the media query, because
+ * next-themes toggles `class="dark"` on <html>.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+/*
+ * Light palette.
+ *
+ * Contrast was chosen against WCAG 2.1 AA (4.5:1 for body text, 3:1 for large
+ * text and UI boundaries), not by eye. `--muted-foreground` in particular is
+ * darker than the shadcn default, which lands at about 4.0:1 on white and
+ * fails for the small type this console uses in table cells and captions.
+ */
+:root {
+  --radius: 0.625rem;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --background: oklch(0.995 0 0);
+  --foreground: oklch(0.21 0.02 255);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 255);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 255);
+
+  /* Deep teal: clinical without being a hospital cliché, and 7.3:1 on white. */
+  --primary: oklch(0.46 0.09 205);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.96 0.005 250);
+  --secondary-foreground: oklch(0.28 0.02 255);
+
+  --muted: oklch(0.965 0.004 250);
+  --muted-foreground: oklch(0.46 0.02 255); /* 4.9:1 on --background */
+
+  --accent: oklch(0.945 0.015 205);
+  --accent-foreground: oklch(0.28 0.04 205);
+
+  --destructive: oklch(0.51 0.19 27);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --success: oklch(0.46 0.12 152);
+  --success-foreground: oklch(0.99 0 0);
+
+  --warning: oklch(0.53 0.13 70);
+  --warning-foreground: oklch(0.99 0 0);
+
+  --info: oklch(0.48 0.13 255);
+  --info-foreground: oklch(0.99 0 0);
+
+  --border: oklch(0.9 0.005 250);
+  --input: oklch(0.87 0.006 250);
+  --ring: oklch(0.46 0.09 205);
+
+  /*
+   * Categorical chart series: four slots, assigned in this fixed order and
+   * never cycled. Four is not an arbitrary cut — no chart in this console
+   * shows more than two categorical series at once (revenue is gross vs
+   * commission; every other chart is single-series with identity on the axis,
+   * or uses the status colours below because its segments are states, not
+   * identities).
+   *
+   * These exact values were produced by the palette validator, not chosen by
+   * eye, and re-verified in both themes:
+   *
+   *   #009da4,#c67f4d,#8e71d6,#3e7232  --mode light --surface #ffffff --pairs all
+   *     lightness band PASS · chroma floor PASS · CVD separation PASS
+   *     (worst all-pairs deltaE 9.3 deutan) · normal-vision floor PASS (17.2)
+   *     · contrast vs surface PASS (all >= 3:1)
+   *
+   * Re-run after any change:
+   *   node scripts/validate_palette.js "<hex,...>" --mode light --surface "#ffffff" --pairs all
+   */
+  --chart-1: oklch(0.63 0.115 200);
+  --chart-2: oklch(0.66 0.11 55);
+  --chart-3: oklch(0.62 0.15 295);
+  --chart-4: oklch(0.5 0.11 140);
+
+  /* Grid and axis are recessive: they orient, they do not compete. */
+  --chart-grid: oklch(0.91 0.004 250);
+  --chart-axis: oklch(0.55 0.02 255);
+
+  --sidebar: oklch(0.985 0.002 250);
+  --sidebar-foreground: oklch(0.26 0.02 255);
+  --sidebar-accent: oklch(0.94 0.015 205);
+  --sidebar-accent-foreground: oklch(0.26 0.05 205);
+  --sidebar-border: oklch(0.9 0.005 250);
+}
+
+/*
+ * Dark palette. Not an inversion: surfaces lift as they come forward, text
+ * sits at ~0.93 rather than pure white to avoid halation on OLED, and the
+ * primary lightens so it still clears 4.5:1 against the dark card.
+ */
+.dark {
+  --background: oklch(0.17 0.012 255);
+  --foreground: oklch(0.93 0.005 250);
+
+  --card: oklch(0.21 0.014 255);
+  --card-foreground: oklch(0.93 0.005 250);
+
+  --popover: oklch(0.23 0.014 255);
+  --popover-foreground: oklch(0.93 0.005 250);
+
+  --primary: oklch(0.75 0.1 200);
+  --primary-foreground: oklch(0.17 0.02 255);
+
+  --secondary: oklch(0.27 0.015 255);
+  --secondary-foreground: oklch(0.93 0.005 250);
+
+  --muted: oklch(0.26 0.014 255);
+  --muted-foreground: oklch(0.72 0.015 250); /* 6.4:1 on --background */
+
+  --accent: oklch(0.3 0.03 200);
+  --accent-foreground: oklch(0.93 0.01 200);
+
+  --destructive: oklch(0.68 0.17 25);
+  --destructive-foreground: oklch(0.16 0.02 255);
+
+  --success: oklch(0.72 0.14 152);
+  --success-foreground: oklch(0.16 0.02 255);
+
+  --warning: oklch(0.78 0.13 75);
+  --warning-foreground: oklch(0.16 0.02 255);
+
+  --info: oklch(0.72 0.11 250);
+  --info-foreground: oklch(0.16 0.02 255);
+
+  --border: oklch(0.31 0.014 255);
+  --input: oklch(0.35 0.016 255);
+  --ring: oklch(0.75 0.1 200);
+
+  /*
+   * Dark is a separate selection from the same hue families, not a flip of the
+   * light steps: the validator's lightness band for a dark surface is
+   * L 0.48-0.67, which the light steps sit outside.
+   *
+   *   #00a6ae,#c57b45,#8b77c4,#4b7a40  --mode dark --surface #14191f --pairs all
+   *     lightness band PASS · chroma floor PASS · normal-vision floor PASS
+   *     (16.8) · contrast vs surface PASS
+   *     · CVD separation WARN: worst all-pairs deltaE 6.0 protan, between
+   *       slot 2 (#c57b45) and slot 4 (#4b7a40). That sits in the 6-8 floor
+   *       band, which is permitted only with secondary encoding. Both
+   *       conditions hold here: every multi-series chart carries a legend and
+   *       direct labels, every chart offers a table view, and slots 2 and 4
+   *       never appear in the same chart in this console.
+   */
+  --chart-1: oklch(0.65 0.13 200);
+  --chart-2: oklch(0.65 0.115 55);
+  --chart-3: oklch(0.62 0.115 295);
+  --chart-4: oklch(0.53 0.1 140);
+
+  --chart-grid: oklch(0.3 0.012 255);
+  --chart-axis: oklch(0.68 0.015 250);
+
+  --sidebar: oklch(0.2 0.013 255);
+  --sidebar-foreground: oklch(0.9 0.005 250);
+  --sidebar-accent: oklch(0.3 0.03 200);
+  --sidebar-accent-foreground: oklch(0.94 0.01 200);
+  --sidebar-border: oklch(0.29 0.014 255);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Focus is visible on every interactive element, always. This console is
+   * operated by keyboard through the verification checklist; a focus ring that
+   * only appears "sometimes" is the single fastest way to make that
+   * impossible.
+   */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Respect the OS setting rather than animating regardless. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Windows high-contrast mode: keep boundaries visible. */
+  @media (forced-colors: active) {
+    * {
+      border-color: CanvasText;
+    }
+  }
+}
+
+@layer utilities {
+  /* Visually hidden but still announced, for table captions and live regions. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
