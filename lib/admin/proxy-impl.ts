@@ -1,8 +1,26 @@
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/auth";
+import { authConfig } from "@/auth.config";
 import { canVisit, groupForPath } from "@/lib/admin/rbac";
 import { contentSecurityPolicy } from "@/lib/admin/security/csp";
+
+/**
+ * The session reader for the proxy.
+ *
+ * Built from `authConfig`, NOT from `@/auth`. That is the canonical Auth.js v5
+ * edge split and here it is load-bearing rather than stylistic: `@/auth`
+ * registers the Keycloak provider and a `jwt` callback that performs a
+ * token-refresh `fetch` against the identity provider. Importing it into the
+ * proxy pulls all of that into the runtime that executes on EVERY request for
+ * every page, including ones that need no session at all.
+ *
+ * `authConfig` carries the cookie name, the JWT settings and the `session`
+ * callback -- everything needed to READ a session and nothing needed to mint
+ * one. Signing in stays in the route handler, where the Node runtime is
+ * declared and the provider belongs.
+ */
+const { auth } = NextAuth(authConfig);
 
 /**
  * Runs before any page is rendered.

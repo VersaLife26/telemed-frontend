@@ -64,6 +64,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   callbacks: {
+    // The `session` callback comes from authConfig, which the admin proxy
+    // also builds an instance from. Spread rather than redeclared so the two
+    // cannot drift: the proxy's authorization decision reads session.roles,
+    // and a copy here that fell behind would let it read stale ones.
+    ...authConfig.callbacks,
+
     async signIn({ account }) {
       if (!account?.access_token) return false;
 
@@ -107,13 +113,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return refreshAccessToken(token);
     },
 
-    async session({ session, token }) {
-      session.roles = token.roles ?? [];
-      session.expiresAt = Date.parse(session.expires);
-      if (token.error) session.error = token.error;
-      if (token.subject) session.user.id = token.subject;
-      return session;
-    },
+    // NOTE: the `session` callback lives in auth.config.ts, not here. The
+    // admin proxy builds a lightweight instance from that config and depends
+    // on it; duplicating it here would let the two drift.
   },
 
   events: {

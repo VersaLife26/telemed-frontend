@@ -10,7 +10,13 @@ const nextConfig: NextConfig = {
   // The admin bundle must not leak build metadata that helps someone
   // fingerprint the exact Next.js patch level.
   poweredByHeader: false,
-  output: "standalone",
+
+  // NO `output: "standalone"`.
+  //
+  // Standalone produces .next/standalone/server.js -- a Node HTTP server --
+  // which is exactly what a Worker is not. @opennextjs/cloudflare builds its
+  // own bundle from the normal .next output, and standalone would either be
+  // ignored or actively conflict with it.
 
   // Doctor credential scans come from MinIO presigned URLs. Routing them
   // through next/image would copy a NIC scan into the optimiser's on-disk

@@ -1,0 +1,65 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ONE CONFIG, THREE WORKERS.
+  //
+  // The surface is baked in at BUILD time, not chosen at request time, and
+  // that is not an accident: scripts/select-surface.mjs writes app/globals.css
+  // from one of two Tailwind v4 theme files, and both declare
+  // `@theme { --color-primary }` with different values. CSS cannot branch at
+  // runtime, so one build serves exactly one surface.
+  //
+  // Deploy each with its own environment, which overrides `name` and the
+  // build-time TELEMED_SURFACE:
+  //
+  //   npm run deploy:patient
+  //   npm run deploy:doctor
+  //   npm run deploy:admin
+  //
+  // The admin bundle staying physically separate is a feature: the route
+  // allowlist in lib/surface-routes.ts is a real boundary rather than a
+  // conditional in shared JavaScript.
+  "name": "telemed-patient",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+
+  // nodejs_compat is required by the adapter. The app itself uses no Node
+  // API in shipped code -- no node:crypto, no Buffer, no fs -- but Next's own
+  // server runtime does.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // No KV or R2 bindings, deliberately. There is no incremental cache to back:
+  // the app has no ISR, no `revalidate` and no `generateStaticParams`, and
+  // every authenticated page is force-dynamic. Adding a cache binding would
+  // configure something nothing writes to.
+
+  "env": {
+    "patient": {
+      "name": "telemed-patient",
+      "vars": {
+        "NEXT_PUBLIC_TELEMED_SURFACE": "patient"
+      }
+    },
+    "doctor": {
+      "name": "telemed-doctor",
+      "vars": {
+        "NEXT_PUBLIC_TELEMED_SURFACE": "doctor"
+      }
+    },
+    "admin": {
+      "name": "telemed-admin",
+      "vars": {
+        "NEXT_PUBLIC_TELEMED_SURFACE": "admin"
+      }
+    }
+  }
+}

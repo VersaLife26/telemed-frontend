@@ -40,3 +40,7 @@ yarn-error.log*
 app/globals.css
 node_modules
 .next/
+
+# Cloudflare Workers build output and local state.
+.open-next/
+.wrangler/

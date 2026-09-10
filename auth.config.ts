@@ -66,6 +66,32 @@ export function sessionCookieOptions(isProduction: boolean) {
 export const authConfig = {
   providers: [],
 
+  callbacks: {
+    /**
+     * Copies the decoded token onto the session.
+     *
+     * Lives HERE and not in auth.ts because the admin proxy needs it. The
+     * proxy runs on the edge runtime and must not pull in the full Auth.js
+     * instance -- that drags the Keycloak provider and the token-refresh
+     * fetch into every request that renders a page. The canonical Auth.js v5
+     * split is exactly this: a lightweight config the middleware can build an
+     * instance from, and a full one for the route handler.
+     *
+     * It is pure. It reads the already-decoded JWT and writes to the session,
+     * touching no network and no Node API. The `jwt` callback that PUTS roles
+     * on the token stays in auth.ts, because it only runs at sign-in and
+     * refresh -- by the time the proxy reads a session, the roles are already
+     * in the cookie.
+     */
+    async session({ session, token }) {
+      session.roles = token.roles ?? [];
+      session.expiresAt = Date.parse(session.expires);
+      if (token.error) session.error = token.error;
+      if (token.subject) session.user.id = token.subject;
+      return session;
+    },
+  },
+
   session: {
     strategy: "jwt",
     maxAge: sessionMaxAge,

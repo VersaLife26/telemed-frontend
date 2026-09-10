@@ -102,6 +102,12 @@ export type PaymentIntentView = {
   order?: OrderSummary;
 };
 
+export type ICEServer = {
+  urls: string[];
+  username?: string;
+  credential?: string;
+};
+
 export type JoinResult = {
   consultation_id: string;
   appointment_id: string;
@@ -110,7 +116,38 @@ export type JoinResult = {
   token: string;
   token_expires_at?: string;
   room_name: string;
-  livekit_url: string;
+
+  /**
+   * Which video stack this deployment runs. The client branches on THIS, not
+   * on which URL happens to be non-empty -- reading a stale `livekit_url` and
+   * handing it to a LiveKit SDK opens a socket speaking a different protocol
+   * and hangs rather than failing.
+   */
+  provider?: "inhouse" | "livekit" | "mock" | string;
+
+  /** Empty for every non-LiveKit provider. */
+  livekit_url?: string;
+
+  /** The platform's own signalling socket, absolute. Append ?token=. */
+  signal_url?: string;
+
+  /**
+   * Where a recording would actually live: "server" (an SFU writes to object
+   * storage), "client" (the doctor's browser records and it dies with the
+   * tab), or "none". The consent copy depends on it -- a patient agreeing to
+   * be recorded is entitled to know who keeps it.
+   */
+  recording_mode?: "server" | "client" | "none";
+
+  /**
+   * STUN/TURN servers, minted per join.
+   *
+   * Belt-and-braces: PeerCall takes its ICE config from the `welcome` frame
+   * instead, which is the better source because it is refreshed on every
+   * signalling reconnect. This copy is for pre-flight checks -- warning a user
+   * before the camera comes on that no relay is configured.
+   */
+  ice_servers?: ICEServer[];
 };
 
 export type WaitingRoomStatus = {

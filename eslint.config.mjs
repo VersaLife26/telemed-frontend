@@ -42,7 +42,17 @@ const tsFiles = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"];
 
 export default [
   {
-    ignores: [".next/**", "node_modules/**", "out/**", "next-env.d.ts", "coverage/**"],
+    // .open-next and .wrangler are Cloudflare build output: a bundled Next
+    // server and a workerd cache, neither of which is source.
+    ignores: [
+      ".next/**",
+      ".open-next/**",
+      ".wrangler/**",
+      "node_modules/**",
+      "out/**",
+      "next-env.d.ts",
+      "coverage/**",
+    ],
   },
 
   js.configs.recommended,
