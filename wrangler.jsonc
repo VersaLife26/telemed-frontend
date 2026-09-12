@@ -42,21 +42,40 @@
   // every authenticated page is force-dynamic. Adding a cache binding would
   // configure something nothing writes to.
 
+  // Each surface answers on its own hostname.
+  //
+  // `custom_domain: true` rather than a route pattern: it makes Cloudflare
+  // create and own the DNS record, so the hostname cannot end up pointing at
+  // the tunnel and the Worker at once. api. and rtc. belong to the tunnel and
+  // must never appear here.
+  //
+  // The cookie names in lib/consumer/env.ts are per surface
+  // (telemed_<surface>_access) precisely because these are sibling subdomains:
+  // a shared name would let a doctor session be presented to the patient app.
   "env": {
     "patient": {
       "name": "telemed-patient",
+      "routes": [
+        { "pattern": "patient.versalifehealth.com", "custom_domain": true }
+      ],
       "vars": {
         "NEXT_PUBLIC_TELEMED_SURFACE": "patient"
       }
     },
     "doctor": {
       "name": "telemed-doctor",
+      "routes": [
+        { "pattern": "doctor.versalifehealth.com", "custom_domain": true }
+      ],
       "vars": {
         "NEXT_PUBLIC_TELEMED_SURFACE": "doctor"
       }
     },
     "admin": {
       "name": "telemed-admin",
+      "routes": [
+        { "pattern": "admin.versalifehealth.com", "custom_domain": true }
+      ],
       "vars": {
         "NEXT_PUBLIC_TELEMED_SURFACE": "admin"
       }
