@@ -9,6 +9,7 @@ import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
 import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
 import type { ClinicalNote, ClinicalNoteDiagnosis, Icd10Code } from "@/lib/consumer/api/types";
+import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import {
   SOAP_SECTIONS,
   addDiagnosis as appendDiagnosis,
@@ -230,6 +231,8 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
           Write prescription →
         </Link>
       </div>
+
+      <ReadyForNextButton appointmentId={appointmentId} />
 
       {error ? <p className="text-body-sm text-danger">{error}</p> : null}
 

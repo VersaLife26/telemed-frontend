@@ -188,6 +188,24 @@ export interface ResolveDoubleBookingRequest {
   reason: string;
 }
 
+export type RescheduleRequestStatus = "pending" | "accepted" | "declined" | "expired";
+
+export interface AdminRescheduleRequest {
+  id: Uuid;
+  appointment_id: Uuid;
+  patient_id: Uuid;
+  doctor_id: Uuid;
+  original_start_at: Timestamp;
+  original_end_at: Timestamp;
+  original_start_at_local?: string;
+  proposed_start_at: Timestamp;
+  proposed_end_at: Timestamp;
+  proposed_start_at_local?: string;
+  reason?: string;
+  status: RescheduleRequestStatus | string;
+  created_at: Timestamp;
+}
+
 // ---------------------------------------------------------------------------
 // Finance — payments_projection, refunds, payouts, commission rules
 // ---------------------------------------------------------------------------
@@ -620,7 +638,7 @@ export interface SetAvailabilityRequest {
 // ---------------------------------------------------------------------------
 
 /** Projected kinds written by admin-service's notifications projector. */
-export type AdminNotificationKind = "doctor_application";
+export type AdminNotificationKind = "doctor_application" | "reschedule_request";
 
 export interface AdminNotification {
   id: Uuid;

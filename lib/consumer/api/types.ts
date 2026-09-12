@@ -50,6 +50,35 @@ export type Appointment = {
   specialty?: string;
 };
 
+export type RescheduleRequest = {
+  id: string;
+  appointment_id: string;
+  patient_id?: string;
+  doctor_id?: string;
+  original_start_at?: string;
+  original_end_at?: string;
+  original_start_at_local?: string;
+  original_end_at_local?: string;
+  proposed_start_at?: string;
+  proposed_end_at?: string;
+  proposed_start_at_local?: string;
+  proposed_end_at_local?: string;
+  reason?: string;
+  status?: "pending" | "accepted" | "declined" | "expired" | string;
+  decided_by_role?: string;
+  created_at?: string;
+};
+
+export type EarlyJoinOffer = {
+  appointment_id: string;
+  consultation_id: string;
+  scheduled_at?: string;
+  offered_at?: string;
+  response?: "accepted" | "declined" | string | null;
+  responded_at?: string;
+  status?: "offered" | "already_offered" | "already_waiting" | "declined" | string;
+};
+
 export type Slot = {
   id: string;
   doctor_id: string;

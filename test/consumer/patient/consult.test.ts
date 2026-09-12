@@ -7,18 +7,27 @@ import {
   afterEndPath,
   callPath,
   canAdmit,
+  earlyJoinPath,
+  earlyJoinRespondPath,
   endConsultBody,
   endPath,
   isWaiting,
   joinPath,
+  readyForNextPath,
   shouldConnectMedia,
   shouldEnterCall,
+  waitingRoomPath,
   waitingRoomPollPath,
 } from "@/lib/consumer/features/consult";
 
-test("join and call paths are keyed by appointment id", () => {
+test("join, ready-for-next, and early-join are keyed by appointment id", () => {
   assert.equal(joinPath("appt-1"), "/consultations/appt-1/join");
   assert.equal(callPath("appt-1"), "/appointments/appt-1/call");
+  assert.equal(readyForNextPath("appt-1"), "/consultations/appt-1/ready-for-next");
+  assert.equal(readyForNextPath(), "/consultations/ready-for-next");
+  assert.equal(earlyJoinPath("appt-1"), "/consultations/appt-1/early-join");
+  assert.equal(earlyJoinRespondPath("appt-1", "accept"), "/consultations/appt-1/early-join/accept");
+  assert.equal(waitingRoomPath("appt-1"), "/appointments/appt-1/waiting-room");
 });
 
 test("waiting-room poll, admit, and end are keyed by consultation id", () => {

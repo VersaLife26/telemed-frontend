@@ -30,7 +30,7 @@ export const endpoints = {
 
   /**
    * Admin in-app inbox (admin-service). Mounted under credentialing RBAC —
-   * today the only projected kind is doctor_application.
+   * projected kinds today are doctor_application and reschedule_request.
    */
   notifications: {
     list: () => `${ADMIN}/notifications`,
@@ -68,6 +68,10 @@ export const endpoints = {
     doubleBookings: () => `${ADMIN}/appointments/double-bookings`,
     resolveDoubleBooking: () => `${ADMIN}/appointments/resolve-double-booking`,
     audit: (id: string) => `${ADMIN}/appointments/${id}/audit`,
+    /** Named gateway routes send these to scheduling-service, not admin-service. */
+    rescheduleRequests: (q: URLSearchParams) => `${ADMIN}/reschedule-requests?${q}`,
+    acceptReschedule: (id: string) => `${ADMIN}/reschedule-requests/${id}/accept`,
+    declineReschedule: (id: string) => `${ADMIN}/reschedule-requests/${id}/decline`,
   },
 
   finance: {

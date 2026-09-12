@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import Link from "next/link";
 
 import { AppointmentsTable } from "@/components/admin/appointments/appointments-table";
 import { DoubleBookingPanel } from "@/components/admin/appointments/double-booking-panel";
+import { RescheduleQueue } from "@/components/admin/appointments/reschedule-queue";
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { FilterBar } from "@/components/admin/data-table/filter-bar";
@@ -9,11 +10,10 @@ import { Pagination } from "@/components/admin/data-table/pagination";
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer, tryListServer } from "@/lib/admin/api/server";
-import type { AdminAppointment, DoubleBooking } from "@/lib/admin/api/types";
+import type { AdminAppointment, AdminRescheduleRequest, DoubleBooking } from "@/lib/admin/api/types";
 import { DISTRICTS } from "@/lib/admin/districts";
 import { filterValues, pageQuery } from "@/lib/admin/url-query";
-
-const metadata: Metadata = { title: "Appointments" };
+import { cn } from "@/lib/admin/utils";
 
 const PER_PAGE = 25;
 
@@ -24,6 +24,64 @@ export default async function AppointmentsPage({
 }) {
   const params = await searchParams;
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
+  const tab = params.tab === "reschedule" ? "reschedule" : "all";
+
+  const header = (
+    <PageHeader
+      title="Appointments"
+      description="Every booking, with force-cancel, double-booking resolution, and doctor-requested reschedules. Intake forms, symptoms and consultation notes are not readable from this console."
+    />
+  );
+
+  const tabs = (
+    <nav className="mb-6 flex gap-1 rounded-lg bg-muted p-1 text-muted-foreground" aria-label="Appointment views">
+      <Link
+        href="/appointments"
+        className={cn(
+          "inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium",
+          tab === "all" && "bg-background text-foreground shadow-sm",
+        )}
+      >
+        All bookings
+      </Link>
+      <Link
+        href="/appointments?tab=reschedule"
+        className={cn(
+          "inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium",
+          tab === "reschedule" && "bg-background text-foreground shadow-sm",
+        )}
+      >
+        Reschedule requests
+      </Link>
+    </nav>
+  );
+
+  if (tab === "reschedule") {
+    const listResult = await tryListServer<AdminRescheduleRequest>(
+      endpoints.appointments.rescheduleRequests(
+        query({ page, per_page: PER_PAGE }),
+      ),
+    );
+
+    return (
+      <>
+        {header}
+        {tabs}
+        {listResult.ok ? (
+          <>
+            <RescheduleQueue requests={listResult.page.data} />
+            <Pagination
+              meta={listResult.page.meta}
+              label="Reschedule requests"
+              query="tab=reschedule"
+            />
+          </>
+        ) : (
+          <ErrorState error={routeFatal(listResult.error)} what="pending reschedule requests" />
+        )}
+      </>
+    );
+  }
 
   const [listResult, conflictsResult] = await Promise.all([
     tryListServer<AdminAppointment>(
@@ -71,13 +129,6 @@ export default async function AppointmentsPage({
     { name: "to", label: "To", kind: "date" as const },
   ];
 
-  const header = (
-    <PageHeader
-      title="Appointments"
-      description="Every booking, with force-cancel and double-booking resolution. Intake forms, symptoms and consultation notes are not readable from this console."
-    />
-  );
-
   const filtered = Boolean(
     params.q || params.status || params.district || params.from || params.to,
   );
@@ -85,6 +136,7 @@ export default async function AppointmentsPage({
   return (
     <>
       {header}
+      {tabs}
 
       <section className="mb-6">
         {conflictsResult.ok || conflictsResult.error.code === "NOT_FOUND" ? (

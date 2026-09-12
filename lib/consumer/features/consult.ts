@@ -10,6 +10,24 @@ export function joinPath(appointmentId: string): string {
   return `/consultations/${appointmentId}/join`;
 }
 
+export function readyForNextPath(appointmentId?: string): string {
+  return appointmentId
+    ? `/consultations/${appointmentId}/ready-for-next`
+    : `/consultations/ready-for-next`;
+}
+
+export function earlyJoinPath(appointmentId: string): string {
+  return `/consultations/${appointmentId}/early-join`;
+}
+
+export function earlyJoinRespondPath(appointmentId: string, kind: "accept" | "decline"): string {
+  return `/consultations/${appointmentId}/early-join/${kind}`;
+}
+
+export function waitingRoomPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/waiting-room`;
+}
+
 export function waitingRoomPollPath(consultationId: string): string {
   return `/consultations/${consultationId}/waiting-room`;
 }
