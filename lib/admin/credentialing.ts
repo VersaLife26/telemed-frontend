@@ -168,5 +168,9 @@ export function documentLabel(kind: PendingDoctor["documents"][number]["kind"]):
       return "Degree certificate";
     case "photo":
       return "Profile photograph";
+    case "signature":
+      return "Signature";
+    case "seal":
+      return "Seal";
   }
 }

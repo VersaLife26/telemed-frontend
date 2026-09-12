@@ -57,7 +57,9 @@ export type CredentialDocumentKind =
   | "slmc_certificate"
   | "nic_document"
   | "degree_certificate"
-  | "photo";
+  | "photo"
+  | "signature"
+  | "seal";
 
 export interface CredentialDocument {
   kind: CredentialDocumentKind;

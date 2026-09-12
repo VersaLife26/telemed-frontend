@@ -15,6 +15,11 @@ import {
   type DoctorDetailResponse,
   mapDoctorDetail,
 } from "@/lib/admin/api/adapters/credentialing";
+import {
+  type DoctorApplicationResponse,
+  mapApplicationDocuments,
+} from "@/lib/admin/api/adapters/doctor-application";
+import { ApplicationProfile } from "@/components/admin/credentialing/application-profile";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer } from "@/lib/admin/api/server";
@@ -30,10 +35,11 @@ export default async function CredentialReviewPage({
 }) {
   const { id } = await params;
 
-  const [detailResult, hoursResult, settingsResult] = await Promise.all([
+  const [detailResult, hoursResult, settingsResult, applicationResult] = await Promise.all([
     tryGetServer<DoctorDetailResponse>(endpoints.credentialing.detail(id)),
     tryGetServer<WorkingHour[]>(endpoints.doctorSchedule.availability(id)),
     tryGetServer<ScheduleSettings>(endpoints.doctorSchedule.settings(id)),
+    tryGetServer<DoctorApplicationResponse>(endpoints.doctorSchedule.application(id)),
   ]);
 
   const back = (
@@ -57,6 +63,8 @@ export default async function CredentialReviewPage({
   }
 
   const { doctor, checklist } = mapDoctorDetail(detailResult.data);
+  const application = applicationResult.ok ? applicationResult.data : null;
+  const applyDocuments = mapApplicationDocuments(application?.documents);
 
   return (
     <>
@@ -77,11 +85,23 @@ export default async function CredentialReviewPage({
       />
 
       <div className="grid min-h-0 gap-6 xl:grid-cols-2">
-        <section aria-label="Submitted documents" className="min-w-0">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Submitted documents
-          </h2>
-          <DocumentViewer documents={doctor.documents} />
+        <section aria-label="Submitted documents" className="min-w-0 space-y-6">
+          <div>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Submitted documents
+            </h2>
+            <DocumentViewer
+              documents={
+                applyDocuments.length > 0
+                  ? [
+                      ...applyDocuments,
+                      ...doctor.documents.filter((d) => d.kind !== "slmc_certificate"),
+                    ]
+                  : doctor.documents
+              }
+            />
+          </div>
+          {application ? <ApplicationProfile app={application} /> : null}
         </section>
 
         <section aria-label="Credential checks" className="min-w-0 space-y-6">

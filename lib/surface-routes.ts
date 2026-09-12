@@ -70,6 +70,7 @@ const ROUTES: Record<Surface, readonly string[]> = {
     "/login",
     "/login/otp",
     "/register",
+    "/legal/*",
     "/api/auth/email/login",
     "/api/auth/google",
     "/api/auth/google/config",

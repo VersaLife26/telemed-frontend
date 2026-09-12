@@ -125,6 +125,7 @@ export const endpoints = {
   doctorSchedule: {
     availability: (id: string) => `${ADMIN}/doctors/${id}/availability`,
     settings: (id: string) => `${ADMIN}/doctors/${id}/schedule-settings`,
+    application: (id: string) => `${ADMIN}/doctors/${id}/application?include=bytes`,
   },
 
   adminUsers: {

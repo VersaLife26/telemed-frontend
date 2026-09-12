@@ -1,112 +1,205 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { parseEnvelope } from "@/lib/consumer/api/envelope";
-
-const SPECIALTIES = [
-  { code: "general_practice", label: "General Practitioner" },
-  { code: "pediatrics", label: "Pediatrics" },
-  { code: "obstetrics_gynae", label: "Obstetrics & Gynaecology" },
-  { code: "cardiology", label: "Cardiology" },
-  { code: "dermatology", label: "Dermatology" },
-  { code: "endocrinology", label: "Endocrinology & Diabetes" },
-  { code: "ent", label: "ENT (Ear, Nose & Throat)" },
-  { code: "psychiatry", label: "Psychiatry" },
-  { code: "psychology", label: "Psychology & Counselling" },
-  { code: "orthopedics", label: "Orthopedics" },
-  { code: "ophthalmology", label: "Ophthalmology (Eye Care)" },
-  { code: "neurology", label: "Neurology" },
-  { code: "gastroenterology", label: "Gastroenterology" },
-  { code: "nephrology", label: "Nephrology" },
-  { code: "urology", label: "Urology" },
-  { code: "pulmonology", label: "Pulmonology (Chest/Lung)" },
-  { code: "general_surgery", label: "General Surgery" },
-  { code: "dental", label: "Dental" },
-  { code: "nutrition", label: "Nutrition & Dietetics" },
-] as const;
-
-const LANGUAGE_OPTIONS = [
-  { code: "en", label: "English" },
-  { code: "si", label: "Sinhala" },
-  { code: "ta", label: "Tamil" },
-] as const;
+import {
+  APPLY_DOCUMENT_TYPES,
+  LANGUAGE_OPTIONS,
+  SPECIALTIES,
+  TERMS_HREF,
+  WEEKDAYS,
+  applyDocumentPath,
+  applyDocuments,
+  doctorApplyError,
+  doctorApplyPayload,
+  readApplyError,
+  type ApplyDocumentType,
+  type DoctorApplyForm,
+} from "@/lib/consumer/features/doctor-apply";
 
 const selectClass =
   "w-full rounded-[32px] bg-white px-6 py-3 text-[16px] font-light leading-[1.4] text-black shadow-[var(--shadow-soft)] outline-none border border-transparent focus:border-primary-light appearance-none";
 
-function readError(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const message = (json as { message?: string }).message;
-    if (message) return message;
-  }
-  return fallback;
+const fileClass =
+  "w-full rounded-[16px] bg-white px-4 py-3 text-[14px] font-light text-black shadow-[var(--shadow-soft)] file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-1.5 file:text-[13px] file:font-medium file:text-white";
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="flex w-full flex-col gap-3">
+      <legend className="text-[15px] font-medium text-black">{title}</legend>
+      {children}
+    </fieldset>
+  );
 }
 
+function YesNo({
+  name,
+  value,
+  onChange,
+  yesLabel = "Yes",
+  noLabel = "No",
+}: {
+  name: string;
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+  yesLabel?: string;
+  noLabel?: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-4 px-1">
+      <label className="inline-flex cursor-pointer items-center gap-2 text-body text-black">
+        <input
+          type="radio"
+          name={name}
+          checked={value === true}
+          onChange={() => onChange(true)}
+          className="size-4 accent-[var(--color-primary)]"
+        />
+        {yesLabel}
+      </label>
+      <label className="inline-flex cursor-pointer items-center gap-2 text-body text-black">
+        <input
+          type="radio"
+          name={name}
+          checked={value === false}
+          onChange={() => onChange(false)}
+          className="size-4 accent-[var(--color-primary)]"
+        />
+        {noLabel}
+      </label>
+    </div>
+  );
+}
+
+const emptyForm: DoctorApplyForm = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  slmcNumber: "",
+  languages: ["en"],
+  languageOther: "",
+  pgimBoardCertified: null,
+  medicalSchool: "",
+  qualifications: "",
+  requiredFeeLkr: "",
+  feeLkr: "",
+  availableDays: [1, 2, 3, 4, 5],
+  availableStart: "09:00",
+  availableEnd: "17:00",
+  availabilityExtra: "",
+  isGeneralPractitioner: null,
+  specialty: "general_practice",
+  experienceYears: "",
+  practicingLocations: "",
+  bankName: "",
+  bankBranch: "",
+  accountNumber: "",
+  accountName: "",
+  termsAccepted: null,
+  signature: null,
+  seal: null,
+  slmcCertificate: null,
+};
+
 export default function RegisterPage() {
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [slmcNumber, setSlmcNumber] = useState("");
-  const [specialty, setSpecialty] = useState("general_practice");
-  const [languages, setLanguages] = useState<string[]>(["en"]);
-  const [experienceYears, setExperienceYears] = useState("");
-  const [feeLkr, setFeeLkr] = useState("");
-  const [bio, setBio] = useState("");
+  const [form, setForm] = useState<DoctorApplyForm>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [pendingDocs, setPendingDocs] = useState<{
+    applicationId: string;
+    remaining: ApplyDocumentType[];
+  } | null>(null);
+
+  function patch(partial: Partial<DoctorApplyForm>) {
+    setForm((prev) => ({ ...prev, ...partial }));
+  }
 
   function toggleLanguage(code: string) {
-    setLanguages((prev) =>
-      prev.includes(code) ? prev.filter((l) => l !== code) : [...prev, code],
-    );
+    setForm((prev) => ({
+      ...prev,
+      languages: prev.languages.includes(code)
+        ? prev.languages.filter((l) => l !== code)
+        : [...prev.languages, code],
+    }));
+  }
+
+  function toggleDay(day: number) {
+    setForm((prev) => ({
+      ...prev,
+      availableDays: prev.availableDays.includes(day)
+        ? prev.availableDays.filter((d) => d !== day)
+        : [...prev.availableDays, day].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b)),
+    }));
+  }
+
+  function setFile(type: ApplyDocumentType, file: File | null) {
+    if (type === "signature") patch({ signature: file });
+    else if (type === "seal") patch({ seal: file });
+    else patch({ slmcCertificate: file });
+  }
+
+  async function uploadDocuments(applicationId: string, docs: { type: ApplyDocumentType; file: File }[]) {
+    const failed: ApplyDocumentType[] = [];
+    for (const doc of docs) {
+      const body = new FormData();
+      body.append("file", doc.file);
+      body.append("document_type", doc.type);
+      const res = await fetch(`/api/proxy${applyDocumentPath(applicationId)}`, {
+        method: "POST",
+        body,
+      });
+      if (!res.ok) {
+        failed.push(doc.type);
+      }
+    }
+    return failed;
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (languages.length === 0) {
-      setError("Select at least one language.");
-      return;
-    }
-
-    const years = Number(experienceYears);
-    const feeRupees = Number(feeLkr);
-    if (!Number.isFinite(years) || years < 0 || years > 70) {
-      setError("Experience years must be between 0 and 70.");
-      return;
-    }
-    if (!Number.isFinite(feeRupees) || feeRupees < 0) {
-      setError("Consultation fee must be a valid amount in LKR.");
+    const problem = doctorApplyError(form);
+    if (problem) {
+      setError(problem);
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch("/api/proxy/doctors/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          display_name: displayName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          slmc_number: slmcNumber.trim(),
-          specialty,
-          languages,
-          experience_years: Math.floor(years),
-          // Wire field is fee_lkr but the value is cents.
-          fee_lkr: Math.round(feeRupees * 100),
-          bio: bio.trim(),
-        }),
-      });
-      const json: unknown = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(readError(json, "Could not submit application"));
-      parseEnvelope(json);
+      let applicationId = pendingDocs?.applicationId;
+      if (!applicationId) {
+        const res = await fetch("/api/proxy/doctors/apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(doctorApplyPayload(form)),
+        });
+        const json: unknown = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(readApplyError(json, "Could not submit application"));
+        const data = parseEnvelope<{ application_id?: string }>(json);
+        applicationId = data.application_id;
+        if (!applicationId) throw new Error("Application was accepted without an id.");
+      }
+
+      const docs = applyDocuments(form);
+      const remainingTypes = pendingDocs?.remaining;
+      const toUpload = remainingTypes
+        ? docs.filter((d) => remainingTypes.includes(d.type))
+        : docs;
+      const failed = await uploadDocuments(applicationId, toUpload);
+      if (failed.length > 0) {
+        setPendingDocs({ applicationId, remaining: failed });
+        throw new Error(
+          `Application saved, but these documents failed to upload: ${failed.join(", ")}. Fix the files and submit again.`,
+        );
+      }
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not submit application");
@@ -116,7 +209,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthLayout blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with OTP.">
+    <AuthLayout
+      scroll
+      blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with OTP."
+    >
       <div className="flex w-full flex-col gap-6">
         <AuthHeading
           title={
@@ -142,104 +238,301 @@ export default function RegisterPage() {
           </div>
         ) : (
           <>
-            <form onSubmit={onSubmit} className="flex w-full flex-col gap-4">
-              <Input
-                type="text"
-                required
-                minLength={2}
-                maxLength={200}
-                focused
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Display name"
-                autoComplete="name"
-              />
-              <Input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                autoComplete="email"
-              />
-              <Input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+9477XXXXXXX"
-                autoComplete="tel"
-              />
-              <Input
-                type="text"
-                required
-                value={slmcNumber}
-                onChange={(e) => setSlmcNumber(e.target.value)}
-                placeholder="SLMC number"
-              />
-              <label className="flex w-full flex-col gap-2">
-                <span className="text-body-sm text-text-label">Specialty</span>
-                <select
-                  className={selectClass}
+            <form onSubmit={onSubmit} className="flex w-full flex-col gap-8">
+              <Section title="Personal details">
+                <Input
+                  type="text"
                   required
-                  value={specialty}
-                  onChange={(e) => setSpecialty(e.target.value)}
-                >
-                  {SPECIALTIES.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <fieldset className="flex w-full flex-col gap-2">
-                <legend className="text-body-sm text-text-label">Languages</legend>
-                <div className="flex flex-wrap gap-4 px-1">
-                  {LANGUAGE_OPTIONS.map((lang) => (
-                    <label
-                      key={lang.code}
-                      className="inline-flex cursor-pointer items-center gap-2 text-body text-black"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={languages.includes(lang.code)}
-                        onChange={() => toggleLanguage(lang.code)}
-                        className="size-4 accent-[var(--color-primary)]"
+                  minLength={1}
+                  maxLength={100}
+                  focused
+                  value={form.firstName}
+                  onChange={(e) => patch({ firstName: e.target.value })}
+                  placeholder="First name"
+                  autoComplete="given-name"
+                />
+                <Input
+                  type="text"
+                  required
+                  minLength={1}
+                  maxLength={100}
+                  value={form.lastName}
+                  onChange={(e) => patch({ lastName: e.target.value })}
+                  placeholder="Last name"
+                  autoComplete="family-name"
+                />
+                <Input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => patch({ email: e.target.value })}
+                  placeholder="Email"
+                  autoComplete="email"
+                />
+                <Input
+                  type="tel"
+                  required
+                  value={form.phone}
+                  onChange={(e) => patch({ phone: e.target.value })}
+                  placeholder="+9477XXXXXXX"
+                  autoComplete="tel"
+                />
+                <fieldset className="flex w-full flex-col gap-2">
+                  <legend className="text-body-sm text-text-label">
+                    What languages you consult in
+                  </legend>
+                  <div className="flex flex-wrap gap-4 px-1">
+                    {LANGUAGE_OPTIONS.map((lang) => (
+                      <label
+                        key={lang.code}
+                        className="inline-flex cursor-pointer items-center gap-2 text-body text-black"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.languages.includes(lang.code)}
+                          onChange={() => toggleLanguage(lang.code)}
+                          className="size-4 accent-[var(--color-primary)]"
+                        />
+                        {lang.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {form.languages.includes("other") ? (
+                  <Input
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={form.languageOther}
+                    onChange={(e) => patch({ languageOther: e.target.value })}
+                    placeholder="Other language"
+                  />
+                ) : null}
+                <label className="flex w-full flex-col gap-2">
+                  <span className="text-body-sm text-text-label">
+                    For specializations, are you PGIM board certified?
+                  </span>
+                  <YesNo
+                    name="pgim"
+                    value={form.pgimBoardCertified}
+                    onChange={(v) => patch({ pgimBoardCertified: v })}
+                  />
+                </label>
+                <Input
+                  type="text"
+                  required
+                  maxLength={200}
+                  value={form.medicalSchool}
+                  onChange={(e) => patch({ medicalSchool: e.target.value })}
+                  placeholder="Medical school"
+                />
+                <Textarea
+                  required
+                  maxLength={2000}
+                  rows={3}
+                  value={form.qualifications}
+                  onChange={(e) => patch({ qualifications: e.target.value })}
+                  placeholder="Qualifications"
+                />
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  step={1}
+                  value={form.requiredFeeLkr}
+                  onChange={(e) => patch({ requiredFeeLkr: e.target.value })}
+                  placeholder="How much you require per consultation (LKR)"
+                />
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  step={1}
+                  value={form.feeLkr}
+                  onChange={(e) => patch({ feeLkr: e.target.value })}
+                  placeholder="How much you like to charge per consultation (LKR)"
+                />
+                <fieldset className="flex w-full flex-col gap-2">
+                  <legend className="text-body-sm text-text-label">
+                    Available times for consultation
+                  </legend>
+                  <div className="flex flex-wrap gap-3 px-1">
+                    {WEEKDAYS.map((d) => (
+                      <label
+                        key={d.day}
+                        className="inline-flex cursor-pointer items-center gap-2 text-body-sm text-black"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.availableDays.includes(d.day)}
+                          onChange={() => toggleDay(d.day)}
+                          className="size-4 accent-[var(--color-primary)]"
+                        />
+                        {d.label.slice(0, 3)}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-body-sm text-text-label">From</span>
+                      <Input
+                        type="time"
+                        value={form.availableStart}
+                        onChange={(e) => patch({ availableStart: e.target.value })}
                       />
-                      {lang.label}
                     </label>
-                  ))}
-                </div>
-              </fieldset>
-              <Input
-                type="number"
-                required
-                min={0}
-                max={70}
-                step={1}
-                value={experienceYears}
-                onChange={(e) => setExperienceYears(e.target.value)}
-                placeholder="Years of experience"
-              />
-              <Input
-                type="number"
-                required
-                min={0}
-                step={1}
-                value={feeLkr}
-                onChange={(e) => setFeeLkr(e.target.value)}
-                placeholder="Consultation fee (LKR)"
-              />
-              <Textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Bio (optional)"
-                maxLength={2000}
-                rows={3}
-              />
+                    <label className="flex flex-col gap-1">
+                      <span className="text-body-sm text-text-label">To</span>
+                      <Input
+                        type="time"
+                        value={form.availableEnd}
+                        onChange={(e) => patch({ availableEnd: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <Textarea
+                    rows={2}
+                    maxLength={1000}
+                    value={form.availabilityExtra}
+                    onChange={(e) => patch({ availabilityExtra: e.target.value })}
+                    placeholder="Any extra availability notes (optional)"
+                  />
+                </fieldset>
+                <Input
+                  type="text"
+                  required
+                  value={form.slmcNumber}
+                  onChange={(e) => patch({ slmcNumber: e.target.value })}
+                  placeholder="Board registration number (SLMC)"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  max={70}
+                  step={1}
+                  value={form.experienceYears}
+                  onChange={(e) => patch({ experienceYears: e.target.value })}
+                  placeholder="Years of experience (optional)"
+                />
+              </Section>
+
+              <Section title="Bank account details">
+                <Input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={form.bankName}
+                  onChange={(e) => patch({ bankName: e.target.value })}
+                  placeholder="Bank name"
+                  autoComplete="off"
+                />
+                <Input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={form.bankBranch}
+                  onChange={(e) => patch({ bankBranch: e.target.value })}
+                  placeholder="Bank branch"
+                  autoComplete="off"
+                />
+                <Input
+                  type="text"
+                  required
+                  maxLength={34}
+                  value={form.accountNumber}
+                  onChange={(e) => patch({ accountNumber: e.target.value })}
+                  placeholder="Account number"
+                  autoComplete="off"
+                />
+                <Input
+                  type="text"
+                  required
+                  maxLength={200}
+                  value={form.accountName}
+                  onChange={(e) => patch({ accountName: e.target.value })}
+                  placeholder="Account name"
+                  autoComplete="off"
+                />
+              </Section>
+
+              <Section title="Documents">
+                {APPLY_DOCUMENT_TYPES.map((doc) => (
+                  <label key={doc.type} className="flex w-full flex-col gap-2">
+                    <span className="text-body-sm text-text-label">{doc.label}</span>
+                    <input
+                      className={fileClass}
+                      type="file"
+                      required={!pendingDocs}
+                      accept={
+                        doc.type === "slmc_certificate"
+                          ? "image/*,application/pdf"
+                          : "image/*"
+                      }
+                      onChange={(e) => setFile(doc.type, e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                ))}
+              </Section>
+
+              <Section title="Practice">
+                <Textarea
+                  required
+                  rows={3}
+                  maxLength={2000}
+                  value={form.practicingLocations}
+                  onChange={(e) => patch({ practicingLocations: e.target.value })}
+                  placeholder="Practicing locations / hospitals (one per line)"
+                />
+                <label className="flex w-full flex-col gap-2">
+                  <span className="text-body-sm text-text-label">Are you a general practitioner?</span>
+                  <YesNo
+                    name="gp"
+                    value={form.isGeneralPractitioner}
+                    onChange={(v) => patch({ isGeneralPractitioner: v })}
+                  />
+                </label>
+                <label className="flex w-full flex-col gap-2">
+                  <span className="text-body-sm text-text-label">Specialty</span>
+                  <select
+                    className={selectClass}
+                    required
+                    value={form.specialty}
+                    onChange={(e) => patch({ specialty: e.target.value })}
+                  >
+                    {SPECIALTIES.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex w-full flex-col gap-2">
+                  <span className="text-body-sm text-text-label">
+                    Do you agree to the terms and conditions as stated in the VersaLife service
+                    retention agreement?
+                  </span>
+                  <p className="text-body-sm text-text-muted">
+                    <Link href={TERMS_HREF} className="text-primary underline" target="_blank">
+                      Read the VersaLife service retention agreement
+                    </Link>
+                  </p>
+                  <YesNo
+                    name="terms"
+                    value={form.termsAccepted}
+                    onChange={(v) => patch({ termsAccepted: v })}
+                    yesLabel="Accept"
+                    noLabel="Don't accept"
+                  />
+                </label>
+              </Section>
+
               {error ? <p className="text-body-sm text-danger">{error}</p> : null}
               <Button type="submit" disabled={loading}>
-                {loading ? "Submitting…" : "Submit application"}
+                {loading
+                  ? "Submitting…"
+                  : pendingDocs
+                    ? "Retry document upload"
+                    : "Submit application"}
               </Button>
             </form>
             <AuthFooterLink text="Already approved?" linkText="Sign in" href="/login" />
