@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ConsoleShell } from "@/components/admin/layout/console-shell";
+import { ConsoleUnavailable } from "@/components/admin/layout/console-unavailable";
 import { adminIdentity } from "@/lib/admin/auth/current";
 import { canVisit, groupForPath } from "@/lib/admin/rbac";
 
@@ -27,15 +28,11 @@ export default async function AdminConsoleLayout({
   const [result, requestHeaders] = await Promise.all([adminIdentity(), headers()]);
 
   if (!result.ok) {
-    // There is no /login to send anyone to: Cloudflare Access challenges at
-    // the edge. A missing token means the request did not come through Access
-    // at all, and an unreachable backend means we cannot say what this person
-    // may do -- neither is fixed by re-rendering the console.
-    throw new Error(
-      result.reason === "unreachable"
-        ? "Could not reach the platform to confirm your admin role."
-        : "This console is reached through Cloudflare Access.",
-    );
+    // Rendered, not thrown. There is no /login to redirect to -- Access
+    // challenges at the edge -- and throwing here produced Next.js's generic
+    // "A server error occurred" page with nothing but a digest, which tells
+    // an operator neither what failed nor whether it is their fault.
+    return <ConsoleUnavailable reason={result.reason} />;
   }
 
   const { identity } = result;

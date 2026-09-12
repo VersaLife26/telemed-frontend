@@ -129,7 +129,13 @@ async function fetchMe(token: string, source: HeaderSource): Promise<MeResponse 
     if (response.status === 401 || response.status === 403 || response.status === 404) {
       return null;
     }
-    if (!response.ok) return "unreachable";
+    if (!response.ok) {
+      console.error(
+        `adminIdentity: ${base}/${ADMIN_PATH_PREFIX}/me answered ${response.status}; ` +
+          "cannot determine the caller's admin role",
+      );
+      return "unreachable";
+    }
 
     const body = (await response.json()) as { data?: MeResponse } | MeResponse;
     const data = "data" in body && body.data ? body.data : (body as MeResponse);
@@ -138,7 +144,14 @@ async function fetchMe(token: string, source: HeaderSource): Promise<MeResponse 
     // Directory, which refuses an inactive admin rather than erroring.
     if (data.active === false) return null;
     return data;
-  } catch {
+  } catch (error) {
+    // Logged, not swallowed. This is the one call standing between a valid
+    // Access session and a usable console, and without the reason an operator
+    // gets a generic error page and a digest to guess from.
+    console.error(
+      `adminIdentity: could not reach ${base}/${ADMIN_PATH_PREFIX}/me: ` +
+        (error instanceof Error ? `${error.name}: ${error.message}` : String(error)),
+    );
     return "unreachable";
   }
 }
