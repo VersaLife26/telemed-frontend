@@ -57,9 +57,9 @@ export async function serverFetch(
       code: "UNAUTHORIZED",
       status: 401,
       serverMessage:
-        auth.reason === "refresh-failed"
-          ? "session could not be refreshed"
-          : "no admin session",
+        auth.reason === "unreachable"
+          ? "could not verify the caller's admin role"
+          : "no cloudflare access session",
     });
   }
 

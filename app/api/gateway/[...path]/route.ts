@@ -9,12 +9,15 @@ import { canCallApi } from "@/lib/admin/rbac";
  * Backend-for-frontend proxy.
  *
  * Every call the browser makes to the platform goes through here. The reason
- * is one line long: the Keycloak access token never enters the browser. It
- * stays in the encrypted Auth.js cookie, is read server-side, and is attached
- * to the upstream request here. An XSS on the admin console therefore cannot
- * exfiltrate a token that can be replayed against the API gateway from
- * anywhere else — and with `connect-src 'self'` in the CSP, injected script
- * cannot reach the gateway directly either.
+ * is one line long: the browser never holds a token it can replay against the
+ * API gateway. The Cloudflare Access JWT arrives on the request, is read
+ * server-side here, and is attached to the upstream call. With
+ * `connect-src 'self'` in the CSP, injected script cannot reach the gateway
+ * directly either.
+ *
+ * (The Access cookie is necessarily present in the browser, since Access set
+ * it — but it is scoped to this hostname and is the credential Access itself
+ * checks at the edge, not a bearer for the API.)
  *
  * Because this handler holds a `super_admin` bearer token, every check it makes
  * has to hold *here*, in the handler. `proxy.ts` runs first and is useful, but
@@ -71,13 +74,13 @@ async function handler(
 
   const auth = await accessTokenFor(request);
   if (auth.token === null) {
-    return errorResponse(
-      401,
-      "UNAUTHORIZED",
-      auth.reason === "refresh-failed"
-        ? "session could not be refreshed"
-        : "authentication required",
-    );
+    // 503, not 401, when the backend could not be asked who this is: the
+    // caller's Access session is fine and telling them to authenticate again
+    // would send them round a loop that cannot fix anything.
+    if (auth.reason === "unreachable") {
+      return errorResponse(503, "UNAVAILABLE", "could not verify your admin role; try again shortly");
+    }
+    return errorResponse(401, "UNAUTHORIZED", "authentication required");
   }
 
   if (!canCallApi(auth.roles, `/${upstreamPath}`)) {

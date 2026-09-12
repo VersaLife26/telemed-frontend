@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Network not allowlisted" };
  *
  * This is a different failure from "you lack permission", and conflating the
  * two costs real time: an ops engineer whose VPN silently dropped will spend
- * ten minutes checking their Keycloak roles if the console tells them
+ * ten minutes checking their admin role if the console tells them
  * "insufficient permissions".
  *
  * The gateway cannot currently distinguish the two in its response — both

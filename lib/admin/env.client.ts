@@ -14,8 +14,9 @@
  *    AUTH_SECRET:z.string().min(1,"AUTH_SECRET is required"),
  *    AUTH_KEYCLOAK_SECRET:z.string().min(1,"AUTH_KEYCLOAK_SECRET is required"), …}
  *
- * — an inventory of every secret the deployment holds and the internal gateway
- * URL, handed to anyone who opens DevTools on the login page. No secret *value*
+ * — an inventory of every secret the deployment held and the internal gateway
+ * URL, handed to anyone who opened DevTools. (Those particular keys are gone
+ * with NextAuth; the boundary this module draws is not.) No secret *value*
  * leaked, because those are read from `process.env` at runtime and the browser
  * has none; but the module boundary was the only thing standing between that
  * and a future `.default("…")` that does contain one, and there was no module

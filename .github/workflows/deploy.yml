@@ -62,6 +62,10 @@ jobs:
           # and a page that links to endpoints that 404 is worse than no page.
           NEXT_PUBLIC_TELEMED_TEST_MODE: "false"
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          # AUTH_SECRET is gone with NextAuth: Cloudflare Access authenticates
+          # the admin console, so there is no session cookie to sign.
+          # ADMIN_SESSION_MAX_AGE now drives the console's client-side idle
+          # timer only -- the Access application's session duration is the
+          # server-side bound.
           ADMIN_SESSION_MAX_AGE: ${{ vars.ADMIN_SESSION_MAX_AGE }}
         run: npm run deploy:${{ matrix.surface }}

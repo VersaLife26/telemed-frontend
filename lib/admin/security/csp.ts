@@ -32,22 +32,6 @@ function storageOrigins(): string[] {
     .filter(Boolean);
 }
 
-/**
- * Keycloak's public origin. The login form POSTs to this console, then Auth.js
- * 303s the browser to the issuer's authorize URL. CSP `form-action` applies to
- * that redirect target as well as the form's action — `'self'` alone makes the
- * SSO button look dead (POST succeeds, navigation is blocked).
- */
-function keycloakOrigin(): string | undefined {
-  const issuer = process.env.AUTH_KEYCLOAK_ISSUER;
-  if (!issuer) return undefined;
-  try {
-    return new URL(issuer).origin;
-  } catch {
-    return undefined;
-  }
-}
-
 export interface CspOptions {
   /** Nonce to authorise Next.js' own inline bootstrap scripts. */
   nonce?: string;
@@ -61,7 +45,6 @@ export interface CspOptions {
 /** Builds the policy string. */
 export function contentSecurityPolicy({ nonce, dev = false }: CspOptions = {}): string {
   const storage = storageOrigins();
-  const keycloak = keycloakOrigin();
 
   const scriptSrc = nonce
     ? ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'", ...(dev ? ["'unsafe-eval'"] : [])]
@@ -79,17 +62,20 @@ export function contentSecurityPolicy({ nonce, dev = false }: CspOptions = {}): 
     "img-src": ["'self'", "blob:", "data:", ...storage],
     "font-src": ["'self'", "data:"],
     // The browser talks to this origin only. Every backend call is proxied by
-    // the BFF route handler, which is what keeps the Keycloak access token
-    // out of the browser entirely.
+    // the BFF route handler, which is what keeps a replayable bearer token out
+    // of the browser entirely.
     "connect-src": ["'self'", ...(dev ? ["ws:", "wss:"] : [])],
     // PDF credential scans render in a sandboxed <iframe> pointed at a
     // presigned storage URL.
     "frame-src": ["'self'", ...storage],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
-    // See keycloakOrigin(): Auth.js SSO is a same-origin POST that 303s to
-    // the issuer. Without the issuer origin here, Chrome blocks the redirect.
-    "form-action": ["'self'", ...(keycloak ? [keycloak] : [])],
+    // 'self' alone, now that the console has no SSO redirect of its own. The
+    // identity provider's origin used to be listed here because Auth.js 303'd
+    // the browser to Keycloak's authorize URL and form-action applies to the
+    // redirect target. Cloudflare Access challenges before the request ever
+    // reaches this Worker, so no response from here navigates to an IdP.
+    "form-action": ["'self'"],
     "frame-ancestors": ["'none'"],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],

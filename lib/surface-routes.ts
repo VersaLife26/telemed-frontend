@@ -92,10 +92,12 @@ const ROUTES: Record<Surface, readonly string[]> = {
     "/content",
     "/settings",
     "/settings/admins",
-    "/login",
+    // No "/login" and no "/api/auth/*": Cloudflare Access authenticates this
+    // hostname at the edge, so the console has no sign-in of its own and
+    // NextAuth is gone. Both paths 404 here; the patient and doctor surfaces
+    // keep their own /login and their own /api/auth/* handlers.
     "/ip-blocked",
     "/no-access",
-    "/api/auth/*",
     "/api/gateway/*",
     "/api/ip-check",
   ],

@@ -48,12 +48,17 @@ const ROLE_HINTS: Record<AssignableAdminRole, string> = {
 /**
  * Create a colleague's admin account.
  *
- * There is no password field, and that is deliberate rather than unfinished.
- * admin-service hands Keycloak three required actions — set a password,
- * enrol TOTP, verify the email address — which the new admin completes on
- * first sign-in. So this platform never generates, transmits, stores or logs
- * an admin password, and there is no temporary credential sitting in an inbox
- * waiting to be found.
+ * There is no password field, and that is deliberate rather than unfinished:
+ * this platform has no admin passwords at all. Cloudflare Access authenticates
+ * the console, so it never generates, transmits, stores or logs a credential,
+ * and there is no temporary password sitting in an inbox waiting to be found.
+ *
+ * What this creates is the AUTHORISATION half — the admin_users row that says
+ * what the person may do. The AUTHENTICATION half lives in the Access policy
+ * for admin.versalifehealth.com and cannot be set from here, so a new admin
+ * cannot reach the console until their address is added there. The dialog says
+ * so rather than leaving a super_admin to discover it from a colleague who
+ * cannot sign in.
  */
 export function CreateAdminDialog() {
   const [open, setOpen] = useState(false);
@@ -66,7 +71,7 @@ export function CreateAdminDialog() {
     path: () => endpoints.adminUsers.create(),
     body: () => ({ email: email.trim(), display_name: displayName.trim(), role }),
     successMessage: (created) =>
-      `${created.display_name} was created. They set their own password and enrol two-factor on first sign-in.`,
+      `${created.display_name || created.email} can now be given access. Add their email to the Cloudflare Access policy for the admin console — until then they cannot sign in.`,
     invalidate: [["admin-users"]],
   });
 

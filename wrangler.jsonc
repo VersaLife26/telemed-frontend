@@ -77,7 +77,16 @@
         { "pattern": "admin.versalifehealth.com", "custom_domain": true }
       ],
       "vars": {
-        "NEXT_PUBLIC_TELEMED_SURFACE": "admin"
+        "NEXT_PUBLIC_TELEMED_SURFACE": "admin",
+        // Where the BFF route handler forwards to. Not NEXT_PUBLIC_: the
+        // browser never calls the gateway directly, and this is read only on
+        // the server side of the Worker.
+        //
+        // It was unset, which left it on env.ts's "http://localhost:8080"
+        // default -- nothing at all from inside a Worker, so every admin API
+        // call failed. Declared here rather than as a CI variable so the
+        // console cannot be deployed without it again.
+        "TELEMED_API_URL": "https://api.versalifehealth.com"
       }
     }
   }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Lock } from "lucide-react";
 
-import { auth } from "@/auth";
+import { adminRoles } from "@/lib/admin/auth/current";
 import { Button } from "@/components/admin/ui/button";
 import {
   Card,
@@ -42,9 +42,8 @@ export default async function NoAccessPage({
 }: {
   searchParams: Promise<{ area?: string }>;
 }) {
-  const [session, params] = await Promise.all([auth(), searchParams]);
+  const [held, params] = await Promise.all([adminRoles(), searchParams]);
   const area = params.area && isGroup(params.area) ? params.area : null;
-  const held = session?.roles ?? [];
 
   return (
     <Card>
@@ -67,13 +66,15 @@ export default async function NoAccessPage({
           <p className="text-muted-foreground">
             {AREA_NAMES[area].charAt(0).toUpperCase() + AREA_NAMES[area].slice(1)} requires{" "}
             {RBAC_MATRIX[area].map(roleLabel).join(" or ")}. Ask a super admin to
-            assign the role in Keycloak; it takes effect the next time your token
-            refreshes.
+            change your role in Settings &rarr; Admins; it takes effect within
+            seconds, without you signing in again.
           </p>
         ) : (
           <p className="text-muted-foreground">
-            Admin roles are assigned in Keycloak as realm roles. A super admin has to
-            grant one before this console will show you anything.
+            Cloudflare Access has let you in, which means it recognises you --
+            but this platform has no admin role for your account. A super admin
+            has to add you in Settings &rarr; Admins before the console will
+            show you anything.
           </p>
         )}
       </CardContent>

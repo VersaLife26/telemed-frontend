@@ -1,10 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Session } from "next-auth";
 
 import { TooltipProvider } from "@/components/admin/ui/tooltip";
 import { Toaster } from "@/components/admin/ui/toaster";
@@ -20,11 +18,9 @@ import { ApiError } from "@/lib/admin/api/errors";
  */
 export function AppProviders({
   children,
-  session,
   nonce,
 }: {
   children: React.ReactNode;
-  session: Session | null;
   nonce?: string;
 }) {
   const [queryClient] = React.useState(
@@ -58,38 +54,19 @@ export function AppProviders({
   );
 
   return (
-    <SessionProvider
-      session={session}
-      /*
-       * Automatic polling is switched off deliberately.
-       *
-       * Auth.js re-issues the session cookie whenever /api/auth/session is
-       * hit and `updateAge` has elapsed. A background poll therefore keeps
-       * the session alive forever, which turns the 15-minute idle timeout the
-       * V2 docs mandate into no timeout at all — an unattended laptop in an
-       * open-plan office would stay signed in indefinitely.
-       *
-       * `components/session/session-guard.tsx` calls `update()` in response to
-       * real user interaction instead, so the session is extended by an admin
-       * doing work and by nothing else.
-       */
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
-    >
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          nonce={nonce}
-        >
-          <TooltipProvider delayDuration={300}>
-            {children}
-            <Toaster />
-          </TooltipProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </SessionProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+        nonce={nonce}
+      >
+        <TooltipProvider delayDuration={300}>
+          {children}
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

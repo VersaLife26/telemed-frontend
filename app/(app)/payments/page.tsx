@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { auth } from "@/auth";
+import { adminRoles } from "@/lib/admin/auth/current";
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { FilterBar } from "@/components/admin/data-table/filter-bar";
@@ -45,8 +45,7 @@ export default async function PaymentsPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [session, params] = await Promise.all([auth(), searchParams]);
-  const roles = session?.roles ?? [];
+  const [roles, params] = await Promise.all([adminRoles(), searchParams]);
   const readOnly = !can(roles, "finance");
 
   const page = Number.parseInt(params.page ?? "1", 10) || 1;

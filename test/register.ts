@@ -9,9 +9,8 @@
  *   - `server-only` → an empty module (its real entry point throws by design,
  *                     which is the whole point of it in the app and useless in
  *                     a test process);
- *   - `next-auth/jwt` → a stub whose `getToken` returns whatever the test set,
  *                     so a route handler can be driven with a chosen session
- *                     without a Keycloak, a cookie or an AUTH_SECRET.
+ *                     without an identity provider, a cookie or a shared secret.
  *
  * `next/server` resolves fine once the `.js` extension is supplied.
  *
@@ -57,7 +56,6 @@ function resolveRelative(specifier: string, parentURL: string | undefined): stri
 
 const STUBS: Record<string, string> = {
   "server-only": pathToFileURL(path.join(here, "stubs", "server-only.ts")).href,
-  "next-auth/jwt": pathToFileURL(path.join(here, "stubs", "next-auth-jwt.ts")).href,
 };
 
 /** `.ts`/`.tsx` must be announced explicitly, or Node parses them as plain JS. */

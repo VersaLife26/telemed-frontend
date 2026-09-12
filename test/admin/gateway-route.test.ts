@@ -3,13 +3,12 @@ import http from "node:http";
 import test, { after, before } from "node:test";
 import type { AddressInfo } from "node:net";
 
-import { setSessionToken } from "../stubs/next-auth-jwt";
 
 /**
  * The BFF proxy, driven end to end.
  *
- * This is the file that matters. `app/api/gateway/[...path]/route.ts` holds a
- * Keycloak bearer token good for every admin route on the platform, so the
+ * This is the file that matters. `app/api/gateway/[...path]/route.ts` forwards
+ * a bearer token good for every admin route the caller's role reaches, so the
  * question "what does it refuse" cannot be answered by reading it — the checks
  * have to be watched failing.
  *
@@ -18,12 +17,27 @@ import { setSessionToken } from "../stubs/next-auth-jwt";
  * upstream that records every request it receives, so "the gateway was never
  * called" is an observation rather than an assumption.
  *
- * Stubbed: only `getToken`, i.e. the decryption of the session cookie. See
- * `test/stubs/next-auth-jwt.ts`.
+ * Nothing is stubbed. The caller's identity arrives the way Cloudflare Access
+ * delivers it -- a JWT in the Cf-Access-Jwt-Assertion header -- and the role
+ * comes back from the same in-process upstream the proxy forwards to, which
+ * answers /api/v1/admin/me. That is the real seam, end to end.
  */
 
 const CONSOLE_ORIGIN = "https://admin.yourapp.lk";
-const ACCESS_TOKEN = "eyJhbGciOiJSUzI1NiJ9.stand-in-access-token.signature";
+/**
+ * A decodable (never verified) Access JWT. The console reads `email` out of
+ * it; telemed-backend is what checks the signature.
+ */
+const ACCESS_TOKEN = [
+  Buffer.from(JSON.stringify({ alg: "RS256" })).toString("base64url"),
+  Buffer.from(JSON.stringify({ email: "ops@clinic.lk", exp: 4102444800 })).toString("base64url"),
+  "signature-not-checked",
+].join(".");
+
+/** What /api/v1/admin/me answers for the current test. */
+let currentRole: string | null = "super_admin";
+/** When true, /me fails, standing in for a backend that cannot be reached. */
+let meUnreachable = false;
 
 interface Seen {
   method: string;
@@ -47,6 +61,28 @@ let handler: (req: Request, ctx: { params: Promise<{ path: string[] }> }) => Pro
 
 before(async () => {
   upstream = http.createServer((req, res) => {
+    // The console asks who the caller is before proxying anything. Answer it
+    // here and keep it out of `seen`, which is about the PROXIED call.
+    if ((req.url ?? "").startsWith("/api/v1/admin/me")) {
+      if (meUnreachable) {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end("{}");
+        return;
+      }
+      if (currentRole === null) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end("{}");
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          data: { email: "ops@clinic.lk", display_name: "Ops", role: currentRole, active: true },
+        }),
+      );
+      return;
+    }
+
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => chunks.push(c));
     req.on("end", () => {
@@ -73,10 +109,6 @@ before(async () => {
   // Must be set before the first serverEnv() call, which caches.
   process.env.TELEMED_API_URL = `http://127.0.0.1:${port}`;
   process.env.TELEMED_API_TIMEOUT_MS = "4000";
-  process.env.AUTH_SECRET = "test-secret-not-used-because-getToken-is-stubbed";
-  process.env.AUTH_KEYCLOAK_ID = "telemed-admin-web";
-  process.env.AUTH_KEYCLOAK_SECRET = "test";
-  process.env.AUTH_KEYCLOAK_ISSUER = "https://sso.yourapp.lk/realms/telemed";
 
   const route = await import("@/app/api/gateway/[...path]/route");
   handler = route.GET as typeof handler;
@@ -94,7 +126,7 @@ function header(req: http.IncomingMessage, name: string): string | undefined {
 interface CallOptions {
   method?: string;
   roles?: string[];
-  session?: "none" | "refresh-failed" | "valid";
+  session?: "none" | "unreachable" | "valid";
   headers?: Record<string, string>;
   body?: string;
   query?: string;
@@ -110,18 +142,16 @@ async function call(segments: string[], options: CallOptions = {}): Promise<Resp
     query = "",
   } = options;
 
-  setSessionToken(
-    session === "none"
-      ? null
-      : session === "refresh-failed"
-        ? { roles, error: "RefreshFailed" }
-        : { accessToken: ACCESS_TOKEN, roles },
-  );
+  currentRole = roles[0] ?? null;
+  meUnreachable = session === "unreachable";
 
   const url = `${CONSOLE_ORIGIN}/api/gateway/${segments.join("/")}${query}`;
   const requestHeaders: Record<string, string> = {
     // What ingress-nginx puts on a request that reaches this pod.
     "x-forwarded-for": "203.0.113.9",
+    // What Cloudflare Access puts on a request it has authenticated. Absent
+    // for session: "none", which is a request that never went through Access.
+    ...(session === "none" ? {} : { "cf-access-jwt-assertion": ACCESS_TOKEN }),
     ...extra,
   };
   if (method !== "GET" && method !== "HEAD" && !("origin" in requestHeaders)) {
@@ -148,6 +178,8 @@ async function call(segments: string[], options: CallOptions = {}): Promise<Resp
 
 test.beforeEach(() => {
   seen = [];
+  currentRole = "super_admin";
+  meUnreachable = false;
   nextUpstreamResponse = {
     status: 200,
     contentType: "application/json",
@@ -273,16 +305,29 @@ test("the proxy will not reach outside /api/v1/admin, whoever asks", async () =>
   assert.deepEqual(seen, [], "no request may leave with an admin token on it");
 });
 
-test("no session, and a session whose refresh failed, are both 401 with no upstream call", async () => {
+test("a request that did not come through Access is 401, with no upstream call", async () => {
   const none = await call(["api", "v1", "admin", "doctors", "pending"], { session: "none" });
   assert.equal(none.status, 401);
+  assert.deepEqual(seen, []);
+});
 
-  const stale = await call(["api", "v1", "admin", "doctors", "pending"], {
-    session: "refresh-failed",
+test("a backend that cannot confirm the role is 503, not 401 and not a pass-through", async () => {
+  // The distinction matters during an incident. 401 would tell an admin whose
+  // Access session is perfectly good to sign in again, which fixes nothing and
+  // sends them round a loop; treating it as "no roles" would be worse still,
+  // silently removing everyone's access exactly when someone needs it.
+  const unreachable = await call(["api", "v1", "admin", "doctors", "pending"], {
+    session: "unreachable",
   });
-  assert.equal(stale.status, 401);
-  assert.match((await stale.json()).message, /could not be refreshed/);
+  assert.equal(unreachable.status, 503);
+  assert.deepEqual(seen, [], "nothing may be proxied when the caller's role is unknown");
+});
 
+test("passing Access with no admin_users row is 403, not 401", async () => {
+  // Access admitted them, so they are authenticated; this platform simply
+  // grants them nothing. Answering 401 would invite another sign-in.
+  const noRow = await call(["api", "v1", "admin", "doctors", "pending"], { roles: [] });
+  assert.equal(noRow.status, 403);
   assert.deepEqual(seen, []);
 });
 
@@ -359,7 +404,7 @@ test("methods outside the five the console uses are not proxied", async () => {
   const request = new Request(`${CONSOLE_ORIGIN}/api/gateway/api/v1/admin/doctors/pending`, {
     method: "OPTIONS",
   });
-  setSessionToken({ accessToken: ACCESS_TOKEN, roles: ["super_admin"] });
+  currentRole = "super_admin";
   const { GET } = await import("@/app/api/gateway/[...path]/route");
   const response = await (GET as typeof handler)(request, {
     params: Promise.resolve({ path: ["api", "v1", "admin", "doctors", "pending"] }),

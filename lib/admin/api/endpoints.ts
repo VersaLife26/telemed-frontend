@@ -16,7 +16,7 @@
 const ADMIN = "/api/v1/admin";
 
 export const endpoints = {
-  /** The admin_users row behind the current Keycloak subject. */
+  /** The admin_users row for the caller Cloudflare Access authenticated. */
   me: () => `${ADMIN}/me`,
 
   credentialing: {

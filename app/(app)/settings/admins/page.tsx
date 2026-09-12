@@ -53,8 +53,10 @@ export default async function AdminAccountsPage() {
           <div>
             <CardTitle>Admins</CardTitle>
             <CardDescription>
-              Accounts are created here, never by self-registration — the
-              Keycloak realm has registration disabled on purpose.
+              Accounts are created here, never by self-registration. This sets
+              what someone may do; Cloudflare Access decides who gets in, so a
+              new admin also needs their email on the console&rsquo;s Access
+              policy before they can sign in.
             </CardDescription>
           </div>
           <CreateAdminDialog />

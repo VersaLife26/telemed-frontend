@@ -529,8 +529,13 @@ export interface ChainVerifyResult {
 // ---------------------------------------------------------------------------
 
 /**
- * What GET /api/v1/admin/me returns: the admin_users row backing the
- * Keycloak subject in the bearer token.
+ * What GET /api/v1/admin/me returns: the admin_users row for the identity in
+ * the bearer token.
+ *
+ * `keycloak_subject` keeps its name because the database column does. Since
+ * Cloudflare Access replaced Keycloak it holds the normalised email address,
+ * which is what the backend's Directory matches an Access token on; renaming
+ * the column is a migration on a live table for no behavioural gain.
  */
 export interface AdminIdentity {
   id: Uuid;

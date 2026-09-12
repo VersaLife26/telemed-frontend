@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { auth } from "@/auth";
+import { adminRoles } from "@/lib/admin/auth/current";
 import { AuditTable } from "@/components/admin/audit/audit-table";
 import { ChainVerifyCard } from "@/components/admin/audit/chain-verify";
 import { ErrorState } from "@/components/admin/common/error-state";
@@ -31,7 +31,7 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [session, params] = await Promise.all([auth(), searchParams]);
+  const [roles, params] = await Promise.all([adminRoles(), searchParams]);
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
 
   const listQuery = query({
@@ -91,7 +91,7 @@ export default async function AuditPage({
             entries={result.page.data}
             filtered={filtered}
             exportQuery={listQuery.toString()}
-            canExport={can(session?.roles ?? [], "audit_export")}
+            canExport={can(roles, "audit_export")}
           />
           <Pagination
             meta={result.page.meta}

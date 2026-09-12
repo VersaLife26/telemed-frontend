@@ -1,7 +1,7 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import { LogOut, ShieldCheck } from "lucide-react";
+
 
 import { Button } from "@/components/admin/ui/button";
 import {
@@ -72,7 +72,17 @@ export function UserMenu({
           )}
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void signOut({ redirectTo: "/login?reason=signed-out" })}>
+        {/*
+          Signing out means ending the Cloudflare Access session, not clearing
+          a cookie this application owns. Clearing anything locally would leave
+          the person signed in at the edge while looking like it had worked.
+        */}
+        <DropdownMenuItem
+          onSelect={() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- /cdn-cgi/access/logout is a Cloudflare edge endpoint, not a Next.js route: it must be a full navigation, and useRouter().push() would try to resolve it client-side and 404.
+            window.location.href = "/cdn-cgi/access/logout";
+          }}
+        >
           <LogOut className="size-4" aria-hidden="true" />
           Sign out
         </DropdownMenuItem>

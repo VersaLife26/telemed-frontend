@@ -18,20 +18,26 @@ const serverSchema = z.object({
   /**
    * Base URL of the API gateway (telemed-api-gateway, port 8080). The browser
    * never sees this: every call is proxied through the BFF route handler at
-   * /api/gateway so the Keycloak access token stays server-side.
+   * /api/gateway, which attaches the caller's Cloudflare Access token
+   * server-side.
    */
   TELEMED_API_URL: z.url().default("http://localhost:8080"),
 
-  AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required"),
-  AUTH_KEYCLOAK_ID: z.string().min(1, "AUTH_KEYCLOAK_ID is required"),
-  AUTH_KEYCLOAK_SECRET: z.string().min(1, "AUTH_KEYCLOAK_SECRET is required"),
-  /** e.g. https://sso.yourapp.lk/realms/telemed */
-  AUTH_KEYCLOAK_ISSUER: z.url(),
+  /*
+   * AUTH_SECRET and the AUTH_KEYCLOAK_* trio are gone with NextAuth. The
+   * console has no sign-in of its own: Cloudflare Access authenticates
+   * admin.versalifehealth.com at the edge and this application reads the JWT
+   * it puts on the request.
+   */
 
   /**
-   * Hard ceiling on a session, in seconds. The V2 docs mandate 15 minutes for
-   * the admin surface; that is the default and lowering it is fine, raising it
-   * is a decision someone should have to make on purpose.
+   * Idle window before the console sends the browser to Access's logout, in
+   * seconds.
+   *
+   * NOT a session ceiling any more, and the rename is the honest part: there
+   * is no server-side session here to cap. The Access application's own
+   * session duration is the only server-side bound. This is the client-side
+   * idle timer in components/admin/session/session-guard.tsx.
    */
   ADMIN_SESSION_MAX_AGE: durationSeconds.default(900),
 
@@ -43,13 +49,7 @@ const serverSchema = z.object({
   /**
    * Transport.
    *
-   * `AUTH_KEYCLOAK_ISSUER` is where the browser is sent to authenticate and
-   * where this server posts the client secret to exchange and refresh tokens.
-   * Over `http://` that is the admin console's SSO credentials in cleartext, so
-   * a production deployment may not do it — and nothing else in the stack was
-   * going to notice: the value is only ever read as a string.
-   *
-   * `TELEMED_API_URL` is held to a weaker rule on purpose. In-cluster it is a
+   * `TELEMED_API_URL` is held to a weaker rule than an internet-facing URL. In-cluster it is a
    * plaintext service address (`http://api-gateway:8080`) because the mesh has
    * no mTLS today (platform review F29), and it is not this console's place to
    * refuse to boot over that. What it can refuse is plaintext to a *routable*
@@ -57,14 +57,6 @@ const serverSchema = z.object({
    */
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "production") return;
-
-    if (new URL(env.AUTH_KEYCLOAK_ISSUER).protocol !== "https:") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["AUTH_KEYCLOAK_ISSUER"],
-        message: "must be https:// in production - it carries the OIDC client secret",
-      });
-    }
 
     const api = new URL(env.TELEMED_API_URL);
     if (api.protocol !== "https:" && !isClusterLocalHost(api.hostname)) {

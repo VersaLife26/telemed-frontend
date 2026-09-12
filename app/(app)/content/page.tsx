@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { auth } from "@/auth";
+import { adminRoles } from "@/lib/admin/auth/current";
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { ContentTabs } from "@/components/admin/content/content-tabs";
@@ -22,8 +22,7 @@ export const metadata: Metadata = { title: "Content" };
  * instant.
  */
 export default async function ContentPage() {
-  const session = await auth();
-  const readOnly = !can(session?.roles ?? [], "content");
+  const readOnly = !can(await adminRoles(), "content");
 
   const page = query({ per_page: 200 });
   const [specialties, symptoms, drugs, articles] = await Promise.all([

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { auth } from "@/auth";
+import { adminRoles } from "@/lib/admin/auth/current";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { CorporateClientsCard } from "@/components/admin/settings/corporate-clients";
 import { FeatureFlagsCard } from "@/components/admin/settings/feature-flags";
@@ -38,8 +38,7 @@ const UNSET = {
  * shows a diff before it writes.
  */
 export default async function SettingsPage() {
-  const session = await auth();
-  const roles = session?.roles ?? [];
+  const roles = await adminRoles();
   const readOnly = !can(roles, "config");
   const financeOnly = !can(roles, "finance");
 

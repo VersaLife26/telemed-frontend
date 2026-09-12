@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { signOut, useSession } from "next-auth/react";
 import { ShieldAlert } from "lucide-react";
 
 import {
@@ -22,17 +21,26 @@ import { formatDuration, spellDuration } from "@/lib/admin/format";
  *
  * Behaviour:
  *   - Any real interaction (pointer, key, scroll, tab focus) resets the idle
- *     clock and, at most once a minute, rolls the server-side session so a
- *     working admin is never signed out mid-task.
+ *     clock, so a working admin is never signed out mid-task.
  *   - With `sessionWarningSeconds` left, a modal appears with a live countdown.
  *     It is a modal on purpose: an admin halfway through a rejection reason
  *     needs to be interrupted, not to discover afterwards that the POST 401'd.
- *   - At zero, the console signs itself out and lands on /login?reason=idle.
+ *   - At zero, the browser is sent to Cloudflare Access's logout endpoint,
+ *     which ends the Access session itself. Nothing local is cleared, because
+ *     nothing local is the credential.
  *   - The countdown itself does *not* count as activity, so leaving the dialog
  *     open does not extend the session.
  *
- * The server-side cookie `maxAge` is the real control — this is the humane
- * front end of it, not a substitute for it.
+ * READ THIS BEFORE TRUSTING IT. Under Auth.js the server-side cookie `maxAge`
+ * was the real control and this was its humane front end. There is no such
+ * cookie now: Cloudflare Access owns the session, and the Access application's
+ * own session duration is the only server-side bound. This timer runs entirely
+ * in the browser, so it is a usability control and a shoulder-surfing defence,
+ * NOT something that survives a closed tab or a hostile client.
+ *
+ * The server-side equivalent is the Access application's session duration
+ * (`cfa_session_duration` in playbooks/04-cloudflare.yml). Shorten that if the
+ * idle window here is meant to be enforced rather than merely honoured.
  */
 
 interface CountdownState {
@@ -62,35 +70,26 @@ const ACTIVITY_EVENTS = [
   "focus",
 ] as const;
 
-/** Roll the server session at most this often; matches `updateAge` in auth.config. */
-const SERVER_REFRESH_INTERVAL_MS = 60_000;
+/** Where an expired idle session lands. Ends the Access session, not a cookie. */
+const ACCESS_LOGOUT_PATH = "/cdn-cgi/access/logout";
 
 export function SessionGuard({ children }: { children: React.ReactNode }) {
-  const { status, update } = useSession();
   const idleMs = clientEnv.idleTimeoutSeconds * 1000;
   const warnMs = Math.min(clientEnv.sessionWarningSeconds * 1000, idleMs - 1000);
 
   const [deadline, setDeadline] = React.useState(() => Date.now() + idleMs);
   const [now, setNow] = React.useState(() => Date.now());
-  // Initialised to 0 rather than Date.now(): reading the clock during render
-  // is impure, and the only thing this ref gates is "have we rolled the server
-  // session in the last minute", for which 0 means "not yet" and is correct.
-  const lastServerRefresh = React.useRef(0);
   const signedOut = React.useRef(false);
   const stayButtonRef = React.useRef<HTMLButtonElement>(null);
 
-  const authenticated = status === "authenticated";
+  // Every render of this component is inside the console layout, which has
+  // already established the caller passed Access and holds a role. There is
+  // no "unauthenticated" client state to wait for any more.
+  const authenticated = true;
 
   const registerActivity = React.useCallback(() => {
-    const at = Date.now();
-    setDeadline(at + idleMs);
-    if (at - lastServerRefresh.current >= SERVER_REFRESH_INTERVAL_MS) {
-      lastServerRefresh.current = at;
-      // Fire and forget: a failed refresh will surface as the session going
-      // unauthenticated, which the effect below already handles.
-      void update();
-    }
-  }, [idleMs, update]);
+    setDeadline(Date.now() + idleMs);
+  }, [idleMs]);
 
   // --- activity listeners ---------------------------------------------------
   React.useEffect(() => {
@@ -124,7 +123,8 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
     if (!authenticated || signedOut.current) return;
     if (remainingMs > 0) return;
     signedOut.current = true;
-    void signOut({ redirectTo: "/login?reason=idle" });
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- /cdn-cgi/access/logout is a Cloudflare edge endpoint, not a Next.js route: it must be a full navigation, and useRouter().push() would try to resolve it client-side and 404.
+    window.location.href = ACCESS_LOGOUT_PATH;
   }, [authenticated, remainingMs]);
 
   const secondsLeft = authenticated ? Math.max(0, Math.ceil(remainingMs / 1000)) : null;
@@ -198,7 +198,8 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
               variant="outline"
               onClick={() => {
                 signedOut.current = true;
-                void signOut({ redirectTo: "/login?reason=signed-out" });
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- /cdn-cgi/access/logout is a Cloudflare edge endpoint, not a Next.js route: it must be a full navigation, and useRouter().push() would try to resolve it client-side and 404.
+                window.location.href = ACCESS_LOGOUT_PATH;
               }}
             >
               Sign out now

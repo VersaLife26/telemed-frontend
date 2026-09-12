@@ -15,11 +15,9 @@ import { servedBy } from "@/lib/surface-routes";
  *    rather than leak anything, but relying on that is relying on an error, so
  *    the table in `lib/surface-routes.ts` decides first and returns a real 404.
  *
- * 2. **The admin console's own middleware** — the Auth.js session and role
- *    check, and the per-request CSP nonce. Reached through a dynamic import
- *    because `@/auth` constructs the Auth.js instance at module load and needs
- *    AUTH_SECRET; a static import would evaluate that in the patient and
- *    doctor builds, which have no such secret and no such console.
+ * 2. **The admin console's own middleware** — the Cloudflare Access check and
+ *    the per-request CSP nonce. Still reached through a dynamic import so the
+ *    patient and doctor builds never evaluate the admin console's modules.
  */
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
   const { pathname } = request.nextUrl;
@@ -32,11 +30,7 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
 
   if (SURFACE === "admin") {
     const { adminProxy } = await import("@/lib/admin/proxy-impl");
-    // Auth.js types its wrapped handler for the route-handler position, where
-    // the second argument carries route params. In the middleware position it
-    // is the NextFetchEvent and the params are never read, so the shape is
-    // asserted rather than fabricated.
-    return adminProxy(request as never, event as never);
+    return adminProxy(request);
   }
 
   return NextResponse.next();

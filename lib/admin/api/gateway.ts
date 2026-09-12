@@ -1,11 +1,8 @@
 import "server-only";
 
-import { getToken } from "next-auth/jwt";
-
-import { SESSION_COOKIE_NAME } from "@/auth.config";
 import { serverEnv } from "@/lib/admin/env";
 import type { AdminRole } from "@/lib/admin/api/types";
-import { isAdminRole } from "@/lib/admin/api/types";
+import { identityFrom } from "@/lib/admin/auth/access";
 import { ADMIN_PATH_PREFIX, clientAddress, forwardingHeaders } from "./upstream";
 
 /**
@@ -17,7 +14,7 @@ import { ADMIN_PATH_PREFIX, clientAddress, forwardingHeaders } from "./upstream"
  *
  * The pure half — path validation, client-address resolution, response
  * shaping — lives in `./upstream`, which carries no secrets and is therefore
- * unit-testable. This file is the half that touches the session.
+ * unit-testable. This file is the half that touches the caller's identity.
  */
 
 export { ADMIN_PATH_PREFIX, clientAddress, forwardingHeaders };
@@ -29,37 +26,39 @@ export function gatewayBaseUrl(): string {
 /** Anything carrying request headers: a Request, or `await headers()`. */
 export type HeaderSource = Request | { headers: Headers };
 
-/** What the encrypted Auth.js cookie yields: a token, and the roles it carries. */
+/** The Access token to forward upstream, and the roles the platform grants. */
 export type SessionCredentials =
   | { token: string; roles: AdminRole[] }
-  | { token: null; roles: AdminRole[]; reason: "no-session" | "refresh-failed" };
+  | { token: null; roles: AdminRole[]; reason: "no-session" | "unreachable" };
 
 /**
- * Reads the Keycloak access token and the admin roles out of the encrypted
- * Auth.js cookie.
+ * Reads the Cloudflare Access token and the caller's admin roles.
  *
- * The roles come back with the token on purpose. They are written into the JWT
- * by `auth.ts`'s `jwt` callback from the freshly issued access token on every
- * refresh, so they are a server-side fact about the current token rather than
- * anything the browser can influence — which is what makes them safe to
- * authorise on in the BFF (see `canCallApi`).
+ * Both used to come out of the encrypted Auth.js cookie: the token was
+ * Keycloak's, and the roles were `realm_access.roles` copied off it on every
+ * refresh. Neither exists now. Access authenticates the hostname and puts its
+ * own JWT on the request, and the role comes from this platform's admin_users
+ * row via `GET /api/v1/admin/me`.
+ *
+ * The roles are still a server-side fact the browser cannot influence, which
+ * is what makes them safe to authorise on in the BFF (see `canCallApi`) --
+ * they are read from the backend with the caller's own token, not from
+ * anything the client sent.
+ *
+ * `unreachable` is kept distinct from `no-session` on purpose: a backend that
+ * cannot be reached must not read as "this person has no roles", which would
+ * turn an outage into a silent, total loss of admin access.
  */
 export async function accessTokenFor(request: HeaderSource): Promise<SessionCredentials> {
-  const jwt = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET ?? "",
-    cookieName: SESSION_COOKIE_NAME,
-    secureCookie: process.env.NODE_ENV === "production",
-  });
-
-  if (!jwt) return { token: null, roles: [], reason: "no-session" };
-
-  const roles = (jwt.roles ?? []).filter((role): role is AdminRole => isAdminRole(role));
-
-  if (jwt.error === "RefreshFailed" || !jwt.accessToken) {
-    return { token: null, roles, reason: "refresh-failed" };
+  const result = await identityFrom(request);
+  if (!result.ok) {
+    return {
+      token: null,
+      roles: [],
+      reason: result.reason === "unreachable" ? "unreachable" : "no-session",
+    };
   }
-  return { token: jwt.accessToken, roles };
+  return { token: result.identity.token, roles: result.identity.roles };
 }
 
 /**

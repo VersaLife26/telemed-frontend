@@ -5,7 +5,7 @@ import { type RequestOptions, parseData, parseList, rawFetch } from "./http";
  * The API client browser code uses.
  *
  * It talks to the BFF at `/api/gateway/...` on the same origin — never to the
- * API gateway directly. Two consequences, both deliberate: the Keycloak access
+ * API gateway directly. Two consequences, both deliberate: the bearer
  * token stays server-side, and the CSP can keep `connect-src 'self'`.
  *
  * The path passed in is the real platform path (`/api/v1/admin/...`) so that
