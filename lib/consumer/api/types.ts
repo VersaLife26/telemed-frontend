@@ -177,6 +177,7 @@ export type JoinResult = {
    * before the camera comes on that no relay is configured.
    */
   ice_servers?: ICEServer[];
+  scheduled_at?: string;
 };
 
 export type WaitingRoomStatus = {

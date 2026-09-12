@@ -6,13 +6,16 @@ import { Card } from "@/components/consumer/layout/AppShell";
 import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Consultation, JoinResult, WaitingRoomStatus } from "@/lib/consumer/api/types";
+import { MarkNoShowButton } from "@/components/consumer/mark-no-show-button";
 import {
   admitDisabled,
   admitPath,
+  canMarkNoShow,
   endConsultBody,
   endPath,
   isWaiting,
   joinPath,
+  minutesLate,
   qualityLabel,
   qualityPath,
   QUALITY_REPORT_INTERVAL_MS,
@@ -70,6 +73,8 @@ export function VideoCallClient({
   const [join, setJoin] = useState<JoinResult | null>(null);
   const [queue, setQueue] = useState<WaitingRoomStatus | null>(null);
   const [status, setStatus] = useState<string>("");
+  const [scheduledAt, setScheduledAt] = useState<string | undefined>();
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -191,6 +196,7 @@ export function VideoCallClient({
         if (!cancelled) {
           setJoin(result);
           setStatus(result.status);
+          if (result.scheduled_at) setScheduledAt(result.scheduled_at);
         }
       } catch (e) {
         if (!cancelled) {
@@ -222,6 +228,7 @@ export function VideoCallClient({
         );
         if (cancelled) return;
         if (consult.status) setStatus(consult.status);
+        if (consult.scheduled_at) setScheduledAt(consult.scheduled_at);
         if (!connected && (role === "patient" || consult.status === "waiting")) {
           const room = await browserApi<WaitingRoomStatus>(
             waitingRoomPollPath(join!.consultation_id),
@@ -247,6 +254,11 @@ export function VideoCallClient({
       window.clearInterval(timer);
     };
   }, [afterEndHref, connectMedia, connected, connecting, join, role, router]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function admit() {
     if (!join?.consultation_id) return;
@@ -341,7 +353,11 @@ export function VideoCallClient({
               </p>
             ) : null}
             {role === "doctor" && status === "scheduled" ? (
-              <p className="text-body-sm text-white/80">Waiting for the patient to join.</p>
+              <p className="text-body-sm text-white/80">
+                {minutesLate(scheduledAt, nowMs) > 0
+                  ? `Patient is ${minutesLate(scheduledAt, nowMs)} min late`
+                  : "Waiting for the patient to join."}
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -383,6 +399,9 @@ export function VideoCallClient({
               {admitting ? "Admitting…" : "Admit patient"}
             </Button>
           </div>
+        ) : null}
+        {role === "doctor" && canMarkNoShow(role, status, scheduledAt, nowMs) ? (
+          <MarkNoShowButton appointmentId={appointmentId} afterHref="/queue" />
         ) : null}
         {live ? (
           <>

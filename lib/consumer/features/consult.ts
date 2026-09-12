@@ -10,6 +10,10 @@ export function joinPath(appointmentId: string): string {
   return `/consultations/${appointmentId}/join`;
 }
 
+export function noShowPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/no-show`;
+}
+
 export function readyForNextPath(appointmentId?: string): string {
   return appointmentId
     ? `/consultations/${appointmentId}/ready-for-next`
@@ -54,6 +58,59 @@ export function canAdmit(role: string, status?: string, joinStatus?: string): bo
 
 export function admitDisabled(status?: string): boolean {
   return status === "scheduled";
+}
+
+/** Matches consultation-service LateJoinGrace / LateJoinCutoff. */
+export const LATE_JOIN_GRACE_MS = 10 * 60 * 1000;
+export const LATE_JOIN_CUTOFF_MS = LATE_JOIN_GRACE_MS;
+
+export function minutesLate(startAt?: string, now = Date.now()): number {
+  if (!startAt) return 0;
+  const start = Date.parse(startAt);
+  if (!Number.isFinite(start) || start >= now) return 0;
+  return Math.floor((now - start) / 60_000);
+}
+
+export function isWithinLateJoinGrace(startAt?: string, now = Date.now()): boolean {
+  if (!startAt) return false;
+  const start = Date.parse(startAt);
+  if (!Number.isFinite(start)) return false;
+  return now >= start && now < start + LATE_JOIN_GRACE_MS;
+}
+
+export function isPastLateJoinCutoff(startAt?: string, now = Date.now()): boolean {
+  if (!startAt) return false;
+  const start = Date.parse(startAt);
+  if (!Number.isFinite(start)) return false;
+  return now >= start + LATE_JOIN_CUTOFF_MS;
+}
+
+/**
+ * Doctor can mark no-show while the visit is still waiting for a first
+ * patient join (consult `scheduled`, or queue `confirmed`) and start is past.
+ */
+export function canMarkNoShow(
+  role: string,
+  status?: string,
+  startAt?: string,
+  now = Date.now(),
+): boolean {
+  if (role !== "doctor") return false;
+  if (
+    status === "waiting" ||
+    status === "active" ||
+    status === "ended" ||
+    status === "abandoned" ||
+    status === "no_show" ||
+    status === "cancelled" ||
+    status === "completed"
+  ) {
+    return false;
+  }
+  if (!startAt) return false;
+  const start = Date.parse(startAt);
+  if (!Number.isFinite(start)) return false;
+  return start < now;
 }
 
 export function endConsultBody() {

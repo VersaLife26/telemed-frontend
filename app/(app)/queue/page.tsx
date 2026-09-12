@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Card } from "@/components/consumer/layout/AppShell";
 import { Button } from "@/components/consumer/ui/Button";
+import { MarkNoShowButton } from "@/components/consumer/mark-no-show-button";
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, RescheduleRequest } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
-import { afterEndPath, callPath } from "@/lib/consumer/features/consult";
+import { afterEndPath, callPath, canMarkNoShow, minutesLate } from "@/lib/consumer/features/consult";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
 
 async function pendingByAppointment(
@@ -76,7 +77,10 @@ export default async function QueuePage() {
           </p>
         </Card>
       ) : null}
-      {appointments.map((a) => (
+      {appointments.map((a) => {
+        const lateMins = minutesLate(a.start_at);
+        const showNoShow = canMarkNoShow("doctor", a.status, a.start_at);
+        return (
         <Card
           key={a.id}
           className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
@@ -86,6 +90,9 @@ export default async function QueuePage() {
             <p className="text-body-sm text-text-muted">
               {a.start_at_local || a.start_at} · {a.status}
             </p>
+            {lateMins > 0 ? (
+              <p className="text-body-sm text-danger">Patient is {lateMins} min late</p>
+            ) : null}
           </div>
           <div className="flex flex-col items-stretch gap-2 sm:items-end">
             <div className="flex flex-wrap gap-2">
@@ -108,6 +115,7 @@ export default async function QueuePage() {
                 Rx
               </Link>
             </div>
+            {showNoShow ? <MarkNoShowButton appointmentId={a.id} /> : null}
             <RescheduleRequestForm
               appointmentId={a.id}
               pending={pending[a.id] ?? null}
@@ -115,7 +123,8 @@ export default async function QueuePage() {
             />
           </div>
         </Card>
-      ))}
+        );
+      })}
       {!error && appointments.length === 0 ? (
         <Card>
           <p className="text-body text-text-muted">No confirmed appointments in queue.</p>
