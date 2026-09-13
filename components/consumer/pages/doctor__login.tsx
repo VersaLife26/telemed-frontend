@@ -127,7 +127,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
           />
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" fullWidth busy={loading === "email"} disabled={busy}>
             {loading === "email" ? "Signing in…" : "Sign in with email"}
           </Button>
         </form>
@@ -140,7 +140,7 @@ export default function LoginPage() {
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+9477XXXXXXX"
           />
-          <Button type="submit" disabled={busy} icon={assets.phoneIcon} iconAlt="">
+          <Button type="submit" fullWidth busy={loading === "otp"} disabled={busy} icon={assets.phoneIcon} iconAlt="">
             {loading === "otp" ? "Sending…" : "Send OTP"}
           </Button>
         </form>

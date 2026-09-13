@@ -288,11 +288,11 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
       ) : null}
 
       {issued ? (
-        <Button type="button" onClick={() => void openPdf(issued.id)}>
+        <Button type="button" fullWidth onClick={() => void openPdf(issued.id)}>
           Download PDF
         </Button>
       ) : (
-        <Button type="button" onClick={() => void issue()} disabled={issuing}>
+        <Button type="button" fullWidth busy={issuing} onClick={() => void issue()}>
           {issuing ? "Generating PDF…" : "Issue e-prescription"}
         </Button>
       )}

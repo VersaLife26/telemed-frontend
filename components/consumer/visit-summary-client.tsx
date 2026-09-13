@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { Button, ButtonLink } from "@/components/consumer/ui/Button";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import { isNotFound } from "@/lib/consumer/api/envelope";
 import type { Appointment, ClinicalNote, Prescription, PrescriptionPdf } from "@/lib/consumer/api/types";
@@ -96,16 +96,16 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
   }
 
   if (loading) {
-    return <p className="text-body text-text-muted">Loading visit summary…</p>;
+    return <FormSkeleton />;
   }
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
-      <h1 className="text-h4 text-black">Visit summary</h1>
+      <h1 className="text-h4 text-ink">Visit summary</h1>
       {error ? <p className="text-body-sm text-danger">{error}</p> : null}
 
       <Card className="flex flex-col gap-2">
-        <p className="text-body font-medium text-black">{appointment?.specialty || "Consultation"}</p>
+        <p className="text-body font-medium text-ink">{appointment?.specialty || "Consultation"}</p>
         <p className="text-body-sm text-text-muted">
           {appointment?.start_at_local || appointment?.start_at || appointmentId}
           {appointment?.status ? ` · ${appointment.status}` : ""}
@@ -146,7 +146,7 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
                 </li>
               ))}
             </ul>
-            <Button type="button" onClick={() => void downloadRx()}>
+            <Button type="button" fullWidth onClick={() => void downloadRx()}>
               Download e-Rx PDF
             </Button>
           </>
@@ -155,11 +155,9 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
         )}
       </Card>
 
-      <Link href="/vault">
-        <Button type="button" variant="outline">
-          Open health vault
-        </Button>
-      </Link>
+      <ButtonLink href="/vault" variant="outline" fullWidth>
+        Open health vault
+      </ButtonLink>
     </div>
   );
 }

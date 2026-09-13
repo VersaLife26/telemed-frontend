@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Card } from "@/components/consumer/ui/Card";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
 import { browserApi } from "@/lib/consumer/api/client";
@@ -42,18 +42,22 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
   return (
     <Card className="mx-auto w-full max-w-xl">
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <h1 className="text-h4 text-black">Intake</h1>
+        <h1 className="text-h4 text-ink">Intake</h1>
         <p className="text-body-sm text-text-muted">
           Slot: {slotId || "not selected"} · Doctor: {doctorId}
         </p>
+        <label htmlFor="symptoms" className="text-body-sm font-medium text-ink">
+          Symptoms
+        </label>
         <Input
+          id="symptoms"
           focused
           placeholder="Describe symptoms"
           value={symptoms}
           onChange={(e) => setSymptoms(e.target.value)}
         />
         {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" fullWidth busy={loading}>
           {loading ? "Booking…" : "Confirm booking"}
         </Button>
       </form>

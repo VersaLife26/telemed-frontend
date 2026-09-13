@@ -3,23 +3,33 @@
 @theme {
   --color-primary: #015591;
   --color-primary-light: #69aad8;
+  --color-ink: #12202a;
+  --color-linen: #eef2f4;
+  --color-paper: #ffffff;
   --color-bg-gray: #f8f8f8;
   --color-bg-gray-300: #f3f3f3;
-  --color-text-muted: #757575;
+  --color-text-muted: #5c6b75;
   --color-text-placeholder: #b9b9b9;
-  --color-text-label: #8c8c8c;
-  --color-border: #dfdfdf;
+  --color-text-label: #6b7780;
+  --color-border: #d5dee4;
   --color-border-light: #e8e8e8;
   --color-border-input: #f3f3f3;
-  --color-border-card: #def1ff;
-  --color-danger: #b80000;
+  --color-border-card: #d7e6f0;
+  --color-danger: #b42318;
+  --color-stamp: #b45309;
+  --color-stamp-soft: #f8eadb;
+  --color-ward: #1f6b5a;
+  --color-ward-soft: #e3f0ec;
+  --color-skeleton: #e3eaee;
   --font-manrope: "Manrope", sans-serif;
   --radius-auth: 38px;
   --radius-card: 16px;
   --radius-pill: 32px;
   --radius-input: 8px;
-  --shadow-soft: 0px 4px 6px rgba(0, 0, 0, 0.02);
-  --shadow-otp: 0px 4px 12px rgba(0, 0, 0, 0.02);
+  --shadow-soft: 0px 4px 6px rgba(18, 32, 42, 0.04);
+  --shadow-otp: 0px 4px 12px rgba(18, 32, 42, 0.04);
+  --shadow-ticket: 0 10px 28px rgba(18, 32, 42, 0.08);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @layer base {
@@ -34,7 +44,7 @@
     min-height: 100%;
     font-family: var(--font-manrope);
     background: #ffffff;
-    color: #000000;
+    color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
   }
 
@@ -49,69 +59,139 @@
   select {
     font: inherit;
   }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -4rem;
+    z-index: 100;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+  }
+
+  .skeleton-pulse {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+  }
+
+  .visit-ticket-rail {
+    background-image: radial-gradient(circle at 0 12px, var(--color-linen) 6px, transparent 7px);
+    background-size: 12px 24px;
+    background-repeat: repeat-y;
+    background-position: left center;
+  }
 }
 
 @layer utilities {
   .text-h1 {
     font-size: 64px;
-    font-weight: 200;
-    line-height: 1.2;
-    letter-spacing: -1.28px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
   }
 
   .text-h2 {
     font-size: 40px;
-    font-weight: 400;
-    line-height: 1;
-    letter-spacing: -0.8px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
   }
 
   .text-h3 {
     font-size: 32px;
-    font-weight: 300;
-    line-height: 1;
-    letter-spacing: -0.96px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
   }
 
   .text-h4 {
     font-size: 24px;
-    font-weight: 300;
-    line-height: 1;
-    letter-spacing: -0.48px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
   .text-h5 {
     font-size: 20px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: -0.4px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
   }
 
   .text-body {
     font-size: 16px;
     font-weight: 400;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
   .text-body-sm {
     font-size: 14px;
     font-weight: 400;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
   .text-caption {
     font-size: 12px;
-    font-weight: 400;
+    font-weight: 500;
     line-height: 1.4;
+    letter-spacing: 0.04em;
+  }
+
+  .tabular-time {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 
   @media (max-width: 768px) {
     .text-h1 {
       font-size: 40px;
-      letter-spacing: -0.8px;
     }
     .text-h2 {
       font-size: 28px;
     }
+    .text-h3 {
+      font-size: 24px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .chrome-blur {
+    backdrop-filter: none !important;
+    background: var(--color-paper) !important;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
   }
 }

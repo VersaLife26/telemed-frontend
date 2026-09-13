@@ -86,7 +86,7 @@ export default function ProfilePage() {
       <Card className="flex flex-col gap-4">
         <p className="text-body text-text-muted">{error || "Sign in required"}</p>
         <Link href="/login" className="max-w-xs">
-          <Button>Sign in</Button>
+          <Button fullWidth>Sign in</Button>
         </Link>
       </Card>
     );
@@ -107,7 +107,7 @@ export default function ProfilePage() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.lk"
         />
-        <Button type="submit" disabled={saving !== null}>
+        <Button type="submit" fullWidth disabled={saving !== null}>
           {saving === "email" ? "Saving…" : "Save email"}
         </Button>
       </form>
@@ -122,7 +122,7 @@ export default function ProfilePage() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password (8+ characters)"
         />
-        <Button type="submit" disabled={saving !== null}>
+        <Button type="submit" fullWidth disabled={saving !== null}>
           {saving === "password" ? "Saving…" : "Save password"}
         </Button>
       </form>
@@ -130,7 +130,7 @@ export default function ProfilePage() {
       {notice ? <p className="text-body-sm text-primary">{notice}</p> : null}
       {error ? <p className="text-body-sm text-danger">{error}</p> : null}
 
-      <Button type="button" variant="outline" onClick={() => void logout()}>
+      <Button type="button" variant="outline" fullWidth onClick={() => void logout()}>
         Sign out
       </Button>
     </Card>

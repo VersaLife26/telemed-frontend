@@ -1,110 +1,169 @@
 import Link from "next/link";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { DoctorCard } from "@/components/consumer/ui/DoctorCard";
+import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { EmptyVisitTicket, VisitTicket } from "@/components/consumer/ui/VisitTicket";
+import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Appointment, Doctor, PageMeta } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
+import {
+  appointmentAction,
+  colomboHour,
+  firstName,
+  formatVisitClock,
+  formatVisitDate,
+  greetingForHour,
+  pickNextAppointment,
+} from "@/lib/consumer/features/patient-appointment";
 
-async function loadHome() {
+async function loadDoctors() {
   try {
     const doctors = await apiFetch<Doctor[]>("/api/v1/doctors?per_page=6&sort=rating");
     return { doctors: Array.isArray(doctors) ? doctors : [], error: null as string | null };
   } catch (e) {
     return {
       doctors: [] as Doctor[],
-      error: e instanceof Error ? e.message : "Gateway unreachable",
+      error: e instanceof Error ? e.message : "Could not load doctors",
     };
   }
 }
 
 async function loadAppointments(token: string | undefined) {
-  if (!token) return [] as Appointment[];
+  if (!token) return { appointments: [] as Appointment[], error: null as string | null };
   try {
-    return await apiFetch<Appointment[]>("/api/v1/appointments?per_page=5", { token });
-  } catch {
-    return [];
+    const data = await apiFetch<Appointment[]>("/api/v1/appointments?per_page=5", { token });
+    return { appointments: Array.isArray(data) ? data : [], error: null as string | null };
+  } catch (e) {
+    return {
+      appointments: [] as Appointment[],
+      error: e instanceof Error ? e.message : "Could not load visits",
+    };
   }
 }
 
-function feeLabel(cents?: number, currency = "LKR") {
-  if (cents == null) return "—";
-  return `${currency} ${(cents / 100).toLocaleString()}`;
+async function loadMe(token: string | undefined) {
+  if (!token) return null;
+  try {
+    return await apiFetch<TelemedUser>("/api/v1/users/me", { token });
+  } catch {
+    return null;
+  }
 }
 
 export default async function HomePage() {
   const token = await getAccessToken();
-  const [{ doctors, error }, appointments] = await Promise.all([
-    loadHome(),
-    loadAppointments(token),
-  ]);
+  const [{ doctors, error: doctorsError }, { appointments, error: appointmentsError }, me] =
+    await Promise.all([loadDoctors(), loadAppointments(token), loadMe(token)]);
+
+  const next = pickNextAppointment(appointments);
+  const doctorName = next?.doctor_id
+    ? doctors.find((d) => d.id === next.doctor_id)?.display_name
+    : null;
+  const name = firstName(me?.name);
+  const hello = greetingForHour(colomboHour());
+  const later = appointments.filter((a) => a.id !== next?.id).slice(0, 4);
 
   return (
     <div className="flex flex-col gap-8">
-      <Card className="flex flex-col gap-4">
-        <h2 className="text-h4 text-black">Find care today</h2>
+      <header className="flex flex-col gap-1">
+        <h1 className="text-h3 text-ink sm:text-h2">
+          {hello}
+          {name ? `, ${name}` : ""}
+        </h1>
         <p className="text-body text-text-muted">
-          Browse approved doctors and book a video consult through the telemed platform.
+          {next ? "Your next consult is ready when you are." : "Book a video consult when you need care."}
         </p>
-        <Link href="/doctors" className="max-w-xs">
-          <Button>Browse doctors</Button>
-        </Link>
-        {error ? (
-          <p className="text-body-sm text-danger">
-            Live doctor list unavailable: {error}. Start `telemed-api-gateway` (and services) to
-            load data.
-          </p>
-        ) : null}
-      </Card>
+      </header>
+
+      {next ? <VisitTicket appointment={next} doctorName={doctorName} /> : <EmptyVisitTicket />}
+
+      {appointmentsError ? (
+        <p className="text-body-sm text-danger">Couldn’t load visits: {appointmentsError}</p>
+      ) : null}
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-h4 text-black">Top doctors</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {doctors.map((d) => (
-            <Link key={d.id} href={`/doctors/${d.id}`}>
-              <Card className="h-full transition hover:border-border-card">
-                <p className="text-h5 text-black">{d.display_name || "Doctor"}</p>
-                <p className="mt-2 text-body-sm text-text-muted">{d.specialty || "General"}</p>
-                <p className="mt-4 text-body text-primary">{feeLabel(d.fee_cents, d.currency)}</p>
-                {d.rating != null ? (
-                  <p className="mt-1 text-caption text-text-label">
-                    ★ {d.rating.toFixed(1)} ({d.review_count ?? 0})
-                  </p>
-                ) : null}
-              </Card>
-            </Link>
-          ))}
-          {!error && doctors.length === 0 ? (
-            <p className="text-body text-text-muted">No doctors returned yet.</p>
-          ) : null}
+        <div className="flex items-end justify-between gap-4">
+          <h2 className="text-h5 text-ink">Doctors</h2>
+          <Link href="/doctors" className="text-body-sm font-medium text-primary">
+            Browse all
+          </Link>
         </div>
+        {doctorsError ? (
+          <EmptyState
+            title="Couldn’t load doctors"
+            body={doctorsError}
+            action={{ href: "/doctors", label: "Try the directory" }}
+          />
+        ) : doctors.length === 0 ? (
+          <EmptyState
+            title="No doctors listed yet"
+            body="Approved clinicians will appear here once the directory is live."
+          />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {doctors.map((d) => (
+              <DoctorCard key={d.id} doctor={d} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-h4 text-black">Your appointments</h2>
-          <Link href="/appointments" className="text-body-sm text-primary">
+        <div className="flex items-end justify-between gap-4">
+          <h2 className="text-h5 text-ink">Later visits</h2>
+          <Link href="/appointments" className="text-body-sm font-medium text-primary">
             View all
           </Link>
         </div>
         {!token ? (
-          <Card>
-            <p className="text-body text-text-muted">Sign in with OTP to see your bookings.</p>
-          </Card>
-        ) : appointments.length === 0 ? (
-          <Card>
-            <p className="text-body text-text-muted">No appointments yet.</p>
-          </Card>
+          <EmptyState
+            title="Sign in to see visits"
+            body="Your bookings stay on this device after you sign in with email or OTP."
+            action={{ href: "/login", label: "Sign in" }}
+          />
+        ) : later.length === 0 && !next ? (
+          <EmptyState
+            title="No visits yet"
+            body="When you book a consult, it will show up here with a way to pay or join."
+            action={{ href: "/doctors", label: "Find a doctor" }}
+          />
+        ) : later.length === 0 ? (
+          <p className="text-body-sm text-text-muted">No other visits on the list.</p>
         ) : (
-          <div className="grid gap-3">
-            {appointments.map((a) => (
-              <Card key={a.id}>
-                <p className="text-body font-medium text-black">{a.specialty || "Consultation"}</p>
-                <p className="text-body-sm text-text-muted">
-                  {a.start_at_local || a.start_at} · {a.status}
-                </p>
-              </Card>
-            ))}
-          </div>
+          <ul className="grid gap-3">
+            {later.map((a) => {
+              const action = appointmentAction(a.id, a.status);
+              const when = a.start_at_local || a.start_at;
+              const inner = (
+                <>
+                  <div className="min-w-0">
+                    <p className="truncate text-body font-medium text-ink">
+                      {a.specialty || "Consultation"}
+                    </p>
+                    <p className="mt-1 text-body-sm text-text-muted">
+                      {formatVisitDate(when)} · {formatVisitClock(when)}
+                    </p>
+                  </div>
+                  <StatusBadge status={a.status} />
+                </>
+              );
+              return (
+                <li key={a.id}>
+                  {action ? (
+                    <Link
+                      href={action.href}
+                      className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-paper px-5 py-4 shadow-[var(--shadow-soft)]"
+                    >
+                      {inner}
+                    </Link>
+                  ) : (
+                    <Card className="flex items-center justify-between gap-3 px-5 py-4">{inner}</Card>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
     </div>

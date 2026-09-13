@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Card } from "@/components/consumer/ui/Card";
 import { Button } from "@/components/consumer/ui/Button";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
 import {
@@ -23,6 +24,7 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hydrating, setHydrating] = useState(true);
   const [polling, setPolling] = useState(false);
 
   useEffect(() => {
@@ -36,9 +38,13 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
         if (!cancelled) {
           setOrder(o);
           setAppointment(a);
+          setHydrating(false);
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load order");
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Could not load order");
+          setHydrating(false);
+        }
       }
     })();
     return () => {
@@ -99,16 +105,20 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
   const currency = order?.currency || appointment?.currency || "LKR";
   const settled = shouldGoToWaitingRoom(intent, payment);
 
+  if (hydrating) {
+    return <FormSkeleton />;
+  }
+
   return (
     <Card className="mx-auto flex max-w-lg flex-col gap-4">
-      <h1 className="text-h4 text-black">Payment</h1>
+      <h1 className="text-h4 text-ink">Payment</h1>
       <p className="text-body text-text-muted">
-        Test checkout uses the <span className="font-medium text-black">mock</span> rail.
+        Test checkout uses the <span className="font-medium text-ink">mock</span> rail.
         No card is charged.
       </p>
-      <div className="rounded-[16px] bg-white p-4">
+      <div className="rounded-[16px] bg-linen p-4">
         <p className="text-body-sm text-text-muted">Consultation fee</p>
-        <p className="text-h3 text-black">{formatMoney(total, currency)}</p>
+        <p className="text-h3 text-ink tabular-time">{formatMoney(total, currency)}</p>
         {order?.discount_cents ? (
           <p className="mt-1 text-body-sm text-text-muted">
             Discount {formatMoney(order.discount_cents, currency)}
@@ -123,12 +133,12 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
       ) : null}
       {error ? <p className="text-body-sm text-danger">{error}</p> : null}
       {settled ? (
-        <Button type="button" onClick={goWaiting}>
+        <Button type="button" fullWidth onClick={goWaiting}>
           Continue to waiting room
         </Button>
       ) : (
-        <Button type="button" onClick={() => void payMock()} disabled={loading || polling}>
-          {loading ? "Starting…" : polling ? "Waiting for mock settlement…" : "Pay with mock"}
+        <Button type="button" fullWidth busy={loading || polling} onClick={() => void payMock()}>
+          {loading ? "Starting…" : polling ? "Waiting for settlement…" : "Pay with mock"}
         </Button>
       )}
       {polling ? (

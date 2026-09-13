@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Button } from "@/components/consumer/ui/Button";
 import { OtpInput } from "@/components/consumer/ui/OtpInput";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 
 const RESEND_COOLDOWN_SEC = 30;
 
@@ -94,7 +95,7 @@ function OtpForm() {
           <OtpInput length={6} value={code} onChange={setCode} />
           {error ? <p className="text-body-sm text-danger">{error}</p> : null}
           {info ? <p className="text-body-sm text-primary">{info}</p> : null}
-          <Button type="submit" disabled={loading || resending || code.length < 6}>
+          <Button type="submit" fullWidth busy={loading} disabled={loading || resending || code.length < 6}>
             {loading ? "Verifying…" : "Verify & continue"}
           </Button>
         </form>
@@ -129,7 +130,7 @@ function OtpForm() {
 
 export default function OtpPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-body text-text-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-8"><FormSkeleton /></div>}>
       <OtpForm />
     </Suspense>
   );

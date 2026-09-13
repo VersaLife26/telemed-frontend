@@ -105,7 +105,7 @@ export default function RegisterPage() {
             placeholder="Password (8+ characters)"
           />
           {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" fullWidth busy={loading === "email"} disabled={busy}>
             {loading === "email" ? "Creating…" : "Create account"}
           </Button>
         </form>

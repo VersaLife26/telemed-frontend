@@ -1,17 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { ProfileField, ProfileFieldRow } from "@/components/consumer/profile/ProfileField";
-import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { ButtonLink } from "@/components/consumer/ui/Button";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Doctor, Slot } from "@/lib/consumer/api/types";
 import { assets } from "@/lib/consumer/assets";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
-
-function feeLabel(cents?: number, currency = "LKR") {
-  if (cents == null) return "—";
-  return `${currency} ${(cents / 100).toLocaleString()}`;
-}
+import { formatMoney } from "@/lib/consumer/money";
+import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 
 function todayColombo() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -50,24 +47,29 @@ export default async function DoctorDetailPage({
       slots = wrapped.slots || [];
     } catch (e) {
       slotsNote =
-        e instanceof Error
-          ? e.message
-          : "Could not load slots (login required at gateway).";
+        e instanceof Error ? e.message : "Could not load today’s slots. Sign in and try again.";
     }
   } else if (doctor && !token) {
-    slotsNote = "Sign in to load today's available slots and book.";
+    slotsNote = "Sign in to see today’s slots and book.";
   }
 
   if (!doctor) {
-    return <p className="text-body text-danger">{error || "Doctor not found"}</p>;
+    return (
+      <EmptyState
+        title="Doctor not found"
+        body={error || "This profile is missing or no longer listed."}
+        action={{ href: "/doctors", label: "Back to doctors" }}
+      />
+    );
   }
 
   const name = doctor.display_name || "Doctor";
+  const openSlots = slots.filter((s) => (s.status || "").toUpperCase() === "AVAILABLE");
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex w-full flex-col gap-4 lg:flex-row">
-        <div className="relative mx-auto size-[280px] shrink-0 overflow-hidden rounded-[var(--radius-card)] lg:mx-0 lg:size-[320px]">
+        <div className="relative mx-auto size-[280px] shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-linen lg:mx-0 lg:size-[320px]">
           <Image
             src={doctor.photo_url || assets.doctorPhoto}
             alt={name}
@@ -76,69 +78,65 @@ export default async function DoctorDetailPage({
             unoptimized={Boolean(doctor.photo_url)}
           />
         </div>
-        <Card className="flex min-w-0 flex-1 flex-col gap-6">
-          <h2 className="px-2 text-h4 text-black">{name}</h2>
-          <ProfileFieldRow>
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
-              <ProfileField
-                label="Specialization :"
-                value={doctor.specialty || "—"}
-                labelWidth="w-[149px]"
-              />
-              <ProfileField
-                label="SLMC Register No :"
-                value={doctor.slmc_number || "—"}
-                labelWidth="w-auto min-w-[157px]"
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
-              <ProfileField
-                label="Consultations :"
-                value={String(doctor.consultation_count ?? "—")}
-                labelWidth="w-auto"
-              />
-              <ProfileField
-                label="Fee :"
-                value={feeLabel(doctor.fee_cents, doctor.currency)}
-                labelWidth="w-[189px]"
-              />
-            </div>
-          </ProfileFieldRow>
-          <div className="flex min-h-[80px] gap-4">
-            <div className="flex w-[149px] shrink-0 items-start p-2">
-              <span className="text-body text-black">Bio :</span>
-            </div>
-            <div className="min-h-[80px] flex-1 rounded-[var(--radius-input)] bg-white p-2">
-              <span className="text-body text-text-label">{doctor.bio || "—"}</span>
-            </div>
+        <Card className="flex min-w-0 flex-1 flex-col gap-5">
+          <div>
+            <p className="text-caption uppercase tracking-[0.14em] text-text-label">
+              {doctor.specialty || "General"}
+            </p>
+            <h1 className="mt-2 text-h3 text-ink">{name}</h1>
           </div>
+          <dl className="grid gap-3 text-body sm:grid-cols-2">
+            <div>
+              <dt className="text-caption text-text-label">SLMC</dt>
+              <dd className="mt-1 text-ink">{doctor.slmc_number || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-text-label">Consultations</dt>
+              <dd className="mt-1 text-ink">{doctor.consultation_count ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-text-label">Fee</dt>
+              <dd className="mt-1 text-ink tabular-time">{formatMoney(doctor.fee_cents, doctor.currency)}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-text-label">Rating</dt>
+              <dd className="mt-1 text-ink">
+                {doctor.rating != null ? `${doctor.rating.toFixed(1)} (${doctor.review_count ?? 0})` : "—"}
+              </dd>
+            </div>
+          </dl>
+          {doctor.bio ? <p className="text-body text-text-muted">{doctor.bio}</p> : null}
         </Card>
       </div>
 
       <Card className="flex flex-col gap-4">
-        <h3 className="text-h5 text-black">Today&apos;s slots ({todayColombo()})</h3>
+        <h2 className="text-h5 text-ink">Today’s slots</h2>
         {slotsNote ? <p className="text-body-sm text-text-muted">{slotsNote}</p> : null}
         <div className="flex flex-wrap gap-2">
-          {slots
-            .filter((s) => (s.status || "").toUpperCase() === "AVAILABLE")
-            .map((s) => (
-              <Link
-                key={s.id}
-                href={`/doctors/${id}/intake?slot_id=${s.id}`}
-                className="rounded-full border border-border bg-white px-4 py-2 text-body-sm hover:bg-primary hover:text-white"
-              >
-                {(s.start_at_local || s.start_at || "").slice(11, 16) || s.id.slice(0, 8)}
-              </Link>
-            ))}
-          {!slotsNote && slots.length === 0 ? (
+          {openSlots.map((s) => (
+            <Link
+              key={s.id}
+              href={`/doctors/${id}/intake?slot_id=${s.id}`}
+              className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-full border border-border bg-linen px-4 text-body-sm font-medium text-ink transition-colors duration-[200ms] ease-[var(--ease-out)] hover:border-primary hover:bg-primary hover:text-white"
+            >
+              {formatVisitClock(s.start_at_local || s.start_at) !== "—"
+                ? formatVisitClock(s.start_at_local || s.start_at)
+                : s.id.slice(0, 8)}
+            </Link>
+          ))}
+          {!slotsNote && openSlots.length === 0 ? (
             <p className="text-body-sm text-text-muted">No open slots for today.</p>
           ) : null}
         </div>
-        <Link href={`/doctors/${id}/intake`} className="max-w-sm">
-          <Button size="lg" className="!font-medium">
+        {!token ? (
+          <ButtonLink href="/login" size="lg">
+            Sign in to book
+          </ButtonLink>
+        ) : (
+          <ButtonLink href={`/doctors/${id}/intake`} size="lg">
             Book appointment
-          </Button>
-        </Link>
+          </ButtonLink>
+        )}
       </Card>
     </div>
   );

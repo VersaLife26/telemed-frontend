@@ -3,15 +3,8 @@
 import { usePathname } from "next/navigation";
 
 import { AppHeader, AppShell } from "@/components/consumer/layout/AppShell";
+import { PatientBottomNav, PatientHeader } from "@/components/consumer/layout/PatientChrome";
 import { SURFACE } from "@/lib/consumer/surface";
-
-const PATIENT_NAV = [
-  { href: "/home", label: "Home" },
-  { href: "/doctors", label: "Doctors" },
-  { href: "/appointments", label: "Appointments" },
-  { href: "/vault", label: "Vault" },
-  { href: "/profile", label: "Profile" },
-];
 
 const DOCTOR_NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -23,16 +16,32 @@ const DOCTOR_NAV = [
 
 export default function ConsumerShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const nav = SURFACE === "doctor" ? DOCTOR_NAV : PATIENT_NAV;
+
+  if (SURFACE === "patient") {
+    return (
+      <div className="flex min-h-dvh flex-col bg-linen text-ink">
+        <a href="#main" className="skip-link">
+          Skip to main content
+        </a>
+        <PatientHeader />
+        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-6 md:px-8 md:pb-10">
+          {children}
+        </main>
+        <PatientBottomNav />
+      </div>
+    );
+  }
+
   const title =
-    nav.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`))?.label || "VersaLife";
+    DOCTOR_NAV.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`))?.label ||
+    "VersaLife";
 
   return (
     <AppShell>
       <AppHeader
         title={title}
         subtitle="VersaLife Telemedicine"
-        nav={nav.map((n) => ({
+        nav={DOCTOR_NAV.map((n) => ({
           ...n,
           active: pathname === n.href || pathname.startsWith(`${n.href}/`),
         }))}

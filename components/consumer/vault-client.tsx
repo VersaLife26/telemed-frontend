@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Card } from "@/components/consumer/ui/Card";
 import { Button } from "@/components/consumer/ui/Button";
+import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { LoadingRegion, Skeleton } from "@/components/consumer/ui/Skeleton";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { VaultDocument, VaultDownload } from "@/lib/consumer/api/types";
 import {
@@ -12,6 +14,7 @@ import {
   uploadError,
   type VaultDocType,
 } from "@/lib/consumer/features/vault";
+import { cx } from "@/lib/consumer/cx";
 
 export function VaultClient() {
   const [docs, setDocs] = useState<VaultDocument[]>([]);
@@ -86,19 +89,23 @@ export function VaultClient() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <h1 className="text-h4 text-black">Health vault</h1>
-      <p className="text-body-sm text-text-muted">Upload reports and scans. Downloads use a short-lived link.</p>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <header>
+        <h1 className="text-h3 text-ink">Health vault</h1>
+        <p className="mt-1 text-body-sm text-text-muted">
+          Upload reports and scans. Downloads use a short-lived link.
+        </p>
+      </header>
 
       {error ? <p className="text-body-sm text-danger">{error}</p> : null}
 
       <Card className="flex flex-col gap-3">
-        <label className="text-body-sm text-text-label" htmlFor="vault-type">
+        <label className="text-body-sm font-medium text-ink" htmlFor="vault-type">
           Document type
         </label>
         <select
           id="vault-type"
-          className="w-full rounded-[32px] bg-white px-6 py-3 text-[16px] text-black shadow-[var(--shadow-soft)] outline-none"
+          className="min-h-12 w-full rounded-[32px] border border-border bg-linen px-6 text-[16px] text-ink outline-none"
           value={docType}
           onChange={(e) => setDocType(e.target.value as typeof docType)}
         >
@@ -109,7 +116,7 @@ export function VaultClient() {
           ))}
         </select>
         <label className="cursor-pointer">
-          <span className="inline-flex w-full items-center justify-center rounded-[32px] bg-primary px-6 py-3 text-[16px] font-bold text-white shadow-[var(--shadow-soft)]">
+          <span className="inline-flex min-h-12 w-full items-center justify-center rounded-[32px] bg-primary px-6 text-[16px] font-bold text-white shadow-[var(--shadow-soft)] enabled:active:scale-[0.97]">
             {uploading ? "Uploading…" : "Choose file to upload"}
           </span>
           <input
@@ -132,42 +139,55 @@ export function VaultClient() {
             key={t.value || "all"}
             type="button"
             onClick={() => setFilter(t.value)}
-            className={`rounded-[32px] px-5 py-2 text-body-sm ${
-              filter === t.value ? "bg-primary text-white" : "bg-bg-gray text-text-muted"
-            }`}
+            className={cx(
+              "inline-flex min-h-11 items-center rounded-[32px] px-5 text-body-sm",
+              filter === t.value ? "bg-primary text-white" : "bg-paper text-text-muted",
+            )}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {loading ? <p className="text-body text-text-muted">Loading…</p> : null}
+      {loading ? (
+        <LoadingRegion label="Loading vault" className="flex flex-col gap-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Card key={i}>
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="mt-2 h-4 w-32" />
+            </Card>
+          ))}
+        </LoadingRegion>
+      ) : null}
 
-      {docs.map((doc) => (
-        <Card key={doc.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-body font-medium text-black">{doc.filename}</p>
-            <p className="text-body-sm text-text-muted">
-              {doc.document_type}
-              {doc.size_bytes ? ` · ${formatBytes(doc.size_bytes)}` : ""}
-              {doc.scan_status ? ` · ${doc.scan_status}` : ""}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" fullWidth={false} onClick={() => void download(doc.id)}>
-              Download
-            </Button>
-            <Button type="button" variant="outline" fullWidth={false} onClick={() => void remove(doc.id)}>
-              Delete
-            </Button>
-          </div>
-        </Card>
-      ))}
+      {!loading
+        ? docs.map((doc) => (
+            <Card key={doc.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-body font-medium text-ink">{doc.filename}</p>
+                <p className="text-body-sm text-text-muted">
+                  {doc.document_type}
+                  {doc.size_bytes ? ` · ${formatBytes(doc.size_bytes)}` : ""}
+                  {doc.scan_status ? ` · ${doc.scan_status}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={() => void download(doc.id)}>
+                  Download
+                </Button>
+                <Button type="button" variant="outline" onClick={() => void remove(doc.id)}>
+                  Delete
+                </Button>
+              </div>
+            </Card>
+          ))
+        : null}
 
       {!loading && docs.length === 0 ? (
-        <Card>
-          <p className="text-body text-text-muted">No documents in this view yet.</p>
-        </Card>
+        <EmptyState
+          title="No documents in this view"
+          body="Add a report or scan so it is ready for your next consult."
+        />
       ) : null}
     </div>
   );

@@ -96,7 +96,7 @@ export function WaitingRoomClient({ appointmentId }: { appointmentId: string }) 
       ) : (
         <p className="text-body text-text-muted">Joining the waiting room…</p>
       )}
-      <Button type="button" onClick={enterCall} disabled={!join}>
+      <Button type="button" fullWidth onClick={enterCall} disabled={!join}>
         Enter call
       </Button>
     </Card>

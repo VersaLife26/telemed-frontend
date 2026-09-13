@@ -528,7 +528,7 @@ export default function RegisterPage() {
               </Section>
 
               {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" fullWidth busy={loading}>
                 {loading
                   ? "Submitting…"
                   : pendingDocs

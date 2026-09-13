@@ -4,46 +4,64 @@ import * as React from "react";
 import { AlertOctagon } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert";
-import { Button } from "@/components/admin/ui/button";
+import { Button as AdminButton } from "@/components/admin/ui/button";
+import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { SURFACE } from "@/lib/consumer/surface";
 
-/**
- * Route-level error boundary.
- *
- * Next.js strips the message from a server-thrown error in production and
- * leaves only `digest`. That digest is the only thing that correlates what the
- * admin saw with the server log line, so it is shown rather than hidden — an
- * opaque code someone can quote beats a friendly sentence nobody can trace.
- */
-export default function ConsoleError({
+export default function AppError({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  if (SURFACE === "admin") {
+    return (
+      <div className="mx-auto max-w-2xl py-10">
+        <Alert variant="destructive">
+          <AlertOctagon aria-hidden="true" />
+          <AlertTitle>This page failed to load</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>
+              Something went wrong while rendering. Your session is unaffected — you can
+              retry, or move to another page.
+            </p>
+            {error.digest ? (
+              <p className="font-mono text-xs">Error digest: {error.digest}</p>
+            ) : null}
+            <div className="flex gap-2">
+              <AdminButton size="sm" onClick={reset}>
+                Try again
+              </AdminButton>
+              <AdminButton size="sm" variant="outline" onClick={() => window.location.reload()}>
+                Reload the page
+              </AdminButton>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-2xl py-10">
-      <Alert variant="destructive">
-        <AlertOctagon aria-hidden="true" />
-        <AlertTitle>This page failed to load</AlertTitle>
-        <AlertDescription className="space-y-3">
-          <p>
-            Something went wrong while rendering. Your session is unaffected — you can
-            retry, or move to another page.
-          </p>
-          {error.digest ? (
-            <p className="font-mono text-xs">Error digest: {error.digest}</p>
-          ) : null}
-          <div className="flex gap-2">
-            <Button size="sm" onClick={reset}>
-              Try again
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
-              Reload the page
-            </Button>
-          </div>
-        </AlertDescription>
-      </Alert>
-    </div>
+    <Card className="mx-auto flex max-w-xl flex-col items-start gap-4">
+      <h1 className="text-h4 text-ink">This page failed to load</h1>
+      <p className="text-body text-text-muted">
+        Something went wrong while rendering. Your session is unaffected — try again, or
+        open another page.
+      </p>
+      {error.digest ? (
+        <p className="font-mono text-caption text-text-label">Error digest: {error.digest}</p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" onClick={reset}>
+          Try again
+        </Button>
+        <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+          Reload the page
+        </Button>
+      </div>
+    </Card>
   );
 }

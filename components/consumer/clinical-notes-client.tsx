@@ -317,7 +317,7 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
           </Button>
         </Card>
       ) : (
-        <Button type="button" onClick={() => void finalise()} disabled={finalising || !hasContent}>
+          <Button type="button" onClick={() => void finalise()} disabled={finalising || !hasContent} fullWidth>
           {finalising ? "Signing…" : "Finalise note"}
         </Button>
       )}

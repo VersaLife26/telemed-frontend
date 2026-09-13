@@ -17,6 +17,7 @@ export function AppShell({
   );
 }
 
+/** Doctor / shared panel. Patient pages use `@/components/consumer/ui/Card`. */
 export function Card({
   children,
   className = "",
@@ -51,7 +52,7 @@ export function AppHeader({
           </Link>
           {title ? (
             <div className="flex flex-col gap-2">
-              <div className="text-h2 text-black">{title}</div>
+              <div className="text-h2 text-ink">{title}</div>
               {subtitle ? <p className="text-body text-text-muted">{subtitle}</p> : null}
             </div>
           ) : null}
@@ -59,11 +60,12 @@ export function AppHeader({
         <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/profile"
+            aria-label="Profile"
             className="relative size-[50px] overflow-hidden rounded-full border-2 border-primary"
           >
             <Image
               src={assets.avatarPlaceholder}
-              alt="Profile"
+              alt=""
               fill
               className="object-cover"
             />
@@ -76,10 +78,11 @@ export function AppHeader({
             <Link
               key={item.href}
               href={item.href}
+              aria-current={item.active ? "page" : undefined}
               className={`rounded-[32px] px-5 py-2 text-body-sm ${
                 item.active
                   ? "bg-primary text-white"
-                  : "bg-bg-gray text-text-muted hover:text-black"
+                  : "bg-bg-gray text-text-muted hover:text-ink"
               }`}
             >
               {item.label}
