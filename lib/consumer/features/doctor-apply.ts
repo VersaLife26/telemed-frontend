@@ -130,12 +130,25 @@ function fileTooLarge(file: File | null): boolean {
   return !!file && file.size > MAX_APPLY_DOCUMENT_BYTES;
 }
 
+/** Local 07XXXXXXXX / 947XXXXXXXX / +94 77 … into E.164. */
+export function normalizeSriLankanMobile(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  let d = digits;
+  if (d.startsWith("94") && d.length === 11) d = d.slice(2);
+  else if (d.startsWith("0") && d.length === 10) d = d.slice(1);
+  if (d.length !== 9 || d[0] !== "7") return null;
+  return `+94${d}`;
+}
+
 export function doctorApplyError(form: DoctorApplyForm): string | null {
   if (!form.firstName.trim() || !form.lastName.trim()) {
     return "First name and last name are required.";
   }
   if (!form.email.trim() || !form.phone.trim()) {
     return "Email and phone are required so we can contact you after review.";
+  }
+  if (!normalizeSriLankanMobile(form.phone)) {
+    return "Enter a Sri Lankan mobile number (07XXXXXXXX or +947XXXXXXXX).";
   }
   if (form.password.length < 8 || form.password.length > 72) {
     return "Password must be between 8 and 72 characters.";
@@ -220,7 +233,7 @@ export function doctorApplyPayload(form: DoctorApplyForm) {
     last_name: form.lastName.trim(),
     email: form.email.trim(),
     password: form.password,
-    phone: form.phone.trim(),
+    phone: normalizeSriLankanMobile(form.phone) ?? form.phone.trim(),
     slmc_number: form.slmcNumber.trim(),
     specialty: form.specialty,
     languages: form.languages,
@@ -264,9 +277,21 @@ export function applyDocumentPath(applicationId: string): string {
 }
 
 export function readApplyError(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const message = (json as { message?: string }).message;
-    if (message) return message;
+  if (!json || typeof json !== "object") return fallback;
+  const obj = json as { message?: string; fields?: Record<string, string> };
+  const fields = obj.fields;
+  if (fields && typeof fields === "object") {
+    const parts = Object.entries(fields)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim() !== "")
+      .map(([key, value]) => `${key}: ${value}`);
+    if (parts.length > 0) {
+      const message = typeof obj.message === "string" ? obj.message.trim() : "";
+      if (message && message !== "one or more fields failed validation") {
+        return `${message} (${parts.join("; ")})`;
+      }
+      return parts.join("; ");
+    }
   }
+  if (typeof obj.message === "string" && obj.message.trim()) return obj.message;
   return fallback;
 }

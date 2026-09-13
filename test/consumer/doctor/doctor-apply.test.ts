@@ -10,6 +10,7 @@ import {
   doctorApplyPayload,
   formatAvailabilityNotes,
   parseLocations,
+  readApplyError,
   rupeesToCents,
   type DoctorApplyForm,
 } from "@/lib/consumer/features/doctor-apply";
@@ -83,8 +84,31 @@ test("a complete form has no error and keeps specialty independent of GP", () =>
   assert.deepEqual(payload.practicing_locations, ["Nawaloka", "Asiri"]);
   assert.equal(payload.terms_accepted, true);
   assert.equal(payload.password, "secure-pass");
+  assert.equal(payload.phone, "+94771234567");
   assert.equal(payload.bank.account_number, "1234567890");
   assert.equal(applyDocuments(form).length, 3);
+});
+
+test("local mobile numbers are sent as E.164", () => {
+  const payload = doctorApplyPayload(completeForm({ phone: "0771234567" }));
+  assert.equal(payload.phone, "+94771234567");
+  assert.match(
+    doctorApplyError(completeForm({ phone: "0112345678" })) ?? "",
+    /Sri Lankan mobile/i,
+  );
+});
+
+test("apply errors include field reasons from the API", () => {
+  assert.equal(
+    readApplyError(
+      {
+        message: "one or more fields failed validation",
+        fields: { phone: "must be a valid Sri Lankan mobile number" },
+      },
+      "fallback",
+    ),
+    "phone: must be a valid Sri Lankan mobile number",
+  );
 });
 
 test("password is required and must match confirmation", () => {
