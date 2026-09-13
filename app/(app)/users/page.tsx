@@ -61,19 +61,6 @@ export default async function UsersPage({
     />
   );
 
-  // No search, no query. Loading the entire user base because someone opened
-  // the page is both slow and the wrong default for a screen that can suspend
-  // accounts.
-  if (!hasSearch) {
-    return (
-      <>
-        {header}
-        <FilterBar filters={filters} legend="Search for users" values={values} />
-        <UsersTable users={[]} filtered={false} />
-      </>
-    );
-  }
-
   const result = await tryListServer<AdminUserRecord>(
     endpoints.users.list(
       query({
@@ -92,7 +79,7 @@ export default async function UsersPage({
       <>
         {header}
         <FilterBar filters={filters} legend="Search for users" values={values} />
-        <ErrorState error={error} what="the user search" />
+        <ErrorState error={error} what="the user list" />
       </>
     );
   }
@@ -101,8 +88,8 @@ export default async function UsersPage({
     <>
       {header}
       <FilterBar filters={filters} legend="Search for users" values={values} />
-      <UsersTable users={result.page.data} filtered />
-      <Pagination meta={result.page.meta} label="User search" query={queryString} />
+      <UsersTable users={result.page.data} filtered={hasSearch} />
+      <Pagination meta={result.page.meta} label="Users" query={queryString} />
     </>
   );
 }

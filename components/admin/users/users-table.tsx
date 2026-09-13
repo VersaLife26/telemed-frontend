@@ -148,8 +148,8 @@ export function UsersTable({
           ) : (
             <EmptyState
               icon={Search}
-              title="Search for a user"
-              description="Enter a name, an email address or a phone number above. The console does not list every user by default — an unfiltered dump of the user base is not something an admin should reach for by accident."
+              title="No users yet"
+              description="Patients and doctors appear here after they register. Use the filters above to narrow the list."
             />
           )
         }
