@@ -141,3 +141,18 @@ export function checklistFieldBody(
 ): Record<string, boolean> {
   return { [item]: value };
 }
+
+/**
+ * Body for POST /api/v1/admin/doctors/{id}/verify.
+ *
+ * Do not send `version`. admin-service DecodeJSON uses DisallowUnknownFields,
+ * and verifyRequest does not (historically) declare that field — the 400
+ * landed as a toast behind the confirmation dialog, which looks like a dead
+ * Confirm button.
+ */
+export function verifyDecisionBody(
+  action: "approve" | "reject",
+  reason: string,
+): { action: "approve" | "reject"; reason: string } {
+  return { action, reason: reason.trim() };
+}

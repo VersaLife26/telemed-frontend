@@ -23,7 +23,9 @@ import {
 } from "@/components/admin/ui/dialog";
 import { Label } from "@/components/admin/ui/label";
 import { Textarea } from "@/components/admin/ui/textarea";
+import { verifyDecisionBody } from "@/lib/admin/api/adapters/credentialing";
 import { endpoints } from "@/lib/admin/api/endpoints";
+import { isApiError } from "@/lib/admin/api/errors";
 import { useApiMutation } from "@/lib/admin/api/hooks";
 import type { PendingDoctor, VerificationChecklist } from "@/lib/admin/api/types";
 import {
@@ -75,11 +77,7 @@ export function DecisionPanel({
   const mutation = useApiMutation<VerificationChecklist, { action: "approve" | "reject" }>({
     method: "POST",
     path: () => endpoints.credentialing.verify(doctor.doctor_id),
-    body: (variables) => ({
-      action: variables.action,
-      reason: reason.trim(),
-      version: checklist.version,
-    }),
+    body: (variables) => verifyDecisionBody(variables.action, reason),
     successMessage: (_result, variables) =>
       variables.action === "approve"
         ? `${doctor.full_name} approved. doctor.approved has been queued.`
@@ -171,6 +169,7 @@ export function DecisionPanel({
             variant="success"
             disabled={!canApprove}
             onClick={() => {
+              mutation.reset();
               setAction("approve");
               setReason("");
               setTouched(false);
@@ -182,6 +181,7 @@ export function DecisionPanel({
           <Button
             variant="destructive"
             onClick={() => {
+              mutation.reset();
               setAction("reject");
               setReason("");
               setTouched(false);
@@ -246,8 +246,30 @@ export function DecisionPanel({
             </p>
           </div>
 
+          {mutation.error ? (
+            <Alert variant="destructive">
+              <ShieldAlert aria-hidden="true" />
+              <AlertTitle>
+                {isApiError(mutation.error)
+                  ? mutation.error.userMessage
+                  : "This decision could not be recorded."}
+              </AlertTitle>
+              <AlertDescription className="space-y-1">
+                {isApiError(mutation.error) && mutation.error.serverMessage ? (
+                  <p>{mutation.error.serverMessage}</p>
+                ) : null}
+                {isApiError(mutation.error) && mutation.error.requestId ? (
+                  <p className="font-mono text-xs">
+                    Request ID: {mutation.error.requestId}
+                  </p>
+                ) : null}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           <DialogFooter>
             <Button
+              type="button"
               variant="outline"
               onClick={() => setAction(null)}
               disabled={mutation.isPending}
@@ -255,6 +277,7 @@ export function DecisionPanel({
               Cancel
             </Button>
             <Button
+              type="button"
               variant={action === "approve" ? "success" : "destructive"}
               disabled={problem !== null || mutation.isPending}
               onClick={() => {

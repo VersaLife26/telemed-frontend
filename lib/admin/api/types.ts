@@ -107,7 +107,6 @@ export interface VerifyDecisionRequest {
   action: "approve" | "reject";
   /** Mandatory in both directions. An approval with no note is not evidence. */
   reason: string;
-  version: number;
 }
 
 // ---------------------------------------------------------------------------

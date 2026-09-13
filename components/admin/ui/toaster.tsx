@@ -16,6 +16,7 @@ export function Toaster() {
       position="bottom-right"
       duration={8000}
       closeButton
+      className="!z-[100]"
       toastOptions={{
         classNames: {
           toast:
