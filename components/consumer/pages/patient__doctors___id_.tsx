@@ -116,7 +116,7 @@ export default async function DoctorDetailPage({
           {openSlots.map((s) => (
             <Link
               key={s.id}
-              href={`/doctors/${id}/intake?slot_id=${s.id}`}
+              href={`/doctors/${id}/intake?slot_id=${s.id}&start=${encodeURIComponent(s.start_at_local || s.start_at || "")}`}
               className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-full border border-border bg-linen px-4 text-body-sm font-medium text-ink transition-colors duration-[200ms] ease-[var(--ease-out)] hover:border-primary hover:bg-primary hover:text-white"
             >
               {formatVisitClock(s.start_at_local || s.start_at) !== "—"
@@ -132,11 +132,9 @@ export default async function DoctorDetailPage({
           <ButtonLink href="/login" size="lg">
             Sign in to book
           </ButtonLink>
-        ) : (
-          <ButtonLink href={`/doctors/${id}/intake`} size="lg">
-            Book appointment
-          </ButtonLink>
-        )}
+        ) : openSlots.length > 0 ? (
+          <p className="text-body-sm text-text-muted">Choose a time to continue to intake.</p>
+        ) : null}
       </Card>
     </div>
   );

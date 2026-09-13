@@ -1,5 +1,5 @@
 export function bookingError(slotId: string): string | null {
-  if (!slotId) return "Pick a slot from the doctor page first (slot_id missing).";
+  if (!slotId) return "Pick a time on the doctor’s page first.";
   return null;
 }
 

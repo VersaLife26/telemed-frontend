@@ -4,7 +4,7 @@ import test from "node:test";
 import { bookingBody, bookingError, paymentPath } from "@/lib/consumer/features/booking";
 
 test("bookingError requires a slot from the doctor page", () => {
-  assert.equal(bookingError(""), "Pick a slot from the doctor page first (slot_id missing).");
+  assert.equal(bookingError(""), "Pick a time on the doctor’s page first.");
   assert.equal(bookingError("slot-1"), null);
 });
 
