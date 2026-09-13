@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Doctor } from "@/lib/consumer/api/types";
 import { Card } from "@/components/consumer/ui/Card";
 import { assets } from "@/lib/consumer/assets";
+import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatMoney } from "@/lib/consumer/money";
 
 export function DoctorCard({ doctor }: { doctor: Doctor }) {
@@ -22,7 +23,7 @@ export function DoctorCard({ doctor }: { doctor: Doctor }) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <p className="truncate text-h5 text-ink">{name}</p>
-          <p className="mt-1 text-body-sm text-text-muted">{doctor.specialty || "General"}</p>
+          <p className="mt-1 text-body-sm text-text-muted">{specialtyLabel(doctor.specialty)}</p>
           <div className="mt-3 flex items-baseline justify-between gap-2">
             <p className="text-body font-medium text-primary tabular-time">
               {formatMoney(doctor.fee_cents, doctor.currency)}
