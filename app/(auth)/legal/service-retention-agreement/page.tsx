@@ -41,9 +41,10 @@ export default function ServiceRetentionAgreementPage() {
           </p>
           <h2 className="text-[16px] font-medium text-black">3. Your consultation fee</h2>
           <p>
-            You tell us how much you require per consultation and how much you would like to
-            charge. VersaLife may discuss or adjust the listed patient-facing fee before your
-            profile is published. You will not be listed at a fee you have not agreed.
+            You tell us how long each consultation lasts and how much you would like to charge
+            per consultation. VersaLife may discuss or adjust the listed patient-facing fee
+            before your profile is published. You will not be listed at a fee you have not
+            agreed.
           </p>
           <h2 className="text-[16px] font-medium text-black">4. Payouts</h2>
           <p>

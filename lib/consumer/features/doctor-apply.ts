@@ -60,7 +60,8 @@ export type DoctorApplyForm = {
   pgimBoardCertified: boolean | null;
   medicalSchool: string;
   qualifications: string;
-  requiredFeeLkr: string;
+  /** Minutes each consultation should last (slot length). */
+  consultationMinutes: string;
   feeLkr: string;
   availableDays: number[];
   availableStart: string;
@@ -93,14 +94,24 @@ export function parseLocations(raw: string): string[] {
     .filter(Boolean);
 }
 
+export function parseConsultationMinutes(raw: string): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 5 || n > 240) return null;
+  return n;
+}
+
 export function formatAvailabilityNotes(
   days: number[],
   start: string,
   end: string,
   extra: string,
+  consultationMinutes?: number | null,
 ): string {
   const labels = WEEKDAYS.filter((d) => days.includes(d.day)).map((d) => d.label.slice(0, 3));
   const parts: string[] = [];
+  if (consultationMinutes != null && consultationMinutes > 0) {
+    parts.push(`${consultationMinutes} min per consultation`);
+  }
   if (labels.length > 0 && start && end) {
     parts.push(`${labels.join(", ")} ${start}–${end}`);
   } else if (labels.length > 0) {
@@ -142,13 +153,21 @@ export function doctorApplyError(form: DoctorApplyForm): string | null {
   if (!form.qualifications.trim()) {
     return "Qualifications are required.";
   }
-  if (rupeesToCents(form.requiredFeeLkr) === null) {
-    return "Enter how much you require per consultation, in LKR.";
+  if (parseConsultationMinutes(form.consultationMinutes) === null) {
+    return "Enter how long each consultation takes, in minutes (5–240).";
   }
   if (rupeesToCents(form.feeLkr) === null) {
     return "Enter how much you like to charge per consultation, in LKR.";
   }
-  if (!formatAvailabilityNotes(form.availableDays, form.availableStart, form.availableEnd, form.availabilityExtra)) {
+  if (
+    !formatAvailabilityNotes(
+      form.availableDays,
+      form.availableStart,
+      form.availableEnd,
+      form.availabilityExtra,
+      parseConsultationMinutes(form.consultationMinutes),
+    )
+  ) {
     return "Tell us when you are available for consultation.";
   }
   if (form.isGeneralPractitioner === null) {
@@ -185,7 +204,7 @@ export function doctorApplyError(form: DoctorApplyForm): string | null {
 }
 
 export function doctorApplyPayload(form: DoctorApplyForm) {
-  const required = rupeesToCents(form.requiredFeeLkr) ?? 0;
+  const minutes = parseConsultationMinutes(form.consultationMinutes) ?? 0;
   const charge = rupeesToCents(form.feeLkr) ?? 0;
   const years = Number(form.experienceYears || "0");
   return {
@@ -201,13 +220,15 @@ export function doctorApplyPayload(form: DoctorApplyForm) {
     medical_school: form.medicalSchool.trim(),
     qualifications: form.qualifications.trim(),
     experience_years: Number.isFinite(years) ? Math.floor(years) : 0,
-    required_fee_lkr: required,
+    // Apply API still requires required_fee_lkr; doctors now declare one list price.
+    required_fee_lkr: charge,
     fee_lkr: charge,
     availability_notes: formatAvailabilityNotes(
       form.availableDays,
       form.availableStart,
       form.availableEnd,
       form.availabilityExtra,
+      minutes,
     ),
     is_general_practitioner: form.isGeneralPractitioner === true,
     practicing_locations: parseLocations(form.practicingLocations),

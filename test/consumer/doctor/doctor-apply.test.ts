@@ -27,7 +27,7 @@ function completeForm(overrides: Partial<DoctorApplyForm> = {}): DoctorApplyForm
     pgimBoardCertified: true,
     medicalSchool: "University of Colombo",
     qualifications: "MBBS, MD",
-    requiredFeeLkr: "2000",
+    consultationMinutes: "30",
     feeLkr: "2500",
     availableDays: [1, 2, 3, 4, 5],
     availableStart: "09:00",
@@ -54,10 +54,10 @@ test("rupees become cents on the wire", () => {
   assert.equal(rupeesToCents("-1"), null);
 });
 
-test("availability notes join selected days and hours", () => {
+test("availability notes join consultation length, days and hours", () => {
   assert.equal(
-    formatAvailabilityNotes([1, 5], "09:00", "13:00", "evenings by request"),
-    "Mon, Fri 09:00–13:00. evenings by request",
+    formatAvailabilityNotes([1, 5], "09:00", "13:00", "evenings by request", 30),
+    "30 min per consultation. Mon, Fri 09:00–13:00. evenings by request",
   );
 });
 
@@ -75,8 +75,9 @@ test("a complete form has no error and keeps specialty independent of GP", () =>
   const payload = doctorApplyPayload(form);
   assert.equal(payload.specialty, "cardiology");
   assert.equal(payload.is_general_practitioner, true);
-  assert.equal(payload.required_fee_lkr, 200000);
+  assert.equal(payload.required_fee_lkr, 250000);
   assert.equal(payload.fee_lkr, 250000);
+  assert.match(payload.availability_notes, /30 min per consultation/);
   assert.deepEqual(payload.practicing_locations, ["Nawaloka", "Asiri"]);
   assert.equal(payload.terms_accepted, true);
   assert.equal(payload.bank.account_number, "1234567890");
@@ -87,6 +88,17 @@ test("other language requires a name", () => {
   assert.match(
     doctorApplyError(completeForm({ languages: ["other"], languageOther: "" })) ?? "",
     /other language/i,
+  );
+});
+
+test("consultation length must be between 5 and 240 minutes", () => {
+  assert.match(
+    doctorApplyError(completeForm({ consultationMinutes: "2" })) ?? "",
+    /minutes/i,
+  );
+  assert.match(
+    doctorApplyError(completeForm({ consultationMinutes: "" })) ?? "",
+    /minutes/i,
   );
 });
 

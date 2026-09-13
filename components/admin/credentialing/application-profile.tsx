@@ -44,12 +44,8 @@ export function ApplicationProfile({ app }: { app: DoctorApplicationResponse }) 
           <Row label="PGIM board certified" value={yn(app.pgim_board_certified)} />
           <Row label="Medical school" value={app.medical_school ?? ""} />
           <Row label="Qualifications" value={app.qualifications ?? ""} />
-          <Row
-            label="Requires per consultation"
-            value={formatMoney(app.required_fee_cents, "LKR")}
-          />
-          <Row label="Likes to charge" value={formatMoney(app.fee_cents, "LKR")} />
-          <Row label="Available times" value={app.availability_notes ?? ""} />
+          <Row label="Consultation fee" value={formatMoney(app.fee_cents, "LKR")} />
+          <Row label="Availability / length" value={app.availability_notes ?? ""} />
           <Row label="Board registration (SLMC)" value={app.slmc_number ?? ""} />
           <Row label="Specialty" value={app.specialty ? humanise(app.specialty) : ""} />
           <Row label="General practitioner" value={yn(app.is_general_practitioner)} />
