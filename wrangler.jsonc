@@ -37,7 +37,8 @@
     { "pattern": "patient.versalifehealth.com", "custom_domain": true }
   ],
   "vars": {
-    "NEXT_PUBLIC_TELEMED_SURFACE": "patient"
+    "NEXT_PUBLIC_TELEMED_SURFACE": "patient",
+    "API_BASE_URL": "https://api.versalifehealth.com"
   },
 
   "assets": {
@@ -71,7 +72,11 @@
         { "pattern": "patient.versalifehealth.com", "custom_domain": true }
       ],
       "vars": {
-        "NEXT_PUBLIC_TELEMED_SURFACE": "patient"
+        "NEXT_PUBLIC_TELEMED_SURFACE": "patient",
+        // Read at runtime by lib/consumer/env.ts. Without it, a build that did
+        // not get NEXT_PUBLIC_API_BASE_URL (e.g. Workers Builds) falls back to
+        // localhost:8080, which Cloudflare rejects with error 1003.
+        "API_BASE_URL": "https://api.versalifehealth.com"
       }
     },
     "doctor": {
@@ -80,7 +85,8 @@
         { "pattern": "doctor.versalifehealth.com", "custom_domain": true }
       ],
       "vars": {
-        "NEXT_PUBLIC_TELEMED_SURFACE": "doctor"
+        "NEXT_PUBLIC_TELEMED_SURFACE": "doctor",
+        "API_BASE_URL": "https://api.versalifehealth.com"
       }
     },
     "admin": {
