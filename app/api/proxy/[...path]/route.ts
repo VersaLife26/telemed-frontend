@@ -24,7 +24,15 @@ async function forward(req: Request, ctx: Ctx) {
     cache: "no-store",
   };
   if (shouldForwardBody(req.method)) {
-    init.body = await req.arrayBuffer();
+    const isMultipart = (contentType || "").toLowerCase().includes("multipart/form-data");
+    if (isMultipart && req.body) {
+      // Stream multipart through. Buffering with arrayBuffer() can desync the
+      // boundary in Content-Type from the bytes the gateway parses.
+      init.body = req.body;
+      Object.assign(init, { duplex: "half" });
+    } else {
+      init.body = await req.arrayBuffer();
+    }
   }
 
   try {

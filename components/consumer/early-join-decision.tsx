@@ -7,7 +7,13 @@ import { browserApi } from "@/lib/consumer/api/client";
 import type { EarlyJoinOffer } from "@/lib/consumer/api/types";
 import { earlyJoinRespondPath, waitingRoomPath } from "@/lib/consumer/features/consult";
 
-export function EarlyJoinDecision({ offer }: { offer: EarlyJoinOffer }) {
+export function EarlyJoinDecision({
+  offer,
+  onChanged,
+}: {
+  offer: EarlyJoinOffer;
+  onChanged?: () => void;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
@@ -41,6 +47,7 @@ export function EarlyJoinDecision({ offer }: { offer: EarlyJoinOffer }) {
         router.push(waitingRoomPath(offer.appointment_id));
         return;
       }
+      onChanged?.();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update the offer");

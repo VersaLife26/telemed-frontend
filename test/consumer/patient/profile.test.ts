@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import type { TelemedUser } from "@/lib/consumer/api/types";
+import {
+  profileDraftFromUser,
+  profileUpdateBody,
+  profileUpdateError,
+} from "@/lib/consumer/features/profile";
+
+const user: TelemedUser = {
+  id: "u1",
+  phone: "+94771234567",
+  name: "Lasana Pahanga",
+  address: "Colombo",
+  date_of_birth: "1994-04-12",
+  language: "en",
+  version: 4,
+};
+
+test("profileDraftFromUser copies the editable fields and hides role", () => {
+  const draft = profileDraftFromUser({ ...user, role: "patient" });
+  assert.deepEqual(draft, {
+    name: "Lasana Pahanga",
+    phone: "+94771234567",
+    address: "Colombo",
+    dateOfBirth: "1994-04-12",
+  });
+  assert.equal("role" in draft, false);
+});
+
+test("profileUpdateError refuses a blank name and a future date of birth", () => {
+  assert.equal(profileUpdateError({ name: " ", phone: "", address: "", dateOfBirth: "" }), "Enter your name.");
+  assert.equal(
+    profileUpdateError({ name: "Pat", phone: "", address: "", dateOfBirth: "2999-01-01" }),
+    "Date of birth cannot be in the future.",
+  );
+  assert.equal(profileUpdateError({ name: "Pat", phone: "077", address: "Kandy", dateOfBirth: "1990-01-01" }), null);
+});
+
+test("profileUpdateBody sends name, phone, address and date of birth with the observed version", () => {
+  assert.deepEqual(
+    profileUpdateBody(user, {
+      name: " Lasana ",
+      phone: "0771234567",
+      address: " Kandy ",
+      dateOfBirth: "1994-04-12",
+    }),
+    {
+      name: "Lasana",
+      phone: "0771234567",
+      address: "Kandy",
+      date_of_birth: "1994-04-12",
+      language: "en",
+      version: 4,
+    },
+  );
+});

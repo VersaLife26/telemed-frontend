@@ -10,6 +10,8 @@ export type TelemedUser = {
   phone: string;
   email?: string | null;
   name?: string;
+  address?: string;
+  date_of_birth?: string | null;
   language?: string;
   role?: string;
   status?: string;

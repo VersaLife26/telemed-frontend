@@ -6,7 +6,13 @@ import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { RescheduleRequest } from "@/lib/consumer/api/types";
 
-export function RescheduleDecision({ request }: { request: RescheduleRequest }) {
+export function RescheduleDecision({
+  request,
+  onChanged,
+}: {
+  request: RescheduleRequest;
+  onChanged?: () => void;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
@@ -16,6 +22,7 @@ export function RescheduleDecision({ request }: { request: RescheduleRequest }) 
     setBusy(kind);
     try {
       await browserApi(`/reschedule-requests/${request.id}/${kind}`, { method: "POST" });
+      onChanged?.();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update the request");
