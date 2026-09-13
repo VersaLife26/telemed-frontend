@@ -31,7 +31,7 @@ function isActive(pathname: string, href: string) {
 
 export function PatientHeader() {
   const pathname = usePathname();
-  const [avatarSrc, setAvatarSrc] = useState(assets.avatarPlaceholder);
+  const [avatarSrc, setAvatarSrc] = useState<string>(assets.avatarPlaceholder);
 
   useEffect(() => {
     let cancelled = false;
