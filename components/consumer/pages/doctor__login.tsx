@@ -105,7 +105,7 @@ export default function LoginPage() {
               <p>sign in</p>
             </>
           }
-          subtitle="Use Google, the email on your doctor profile, or your registered mobile number."
+          subtitle="Use the email and password from your application, Google, or your registered mobile number."
         />
         <GoogleButton onCredential={onGoogle} disabled={busy} />
         <form onSubmit={onEmail} className="flex w-full flex-col gap-4">

@@ -102,6 +102,8 @@ const emptyForm: DoctorApplyForm = {
   accountNumber: "",
   accountName: "",
   termsAccepted: null,
+  password: "",
+  confirmPassword: "",
   signature: null,
   seal: null,
   slmcCertificate: null,
@@ -211,7 +213,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       scroll
-      blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with OTP."
+      blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with your email and password."
     >
       <div className="flex w-full flex-col gap-6">
         <AuthHeading
@@ -232,7 +234,7 @@ export default function RegisterPage() {
           <div className="flex w-full flex-col gap-6">
             <p className="text-body text-text-muted">
               Your application has been received and is under review. After approval you will get
-              an email, then you can sign in with OTP.
+              an email, then you can sign in with the email and password you just chose.
             </p>
             <AuthFooterLink text="Ready to continue?" linkText="Back to sign in" href="/login" />
           </div>
@@ -276,6 +278,26 @@ export default function RegisterPage() {
                   onChange={(e) => patch({ phone: e.target.value })}
                   placeholder="+9477XXXXXXX"
                   autoComplete="tel"
+                />
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={72}
+                  value={form.password}
+                  onChange={(e) => patch({ password: e.target.value })}
+                  placeholder="Password (8+ characters)"
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={72}
+                  value={form.confirmPassword}
+                  onChange={(e) => patch({ confirmPassword: e.target.value })}
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
                 />
                 <fieldset className="flex w-full flex-col gap-2">
                   <legend className="text-body-sm text-text-label">

@@ -80,7 +80,7 @@ export function DecisionPanel({
     body: (variables) => verifyDecisionBody(variables.action, reason),
     successMessage: (_result, variables) =>
       variables.action === "approve"
-        ? `${doctor.full_name} approved. doctor.approved has been queued.`
+        ? `${doctor.full_name} approved. They can now sign in with the email and password from their application.`
         : `${doctor.full_name} rejected. doctor.rejected has been queued.`,
     onSuccess: () => {
       setAction(null);

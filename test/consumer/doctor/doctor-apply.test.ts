@@ -42,6 +42,8 @@ function completeForm(overrides: Partial<DoctorApplyForm> = {}): DoctorApplyForm
     accountNumber: "1234567890",
     accountName: "Amila Perera",
     termsAccepted: true,
+    password: "s3cret-pass",
+    confirmPassword: "s3cret-pass",
     signature: file,
     seal: file,
     slmcCertificate: file,
@@ -80,6 +82,7 @@ test("a complete form has no error and keeps specialty independent of GP", () =>
   assert.match(payload.availability_notes, /30 min per consultation/);
   assert.deepEqual(payload.practicing_locations, ["Nawaloka", "Asiri"]);
   assert.equal(payload.terms_accepted, true);
+  assert.equal(payload.password, "s3cret-pass");
   assert.equal(payload.bank.account_number, "1234567890");
   assert.equal(applyDocuments(form).length, 3);
 });
@@ -99,6 +102,17 @@ test("consultation length must be between 5 and 240 minutes", () => {
   assert.match(
     doctorApplyError(completeForm({ consultationMinutes: "" })) ?? "",
     /minutes/i,
+  );
+});
+
+test("password must be at least 8 characters and confirmed", () => {
+  assert.match(
+    doctorApplyError(completeForm({ password: "short", confirmPassword: "short" })) ?? "",
+    /8/i,
+  );
+  assert.match(
+    doctorApplyError(completeForm({ confirmPassword: "different-pass" })) ?? "",
+    /do not match/i,
   );
 });
 
