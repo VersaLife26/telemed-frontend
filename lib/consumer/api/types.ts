@@ -12,6 +12,7 @@ export type TelemedUser = {
   name?: string;
   address?: string;
   date_of_birth?: string | null;
+  photo_url?: string | null;
   language?: string;
   role?: string;
   status?: string;

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   FolderClosed,
@@ -12,6 +13,9 @@ import {
 } from "lucide-react";
 import { cx } from "@/lib/consumer/cx";
 import { assets } from "@/lib/consumer/assets";
+import { browserApi } from "@/lib/consumer/api/client";
+import type { TelemedUser } from "@/lib/consumer/api/types";
+import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 
 export const PATIENT_NAV = [
   { href: "/home", label: "Home", icon: House },
@@ -27,6 +31,29 @@ function isActive(pathname: string, href: string) {
 
 export function PatientHeader() {
   const pathname = usePathname();
+  const [avatarSrc, setAvatarSrc] = useState(assets.avatarPlaceholder);
+
+  useEffect(() => {
+    let cancelled = false;
+    browserApi<TelemedUser>("/users/me")
+      .then((account) => {
+        if (cancelled) return;
+        setAvatarSrc(profilePhotoSrc(account.photo_url) || assets.avatarPlaceholder);
+      })
+      .catch(() => {
+        if (!cancelled) setAvatarSrc(assets.avatarPlaceholder);
+      });
+
+    function onProfileUpdated(event: Event) {
+      const detail = (event as CustomEvent<TelemedUser>).detail;
+      setAvatarSrc(profilePhotoSrc(detail?.photo_url) || assets.avatarPlaceholder);
+    }
+    window.addEventListener("telemed:profile-updated", onProfileUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("telemed:profile-updated", onProfileUpdated);
+    };
+  }, []);
 
   return (
     <header className="chrome-blur sticky top-0 z-30 border-b border-border/80 bg-paper/75 backdrop-blur-[20px] backdrop-saturate-150">
@@ -57,7 +84,13 @@ export function PatientHeader() {
           aria-label="Profile"
           className="relative size-11 overflow-hidden rounded-full border-2 border-primary"
         >
-          <Image src={assets.avatarPlaceholder} alt="" fill className="object-cover" />
+          <Image
+            src={avatarSrc}
+            alt=""
+            fill
+            className="object-cover"
+            unoptimized={avatarSrc !== assets.avatarPlaceholder}
+          />
         </Link>
       </div>
     </header>

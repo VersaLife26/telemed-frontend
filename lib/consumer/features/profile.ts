@@ -7,6 +7,10 @@ export type ProfileDraft = {
   dateOfBirth: string;
 };
 
+export const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
+
+const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 export function profileDraftFromUser(user: TelemedUser): ProfileDraft {
   return {
     name: user.name || "",
@@ -39,4 +43,26 @@ export function profileUpdateBody(user: TelemedUser, draft: ProfileDraft) {
     language: user.language || "en",
     version: user.version ?? 0,
   };
+}
+
+/** Turns the API's relative photo path into a same-origin BFF URL. */
+export function profilePhotoSrc(photoUrl?: string | null): string | null {
+  if (!photoUrl?.trim()) return null;
+  const raw = photoUrl.trim();
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/api/proxy/")) {
+    return raw;
+  }
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `/api/proxy${path}`;
+}
+
+export function profilePhotoError(file: File | null): string | null {
+  if (!file) return "Choose a photo to upload.";
+  if (!ALLOWED_PROFILE_PHOTO_TYPES.has(file.type)) {
+    return "Use a JPEG, PNG, or WebP image.";
+  }
+  if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+    return "Photo must be 2 MB or smaller.";
+  }
+  return null;
 }

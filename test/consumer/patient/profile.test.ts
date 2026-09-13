@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { TelemedUser } from "@/lib/consumer/api/types";
 import {
+  MAX_PROFILE_PHOTO_BYTES,
   profileDraftFromUser,
+  profilePhotoError,
+  profilePhotoSrc,
   profileUpdateBody,
   profileUpdateError,
 } from "@/lib/consumer/features/profile";
@@ -55,4 +58,23 @@ test("profileUpdateBody sends name, phone, address and date of birth with the ob
       version: 4,
     },
   );
+});
+
+test("profilePhotoSrc prefixes the BFF proxy path", () => {
+  assert.equal(profilePhotoSrc(null), null);
+  assert.equal(profilePhotoSrc("/users/me/photo?v=1"), "/api/proxy/users/me/photo?v=1");
+  assert.equal(profilePhotoSrc("https://cdn.example/a.jpg"), "https://cdn.example/a.jpg");
+});
+
+test("profilePhotoError rejects unsupported types and oversized files", () => {
+  assert.equal(profilePhotoError(null), "Choose a photo to upload.");
+  assert.equal(
+    profilePhotoError({ type: "image/gif", size: 10 } as File),
+    "Use a JPEG, PNG, or WebP image.",
+  );
+  assert.equal(
+    profilePhotoError({ type: "image/jpeg", size: MAX_PROFILE_PHOTO_BYTES + 1 } as File),
+    "Photo must be 2 MB or smaller.",
+  );
+  assert.equal(profilePhotoError({ type: "image/png", size: 100 } as File), null);
 });

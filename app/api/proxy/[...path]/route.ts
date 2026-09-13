@@ -43,11 +43,26 @@ async function forward(req: Request, ctx: Ctx) {
     if (isNullBodyStatus(upstream.status)) {
       return new NextResponse(null, { status: upstream.status });
     }
+    const upstreamType = upstream.headers.get("Content-Type") || "application/json";
+    const isBinary =
+      upstreamType.startsWith("image/") ||
+      upstreamType.startsWith("application/pdf") ||
+      upstreamType.startsWith("application/octet-stream");
+    if (isBinary) {
+      const bytes = await upstream.arrayBuffer();
+      return new NextResponse(bytes, {
+        status: upstream.status,
+        headers: {
+          "Content-Type": upstreamType,
+          "Cache-Control": upstream.headers.get("Cache-Control") || "private, no-store",
+        },
+      });
+    }
     const text = await upstream.text();
     return new NextResponse(text, {
       status: upstream.status,
       headers: {
-        "Content-Type": upstream.headers.get("Content-Type") || "application/json",
+        "Content-Type": upstreamType,
       },
     });
   } catch {
