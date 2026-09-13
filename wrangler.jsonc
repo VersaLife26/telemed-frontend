@@ -28,6 +28,18 @@
   // server runtime does.
   "compatibility_flags": ["nodejs_compat"],
 
+  // Cloudflare Workers Builds runs `npx wrangler deploy` with no `--env`.
+  // The named `env.patient` block below is what GitHub Actions uses
+  // (`wrangler deploy --env patient`). Mirror the patient hostname here so
+  // that unscoped dashboard deploy still binds the same Worker rather than
+  // uploading a script with no route.
+  "routes": [
+    { "pattern": "patient.versalifehealth.com", "custom_domain": true }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_TELEMED_SURFACE": "patient"
+  },
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

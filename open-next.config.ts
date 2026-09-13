@@ -19,5 +19,14 @@ import { defineCloudflareConfig } from "@opennextjs/cloudflare";
  * runtime, which this adapter supports. That is why `lib/admin/proxy-impl.ts`
  * builds its Auth.js instance from `authConfig` rather than importing the full
  * `@/auth` -- see the comment there.
+ *
+ * `buildCommand` is `next build` on purpose. Cloudflare Workers Builds and
+ * `npm run build` both invoke `opennextjs-cloudflare build`. If that in turn
+ * ran the npm `build` script, the two would recurse. The surface stylesheet
+ * is still selected first: npm's `prebuild` on the outer call, and
+ * select-surface.mjs here so `npm run cf:build` (no prebuild) stays correct.
  */
-export default defineCloudflareConfig();
+export default {
+  ...defineCloudflareConfig(),
+  buildCommand: "node scripts/select-surface.mjs && npx next build",
+};
