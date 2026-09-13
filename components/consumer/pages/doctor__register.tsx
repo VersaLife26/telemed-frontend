@@ -80,6 +80,8 @@ const emptyForm: DoctorApplyForm = {
   firstName: "",
   lastName: "",
   email: "",
+  password: "",
+  confirmPassword: "",
   phone: "",
   slmcNumber: "",
   languages: ["en"],
@@ -211,7 +213,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       scroll
-      blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with OTP."
+      blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with email and password, or OTP."
     >
       <div className="flex w-full flex-col gap-6">
         <AuthHeading
@@ -224,7 +226,7 @@ export default function RegisterPage() {
           subtitle={
             submitted
               ? undefined
-              : "Tell us about your practice. An admin will review your application."
+              : "Tell us about your practice. Choose an email and password now — you will use them to sign in after approval."
           }
         />
 
@@ -232,7 +234,8 @@ export default function RegisterPage() {
           <div className="flex w-full flex-col gap-6">
             <p className="text-body text-text-muted">
               Your application has been received and is under review. After approval you will get
-              an email, then you can sign in with OTP.
+              an email, then you can sign in with the email and password you chose here, or with
+              OTP on your phone.
             </p>
             <AuthFooterLink text="Ready to continue?" linkText="Back to sign in" href="/login" />
           </div>
@@ -268,6 +271,26 @@ export default function RegisterPage() {
                   onChange={(e) => patch({ email: e.target.value })}
                   placeholder="Email"
                   autoComplete="email"
+                />
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={72}
+                  value={form.password}
+                  onChange={(e) => patch({ password: e.target.value })}
+                  placeholder="Password (8–72 characters)"
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={72}
+                  value={form.confirmPassword}
+                  onChange={(e) => patch({ confirmPassword: e.target.value })}
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
                 />
                 <Input
                   type="tel"

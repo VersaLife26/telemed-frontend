@@ -53,6 +53,8 @@ export type DoctorApplyForm = {
   firstName: string;
   lastName: string;
   email: string;
+  password: string;
+  confirmPassword: string;
   phone: string;
   slmcNumber: string;
   languages: string[];
@@ -135,6 +137,12 @@ export function doctorApplyError(form: DoctorApplyForm): string | null {
   if (!form.email.trim() || !form.phone.trim()) {
     return "Email and phone are required so we can contact you after review.";
   }
+  if (form.password.length < 8 || form.password.length > 72) {
+    return "Password must be between 8 and 72 characters.";
+  }
+  if (form.password !== form.confirmPassword) {
+    return "Password and confirmation do not match.";
+  }
   if (!form.slmcNumber.trim()) {
     return "Board registration number (SLMC) is required.";
   }
@@ -211,6 +219,7 @@ export function doctorApplyPayload(form: DoctorApplyForm) {
     first_name: form.firstName.trim(),
     last_name: form.lastName.trim(),
     email: form.email.trim(),
+    password: form.password,
     phone: form.phone.trim(),
     slmc_number: form.slmcNumber.trim(),
     specialty: form.specialty,

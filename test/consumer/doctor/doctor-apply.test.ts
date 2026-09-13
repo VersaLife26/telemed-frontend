@@ -20,6 +20,8 @@ function completeForm(overrides: Partial<DoctorApplyForm> = {}): DoctorApplyForm
     firstName: "Amila",
     lastName: "Perera",
     email: "amila@example.com",
+    password: "secure-pass",
+    confirmPassword: "secure-pass",
     phone: "+94771234567",
     slmcNumber: "12345",
     languages: ["en", "si"],
@@ -80,8 +82,20 @@ test("a complete form has no error and keeps specialty independent of GP", () =>
   assert.match(payload.availability_notes, /30 min per consultation/);
   assert.deepEqual(payload.practicing_locations, ["Nawaloka", "Asiri"]);
   assert.equal(payload.terms_accepted, true);
+  assert.equal(payload.password, "secure-pass");
   assert.equal(payload.bank.account_number, "1234567890");
   assert.equal(applyDocuments(form).length, 3);
+});
+
+test("password is required and must match confirmation", () => {
+  assert.match(
+    doctorApplyError(completeForm({ password: "short" })) ?? "",
+    /password/i,
+  );
+  assert.match(
+    doctorApplyError(completeForm({ confirmPassword: "different-pass" })) ?? "",
+    /confirmation/i,
+  );
 });
 
 test("other language requires a name", () => {
