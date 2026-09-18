@@ -53,3 +53,4 @@ jobs:
       - run: npm run build
         env:
           TELEMED_SURFACE: ${{ matrix.surface }}
+          NEXT_PUBLIC_TELEMED_SURFACE: ${{ matrix.surface }}

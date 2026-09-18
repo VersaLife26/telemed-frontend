@@ -1,5 +1,6 @@
-import { SURFACE } from "@/lib/consumer/surface";
 "use client";
+
+import { SURFACE } from "@/lib/consumer/surface";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";

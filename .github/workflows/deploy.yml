@@ -48,6 +48,7 @@ jobs:
       - run: npm run typecheck
         env:
           TELEMED_SURFACE: ${{ matrix.surface }}
+          NEXT_PUBLIC_TELEMED_SURFACE: ${{ matrix.surface }}
 
       - name: deploy to Cloudflare
         env:
