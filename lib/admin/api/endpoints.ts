@@ -50,7 +50,8 @@ export const endpoints = {
       return `${ADMIN}/users?${sp}`;
     },
     detail: (userId: string) => `${ADMIN}/users/${userId}`,
-    activity: (userId: string) => `${ADMIN}/users/${userId}/activity`,
+    activity: (userId: string) =>
+      `${ADMIN}/users/${userId}/activity?per_page=100`,
     suspend: (userId: string) => `${ADMIN}/users/${userId}/suspend`,
     reinstate: (userId: string) => `${ADMIN}/users/${userId}/reinstate`,
     // NOTE: there is deliberately no `impersonate` entry. The V2 docs §7.3
