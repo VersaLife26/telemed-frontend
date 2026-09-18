@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { PracticeOverview } from "@/components/consumer/practice-overview";
 import { Card } from "@/components/consumer/layout/AppShell";
 import { Button } from "@/components/consumer/ui/Button";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Doctor } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
+import type { PeakHours, PracticeSummary } from "@/lib/consumer/features/practice";
 
 export default async function DashboardPage() {
   const token = await getAccessToken();
@@ -57,6 +59,20 @@ export default async function DashboardPage() {
     );
   }
 
+  let summary: PracticeSummary | null = null;
+  let peak: PeakHours | null = null;
+  let analyticsError: string | null = null;
+  try {
+    const [s, p] = await Promise.all([
+      apiFetch<PracticeSummary>("/api/v1/doctors/me/analytics", { token }),
+      apiFetch<PeakHours>("/api/v1/doctors/me/analytics/peak-hours", { token }),
+    ]);
+    summary = s;
+    peak = p;
+  } catch (e) {
+    analyticsError = e instanceof Error ? e.message : "Could not load practice analytics";
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-2">
@@ -81,10 +97,15 @@ export default async function DashboardPage() {
         <Link href="/earnings">
           <Card className="hover:border-border-card">
             <p className="text-h5 text-black">Earnings</p>
-            <p className="mt-2 text-body-sm text-text-muted">Payouts (soon)</p>
+            <p className="mt-2 text-body-sm text-text-muted">Settled consults</p>
           </Card>
         </Link>
       </div>
+      {analyticsError ? (
+        <p className="text-body-sm text-danger">{analyticsError}</p>
+      ) : (
+        <PracticeOverview summary={summary} peak={peak} />
+      )}
     </div>
   );
 }

@@ -19,22 +19,34 @@ export type TelemedUser = {
   version?: number;
 };
 
+export type DoctorQualification = {
+  degree: string;
+  institution: string;
+  year: number;
+};
+
 export type Doctor = {
   id: string;
   user_id?: string;
   slmc_number?: string;
   specialty?: string;
+  sub_specialties?: string[];
   display_name?: string;
   languages?: string[];
   bio?: string;
   photo_url?: string | null;
+  qualifications?: DoctorQualification[];
   fee_cents?: number;
+  /** Deprecated alias of fee_cents. The PUT body still uses this name. */
+  fee_lkr?: number;
   currency?: string;
   rating?: number;
   review_count?: number;
   consultation_count?: number;
   verification_status?: string;
   experience_years?: number;
+  accepts_new_patients?: boolean;
+  version?: number;
   next_available_at?: string | null;
 };
 
