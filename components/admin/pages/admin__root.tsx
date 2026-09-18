@@ -11,7 +11,7 @@ import { UtilisationTable } from "@/components/admin/dashboard/utilisation-table
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer } from "@/lib/admin/api/server";
-import type { DashboardSummary } from "@/lib/admin/api/types";
+import type { DashboardSummary, DoctorTotalsRow, RevenuePoint, BookingsPoint } from "@/lib/admin/api/types";
 import { DISTRICTS, districtName } from "@/lib/admin/districts";
 import { formatCount, formatDate, formatMoney, formatPercent, humanise } from "@/lib/admin/format";
 
@@ -47,14 +47,21 @@ export default async function DashboardPage({
   const to = new Date();
   const from = new Date(to.getTime() - days * 86_400_000);
 
-  const result = await tryGetServer<DashboardSummary>(
-    endpoints.analytics.dashboard(
-      query({
-        from: from.toISOString().slice(0, 10),
-        to: to.toISOString().slice(0, 10),
-      }),
-    ),
-  );
+  const range = query({
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  });
+
+  const [result, revenueResult, bookingsResult, doctorsResult] = await Promise.all([
+    tryGetServer<DashboardSummary>(endpoints.analytics.dashboard(range)),
+    tryGetServer<RevenuePoint[]>(endpoints.analytics.revenue(range)),
+    tryGetServer<BookingsPoint[]>(endpoints.analytics.bookings(range)),
+    tryGetServer<DoctorTotalsRow[]>(endpoints.analytics.doctors(query({
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      limit: 10,
+    }))),
+  ]);
 
   const header = (
     <PageHeader
@@ -85,8 +92,9 @@ export default async function DashboardPage({
   const topSpecialties = summary.top_specialties ?? [];
   const districts = summary.districts ?? [];
   const doctorUtilisation = summary.doctor_utilisation ?? [];
-  const revenue = summary.revenue ?? [];
-  const bookingsDaily = summary.bookings_daily ?? [];
+  const revenue = revenueResult.ok ? revenueResult.data : (summary.revenue ?? []);
+  const bookingsDaily = bookingsResult.ok ? bookingsResult.data : (summary.bookings_daily ?? []);
+  const topDoctors = doctorsResult.ok ? doctorsResult.data : [];
 
   // Every district, including the ones with no activity — a chart built only
   // from returned rows hides exactly the coverage gaps this view exists to show.
@@ -146,6 +154,17 @@ export default async function DashboardPage({
             value: row.booking_count,
           }))}
           emptyLabel="No bookings recorded in this range."
+        />
+
+        <RankedBars
+          title="Top doctors"
+          description="Booking volume from GET /analytics/doctors."
+          items={topDoctors.map((row) => ({
+            key: row.doctor_id,
+            label: row.doctor_id.slice(0, 8),
+            value: row.total_count,
+          }))}
+          emptyLabel="No doctor totals in this range."
         />
 
         <RankedBars

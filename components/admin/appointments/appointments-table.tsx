@@ -14,6 +14,7 @@ import { formatDateTime, humanise, shortId } from "@/lib/admin/format";
 import { AppointmentStatusBadge } from "./status-badge";
 import { ForceCancelDialog } from "./force-cancel-dialog";
 import { AppointmentAuditDialog } from "./appointment-audit-dialog";
+import { AppointmentDetailDialog } from "./appointment-detail-dialog";
 
 export function AppointmentsTable({
   appointments,
@@ -24,6 +25,7 @@ export function AppointmentsTable({
 }) {
   const [cancelTarget, setCancelTarget] = React.useState<AdminAppointment | null>(null);
   const [auditTarget, setAuditTarget] = React.useState<AdminAppointment | null>(null);
+  const [detailId, setDetailId] = React.useState<string | null>(null);
 
   const columns = React.useMemo<ColumnDef<AdminAppointment, unknown>[]>(
     () => [
@@ -39,7 +41,13 @@ export function AppointmentsTable({
               className="truncate font-mono text-xs text-muted-foreground"
               title={row.original.appointment_id}
             >
-              {shortId(row.original.appointment_id)}
+              <button
+                type="button"
+                className="underline-offset-2 hover:underline"
+                onClick={() => setDetailId(row.original.appointment_id)}
+              >
+                {shortId(row.original.appointment_id)}
+              </button>
             </p>
           </div>
         ),
@@ -141,6 +149,7 @@ export function AppointmentsTable({
 
       <ForceCancelDialog appointment={cancelTarget} onClose={() => setCancelTarget(null)} />
       <AppointmentAuditDialog appointment={auditTarget} onClose={() => setAuditTarget(null)} />
+      <AppointmentDetailDialog appointmentId={detailId} onClose={() => setDetailId(null)} />
     </>
   );
 }

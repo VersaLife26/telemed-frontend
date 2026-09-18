@@ -159,9 +159,134 @@ export function ScheduleEditor({
       </div>
 
       <p className="text-muted-foreground text-sm">
-        This sets the weekly pattern. Individual days off are recorded as leave,
-        which is managed separately from the appointments screen.
+        This sets the weekly pattern. Use the leave form below for a single day off.
       </p>
+
+      <HolidayForm doctorId={doctorId} />
+      <SlotBlockForm />
+    </div>
+  );
+}
+
+function HolidayForm({ doctorId }: { doctorId: string }) {
+  const [date, setDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [applyExisting, setApplyExisting] = useState(false);
+  const [cancelBooked, setCancelBooked] = useState(false);
+
+  const mutation = useApiMutation<unknown, void>({
+    method: "POST",
+    path: () => endpoints.doctorSchedule.holidays(),
+    body: () => ({
+      doctor_id: doctorId,
+      date,
+      reason: reason.trim(),
+      apply_to_existing: applyExisting,
+      cancel_booked: cancelBooked,
+    }),
+    successMessage: () => "Leave recorded. Generated slots for that day follow the holiday rules.",
+    onSuccess: () => {
+      setDate("");
+      setReason("");
+      setApplyExisting(false);
+      setCancelBooked(false);
+    },
+  });
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <h3 className="text-sm font-medium">Record leave</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor="leave-date">Date</Label>
+          <Input id="leave-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="leave-reason">Reason</Label>
+          <Input
+            id="leave-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={200}
+          />
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={applyExisting}
+          onChange={(e) => setApplyExisting(e.target.checked)}
+        />
+        Withdraw already-generated slots
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={cancelBooked}
+          onChange={(e) => setCancelBooked(e.target.checked)}
+        />
+        Cancel and refund existing bookings
+      </label>
+      <Button
+        variant="outline"
+        disabled={!date || reason.trim().length === 0 || mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        Save leave
+      </Button>
+    </div>
+  );
+}
+
+function SlotBlockForm() {
+  const [slotId, setSlotId] = useState("");
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState("BLOCKED");
+
+  const mutation = useApiMutation<unknown, void>({
+    method: "POST",
+    path: () => endpoints.doctorSchedule.blockSlot(slotId.trim()),
+    body: () => ({ status, reason: reason.trim() }),
+    successMessage: () => "Slot updated.",
+    onSuccess: () => {
+      setSlotId("");
+      setReason("");
+    },
+  });
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <h3 className="text-sm font-medium">Block or restore a slot</h3>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-1">
+          <Label htmlFor="slot-id">Slot ID</Label>
+          <Input
+            id="slot-id"
+            value={slotId}
+            onChange={(e) => setSlotId(e.target.value)}
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="slot-status">Status</Label>
+          <Input
+            id="slot-status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="slot-reason">Reason</Label>
+          <Input id="slot-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        disabled={slotId.trim().length < 8 || reason.trim().length === 0 || mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        Update slot
+      </Button>
     </div>
   );
 }

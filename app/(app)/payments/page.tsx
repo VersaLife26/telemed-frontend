@@ -8,6 +8,7 @@ import { Pagination } from "@/components/admin/data-table/pagination";
 import { CommissionEditor } from "@/components/admin/payments/commission-editor";
 import { LedgerTable } from "@/components/admin/payments/ledger-table";
 import { PayoutBatches } from "@/components/admin/payments/payout-batches";
+import { PromoCodesPanel } from "@/components/admin/payments/promo-codes";
 import { RefundsPanel } from "@/components/admin/payments/refunds-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/admin/ui/tabs";
 import { endpoints, query } from "@/lib/admin/api/endpoints";
@@ -17,6 +18,7 @@ import type {
   CommissionRuleSet,
   LedgerEntry,
   PayoutBatch,
+  PromoCode,
   RefundRequestRecord,
   SystemConfig,
 } from "@/lib/admin/api/types";
@@ -58,13 +60,12 @@ export default async function PaymentsPage({
     per_page: PER_PAGE,
   });
 
-  const [ledger, rules, batches, refunds] = await Promise.all([
+  const [ledger, rules, batches, refunds, promos] = await Promise.all([
     tryListServer<LedgerEntry>(endpoints.finance.ledger(ledgerQuery)),
-    tryGetServer<SystemConfig<CommissionRuleSet>>(
-      endpoints.settings.config(CONFIG_KEYS.commissionRules),
-    ),
+    tryGetServer<SystemConfig<CommissionRuleSet>>(endpoints.finance.commissionRules()),
     tryListServer<PayoutBatch>(endpoints.finance.payoutBatches(query({ per_page: 10 }))),
     tryListServer<RefundRequestRecord>(endpoints.finance.refunds(query({ per_page: 25 }))),
+    tryListServer<PromoCode>(endpoints.finance.promoCodes(query({ per_page: 50, include_inactive: true }))),
   ]);
 
   const filters = [
@@ -98,7 +99,7 @@ export default async function PaymentsPage({
     <>
       <PageHeader
         title="Payments"
-        description="Ledger, commission policy, payout batches and refund approvals. All amounts are integer cents on the wire; the currency is carried separately and never inferred."
+        description="Ledger, commission policy, payout batches, refunds and promo codes. All amounts are integer cents on the wire; the currency is carried separately and never inferred."
       />
 
       <Tabs defaultValue="ledger">
@@ -107,6 +108,7 @@ export default async function PaymentsPage({
           <TabsTrigger value="commission">Commission rules</TabsTrigger>
           <TabsTrigger value="payouts">Payout batches</TabsTrigger>
           <TabsTrigger value="refunds">Refunds</TabsTrigger>
+          <TabsTrigger value="promos">Promo codes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ledger">
@@ -172,6 +174,14 @@ export default async function PaymentsPage({
             />
           ) : (
             <ErrorState error={refunds.error} what="refund requests" />
+          )}
+        </TabsContent>
+
+        <TabsContent value="promos">
+          {promos.ok || promos.error.code === "NOT_FOUND" ? (
+            <PromoCodesPanel codes={promos.ok ? promos.page.data : []} readOnly={readOnly} />
+          ) : (
+            <ErrorState error={promos.error} what="promo codes" />
           )}
         </TabsContent>
       </Tabs>

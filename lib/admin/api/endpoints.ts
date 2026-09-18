@@ -84,6 +84,9 @@ export const endpoints = {
     runPayoutBatch: () => `${ADMIN}/finance/payouts/run`,
     refunds: (q: URLSearchParams) => `${ADMIN}/finance/refunds?${q}`,
     decideRefund: (id: string) => `${ADMIN}/finance/refunds/${id}/decision`,
+    promoCodes: (q: URLSearchParams) => `${ADMIN}/finance/promo-codes?${q}`,
+    promoCode: (code?: string) =>
+      code ? `${ADMIN}/finance/promo-codes/${encodeURIComponent(code)}` : `${ADMIN}/finance/promo-codes`,
   },
 
   content: {
@@ -102,6 +105,7 @@ export const endpoints = {
 
   disputes: {
     list: (q: URLSearchParams) => `${ADMIN}/disputes?${q}`,
+    create: () => `${ADMIN}/disputes`,
     detail: (id: string) => `${ADMIN}/disputes/${id}`,
     comments: (id: string) => `${ADMIN}/disputes/${id}/comments`,
     assign: (id: string) => `${ADMIN}/disputes/${id}/assign`,
@@ -127,6 +131,8 @@ export const endpoints = {
     availability: (id: string) => `${ADMIN}/doctors/${id}/availability`,
     settings: (id: string) => `${ADMIN}/doctors/${id}/schedule-settings`,
     application: (id: string) => `${ADMIN}/doctors/${id}/application?include=bytes`,
+    holidays: () => `${ADMIN}/holidays`,
+    blockSlot: (slotId: string) => `${ADMIN}/slots/${slotId}/block`,
   },
 
   adminUsers: {
@@ -140,6 +146,10 @@ export const endpoints = {
   analytics: {
     /** Documented in the gateway route table. */
     revenue: (q: URLSearchParams) => `${ADMIN}/analytics/revenue?${q}`,
+    bookings: (q: URLSearchParams) => `${ADMIN}/analytics/bookings?${q}`,
+    doctors: (q: URLSearchParams) => `${ADMIN}/analytics/doctors?${q}`,
+    utilization: (q: URLSearchParams) => `${ADMIN}/analytics/utilization?${q}`,
+    districts: (q: URLSearchParams) => `${ADMIN}/analytics/districts?${q}`,
     dashboard: (q: URLSearchParams) => `${ADMIN}/analytics/dashboard?${q}`,
   },
 

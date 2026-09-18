@@ -242,6 +242,26 @@ export interface RefundRequestRecord {
   decided_by: Uuid | null;
 }
 
+export interface PromoCode {
+  id: Uuid;
+  code: string;
+  description?: string;
+  discount_type: "percent" | "fixed";
+  percent_bps?: number;
+  amount_off_cents?: Cents;
+  max_discount_cents?: Cents;
+  min_amount_cents?: Cents;
+  currency: string;
+  valid_from: Timestamp;
+  valid_until?: Timestamp | null;
+  max_redemptions?: number | null;
+  max_per_user: number;
+  redemption_count: number;
+  active: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface PayoutBatch {
   id: Uuid;
   status: "pending" | "processing" | "paid" | "failed";
@@ -456,6 +476,14 @@ export interface BookingsPoint {
 export interface DoctorUtilisationRow {
   doctor_id: Uuid;
   doctor_name: string | null;
+  completed_count: number;
+  no_show_count: number;
+  cancelled_count: number;
+  total_count: number;
+}
+
+export interface DoctorTotalsRow {
+  doctor_id: Uuid;
   completed_count: number;
   no_show_count: number;
   cancelled_count: number;

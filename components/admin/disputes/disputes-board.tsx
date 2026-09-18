@@ -12,6 +12,7 @@ import type { AdminIdentity, Dispute, DisputeStatus } from "@/lib/admin/api/type
 import { formatMoney, formatRelative, humanise, shortId } from "@/lib/admin/format";
 
 import { DisputeDrawer } from "./dispute-drawer";
+import { CreateDisputeDialog } from "./create-dispute-dialog";
 
 const STATUS_VARIANT: Record<
   DisputeStatus,
@@ -40,6 +41,7 @@ export function DisputesBoard({
   filtered: boolean;
 }) {
   const [selected, setSelected] = React.useState<Dispute | null>(null);
+  const [creating, setCreating] = React.useState(false);
 
   const columns = React.useMemo<ColumnDef<Dispute, unknown>[]>(
     () => [
@@ -128,6 +130,11 @@ export function DisputesBoard({
 
   return (
     <>
+      <div className="mb-3 flex justify-end">
+        <Button size="sm" onClick={() => setCreating(true)}>
+          Open a dispute
+        </Button>
+      </div>
       <DataTable
         columns={columns}
         data={disputes}
@@ -151,6 +158,7 @@ export function DisputesBoard({
         admins={admins}
         onClose={() => setSelected(null)}
       />
+      <CreateDisputeDialog open={creating} onClose={() => setCreating(false)} />
     </>
   );
 }

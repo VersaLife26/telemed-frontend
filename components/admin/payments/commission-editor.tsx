@@ -24,7 +24,6 @@ import {
 import { Label } from "@/components/admin/ui/label";
 import { Textarea } from "@/components/admin/ui/textarea";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import { CONFIG_KEYS } from "@/lib/admin/api/types";
 import { useApiMutation } from "@/lib/admin/api/hooks";
 import type { CommissionRuleSet, SystemConfig } from "@/lib/admin/api/types";
 import { formatDateTime } from "@/lib/admin/format";
@@ -34,6 +33,7 @@ import {
 } from "@/lib/admin/schemas/commission";
 
 import { DiffView } from "./diff-view";
+import { ConfigHistory } from "@/components/admin/settings/config-history";
 
 /**
  * The commission rule editor.
@@ -71,7 +71,7 @@ export function CommissionEditor({
 
   const mutation = useApiMutation<SystemConfig<CommissionRuleSet>, void>({
     method: "PUT",
-    path: () => endpoints.settings.config(CONFIG_KEYS.commissionRules),
+    path: () => endpoints.finance.commissionRules(),
     body: () => ({
       value: parsed.ok ? parsed.value : undefined,
     }),
@@ -185,6 +185,14 @@ export function CommissionEditor({
           </Button>
         </div>
       </CardFooter>
+
+      <CardContent>
+        <h3 className="mb-2 text-sm font-medium">Version history</h3>
+        <ConfigHistory
+          configKey="commission_rules"
+          path={endpoints.finance.commissionRuleHistory()}
+        />
+      </CardContent>
 
       <Dialog
         open={confirming}

@@ -94,6 +94,8 @@ test("canCallApi mirrors the Go rbac.Matrix, group for group", () => {
     [["support"], "/api/v1/admin/disputes", true],
     [["support"], "/api/v1/admin/reschedule-requests", true],
     [["support"], "/api/v1/admin/reschedule-requests/req-1/accept", true],
+    [["support"], "/api/v1/admin/holidays", true],
+    [["support"], "/api/v1/admin/slots/slot-1/block", true],
     [["support"], "/api/v1/admin/me", true],
   ];
   for (const [roles, path, want] of cases) {

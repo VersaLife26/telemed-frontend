@@ -13,6 +13,8 @@ import {
   CardTitle,
 } from "@/components/admin/ui/card";
 import { EmptyState } from "@/components/admin/ui/empty-state";
+import { Input } from "@/components/admin/ui/input";
+import { Label } from "@/components/admin/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,9 +55,16 @@ export function PayoutBatches({
   batches: PayoutBatch[];
   readOnly: boolean;
 }) {
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+
   const mutation = useApiMutation<PayoutBatch, void>({
     method: "POST",
     path: () => endpoints.finance.runPayoutBatch(),
+    body: () =>
+      from && to
+        ? { from: new Date(`${from}T00:00:00.000Z`).toISOString(), to: new Date(`${to}T23:59:59.000Z`).toISOString() }
+        : undefined,
     successMessage: () =>
       "Payout batch requested. payment-service performs the transfers and publishes payout.sent per doctor.",
   });
@@ -72,6 +81,15 @@ export function PayoutBatches({
         </div>
 
         {!readOnly ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="payout-from">From</Label>
+              <Input id="payout-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="payout-to">To</Label>
+              <Input id="payout-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+            </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="sm" disabled={mutation.isPending}>
@@ -96,7 +114,8 @@ export function PayoutBatches({
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
-          </AlertDialog>
+            </AlertDialog>
+          </div>
         ) : null}
       </CardHeader>
 

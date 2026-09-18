@@ -26,7 +26,7 @@ import { Separator } from "@/components/admin/ui/separator";
 import { Skeleton } from "@/components/admin/ui/skeleton";
 import { Textarea } from "@/components/admin/ui/textarea";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import { useApiList, useApiMutation } from "@/lib/admin/api/hooks";
+import { useApiList, useApiMutation, useApiQuery } from "@/lib/admin/api/hooks";
 import type { AdminIdentity, Dispute, DisputeComment } from "@/lib/admin/api/types";
 import { formatDateTime, formatMoney, humanise, shortId } from "@/lib/admin/format";
 
@@ -67,12 +67,20 @@ export function DisputeDrawer({
     { enabled },
   );
 
+  const detail = useApiQuery<Dispute>(
+    ["dispute-detail", dispute?.id ?? ""],
+    dispute ? endpoints.disputes.detail(dispute.id) : "",
+    { enabled },
+  );
+
+  const view = detail.data ?? dispute;
+
   const assign = useApiMutation<Dispute, { assignedTo: string | null }>({
     method: "POST",
     path: () => endpoints.disputes.assign(dispute?.id ?? ""),
-    body: (variables) => ({
+            body: (variables) => ({
       assigned_to: variables.assignedTo,
-      version: dispute?.version,
+      version: (detail.data ?? dispute)?.version,
     }),
     successMessage: () => "Assignment updated.",
   });
@@ -94,7 +102,7 @@ export function DisputeDrawer({
     body: () => ({
       status: outcome,
       resolution: resolution.trim(),
-      version: dispute?.version,
+      version: (detail.data ?? dispute)?.version,
     }),
     successMessage: () => "Dispute resolved.",
     onSuccess: onClose,
@@ -127,14 +135,14 @@ export function DisputeDrawer({
             <section>
               <h3 className="mb-1 text-sm font-medium">What the patient reported</h3>
               <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-                {dispute.description}
+                {view?.description || "Open the case to load the patient's report."}
               </p>
-              {dispute.refund_requested ? (
+              {view?.refund_requested ? (
                 <Alert variant="warning" className="mt-3">
                   <MessageSquare aria-hidden="true" />
                   <AlertTitle>
                     Refund requested:{" "}
-                    {formatMoney(dispute.refund_amount_cents, dispute.currency)}
+                    {formatMoney(view.refund_amount_cents, view.currency)}
                   </AlertTitle>
                   <AlertDescription>
                     Resolving this dispute does not move money. Approve the refund on the
@@ -151,18 +159,19 @@ export function DisputeDrawer({
               <div className="flex gap-2">
                 <Select
                   value={dispute.assigned_to ?? "__unassigned__"}
-                  onValueChange={(value) =>
-                    assign.mutate({
-                      assignedTo: value === "__unassigned__" ? null : value,
-                    })
-                  }
+                  onValueChange={(value) => {
+                    if (value === "__unassigned__") return;
+                    assign.mutate({ assignedTo: value });
+                  }}
                   disabled={settled || assign.isPending}
                 >
                   <SelectTrigger id="dispute-assignee" className="max-w-sm">
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__unassigned__">Unassigned</SelectItem>
+                    <SelectItem value="__unassigned__" disabled>
+                      Unassigned
+                    </SelectItem>
                     {admins.map((admin) => (
                       <SelectItem key={admin.id} value={admin.id}>
                         {admin.display_name || admin.email}

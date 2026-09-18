@@ -12,7 +12,7 @@ import type { AdminUserRecord } from "@/lib/admin/api/types";
 import { formatDate, shortId } from "@/lib/admin/format";
 
 import { SuspensionDialog } from "./suspension-dialog";
-import { ActivityDialog } from "./activity-dialog";
+import { UserDetailDialog } from "./user-detail-dialog";
 
 /**
  * User search results.
@@ -34,6 +34,7 @@ export function UsersTable({
 }) {
   const [suspendTarget, setSuspendTarget] = React.useState<AdminUserRecord | null>(null);
   const [activityTarget, setActivityTarget] = React.useState<AdminUserRecord | null>(null);
+  const [detailId, setDetailId] = React.useState<string | null>(null);
 
   const columns = React.useMemo<ColumnDef<AdminUserRecord, unknown>[]>(
     () => [
@@ -41,7 +42,11 @@ export function UsersTable({
         accessorKey: "full_name",
         header: "Name",
         cell: ({ row }) => (
-          <div className="min-w-0">
+          <button
+            type="button"
+            className="min-w-0 text-left"
+            onClick={() => setDetailId(row.original.user_id)}
+          >
             <p className="truncate font-medium">{row.original.full_name ?? "Unnamed"}</p>
             <p
               className="truncate font-mono text-xs text-muted-foreground"
@@ -49,7 +54,7 @@ export function UsersTable({
             >
               {shortId(row.original.user_id)}
             </p>
-          </div>
+          </button>
         ),
       },
       {
@@ -160,6 +165,7 @@ export function UsersTable({
         onClose={() => setSuspendTarget(null)}
       />
       <ActivityDialog user={activityTarget} onClose={() => setActivityTarget(null)} />
+      <UserDetailDialog userId={detailId} onClose={() => setDetailId(null)} />
     </>
   );
 }

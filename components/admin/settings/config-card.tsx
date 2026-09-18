@@ -19,6 +19,7 @@ import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiMutation } from "@/lib/admin/api/hooks";
 import type { SystemConfig } from "@/lib/admin/api/types";
 import { formatDateTime } from "@/lib/admin/format";
+import { ConfigHistory } from "@/components/admin/settings/config-history";
 
 export interface NumberFieldSpec {
   key: string;
@@ -185,6 +186,10 @@ export function NumericConfigCard<T extends object>({
           {mutation.isPending ? "Saving…" : "Save new version"}
         </Button>
       </CardFooter>
+      <CardContent>
+        <h3 className="mb-2 text-sm font-medium">Version history</h3>
+        <ConfigHistory configKey={configKey} />
+      </CardContent>
     </Card>
   );
 }
