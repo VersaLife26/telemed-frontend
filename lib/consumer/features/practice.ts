@@ -108,6 +108,11 @@ export function peakGrid(cells: PeakHourCell[] | undefined): number[][] {
   return grid;
 }
 
+export type TimeWindow = {
+  start_time: string;
+  end_time: string;
+};
+
 export function defaultWorkingHours(): WorkingHour[] {
   return Array.from({ length: 7 }, (_, day) => ({
     day_of_week: day,
@@ -118,8 +123,101 @@ export function defaultWorkingHours(): WorkingHour[] {
 }
 
 export function fillWorkingHours(hours: WorkingHour[]): WorkingHour[] {
-  const byDay = new Map(hours.map((h) => [h.day_of_week, h]));
-  return defaultWorkingHours().map((fallback) => byDay.get(fallback.day_of_week) ?? fallback);
+  const byDay = new Map<number, WorkingHour[]>();
+  for (const h of hours) {
+    const list = byDay.get(h.day_of_week) ?? [];
+    list.push(h);
+    byDay.set(h.day_of_week, list);
+  }
+
+  const result: WorkingHour[] = [];
+  for (const fallback of defaultWorkingHours()) {
+    const dayHours = byDay.get(fallback.day_of_week);
+    if (dayHours && dayHours.length > 0) {
+      result.push(...dayHours);
+    } else {
+      result.push(fallback);
+    }
+  }
+  return result;
+}
+
+export function groupWorkingHours(hours: WorkingHour[]): {
+  windows: Record<number, TimeWindow[]>;
+  available: Record<number, boolean>;
+} {
+  const seeded = fillWorkingHours(hours);
+  const windows: Record<number, TimeWindow[]> = {};
+  const available: Record<number, boolean> = {};
+
+  for (let day = 0; day <= 6; day++) {
+    windows[day] = [];
+    available[day] = false;
+  }
+
+  for (const h of seeded) {
+    const day = h.day_of_week;
+    if (day >= 0 && day <= 6) {
+      const dayWins = windows[day] ?? [];
+      dayWins.push({
+        start_time: h.start_time.slice(0, 5),
+        end_time: h.end_time.slice(0, 5),
+      });
+      windows[day] = dayWins;
+      if (h.is_available) {
+        available[day] = true;
+      }
+    }
+  }
+
+  for (let day = 0; day <= 6; day++) {
+    const dayWins = windows[day];
+    if (!dayWins || dayWins.length === 0) {
+      windows[day] = [{ start_time: "09:00", end_time: "17:00" }];
+    }
+  }
+
+  return { windows, available };
+}
+
+export function flattenWorkingHours(
+  windows: Record<number, TimeWindow[]>,
+  available: Record<number, boolean>,
+): WorkingHour[] {
+  const result: WorkingHour[] = [];
+  for (let day = 0; day <= 6; day++) {
+    const isDayAvailable = available[day] ?? false;
+    const dayWins = windows[day] ?? [];
+
+    if (!isDayAvailable) {
+      const first = dayWins[0];
+      result.push({
+        day_of_week: day,
+        start_time: first?.start_time || "09:00",
+        end_time: first?.end_time || "17:00",
+        is_available: false,
+      });
+    } else {
+      if (dayWins.length === 0) {
+        result.push({
+          day_of_week: day,
+          start_time: "09:00",
+          end_time: "17:00",
+          is_available: true,
+        });
+      } else {
+        for (const w of dayWins) {
+          result.push({
+            day_of_week: day,
+            start_time: w.start_time,
+            end_time: w.end_time,
+            is_available: true,
+          });
+        }
+      }
+    }
+  }
+  return result;
 }
 
 export function rupeesToCents(rupees: number): number {

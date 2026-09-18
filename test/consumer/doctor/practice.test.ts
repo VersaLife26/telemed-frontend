@@ -10,7 +10,9 @@ import {
   documentMetadataBody,
   doctorFeeCents,
   fillWorkingHours,
+  flattenWorkingHours,
   formatRate,
+  groupWorkingHours,
   peakGrid,
   practiceProfileBody,
   rupeesToCents,
@@ -44,6 +46,43 @@ test("fillWorkingHours keeps stored days and fills the rest", () => {
   assert.equal(filled.length, 7);
   assert.equal(filled[1]?.start_time, "08:00");
   assert.equal(filled[0]?.is_available, false);
+});
+
+test("fillWorkingHours preserves multiple windows for the same day", () => {
+  const filled = fillWorkingHours([
+    { day_of_week: 1, start_time: "08:00", end_time: "12:00", is_available: true },
+    { day_of_week: 1, start_time: "16:00", end_time: "20:00", is_available: true },
+  ]);
+  assert.equal(filled.length, 8);
+  const monday = filled.filter((h) => h.day_of_week === 1);
+  assert.equal(monday.length, 2);
+  assert.equal(monday[0]?.start_time, "08:00");
+  assert.equal(monday[1]?.start_time, "16:00");
+});
+
+test("groupWorkingHours and flattenWorkingHours round-trip multiple shifts per day", () => {
+  const input = [
+    { day_of_week: 1, start_time: "08:00:00", end_time: "12:00:00", is_available: true },
+    { day_of_week: 1, start_time: "16:00:00", end_time: "20:00:00", is_available: true },
+  ];
+  const { windows, available } = groupWorkingHours(input);
+  assert.equal(available[1], true);
+  assert.equal(available[0], false);
+  assert.equal(windows[1]?.length, 2);
+  assert.equal(windows[1]?.[0]?.start_time, "08:00");
+  assert.equal(windows[1]?.[1]?.start_time, "16:00");
+
+  const flattened = flattenWorkingHours(windows, available);
+  const mondayFlattened = flattened.filter((h) => h.day_of_week === 1);
+  assert.equal(mondayFlattened.length, 2);
+  assert.equal(mondayFlattened[0]?.start_time, "08:00");
+  assert.equal(mondayFlattened[0]?.is_available, true);
+  assert.equal(mondayFlattened[1]?.start_time, "16:00");
+  assert.equal(mondayFlattened[1]?.is_available, true);
+
+  const sundayFlattened = flattened.filter((h) => h.day_of_week === 0);
+  assert.equal(sundayFlattened.length, 1);
+  assert.equal(sundayFlattened[0]?.is_available, false);
 });
 
 test("availabilityPutBody omits unset buffer and empty holidays", () => {
