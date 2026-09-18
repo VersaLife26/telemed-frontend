@@ -68,7 +68,7 @@ export const endpoints = {
     forceCancel: (id: string) => `${ADMIN}/appointments/${id}/force-cancel`,
     doubleBookings: () => `${ADMIN}/appointments/double-bookings`,
     resolveDoubleBooking: () => `${ADMIN}/appointments/resolve-double-booking`,
-    audit: (id: string) => `${ADMIN}/appointments/${id}/audit`,
+    audit: (id: string) => `${ADMIN}/appointments/${id}/audit?per_page=100`,
     /** Named gateway routes send these to scheduling-service, not admin-service. */
     rescheduleRequests: (q: URLSearchParams) => `${ADMIN}/reschedule-requests?${q}`,
     acceptReschedule: (id: string) => `${ADMIN}/reschedule-requests/${id}/accept`,
