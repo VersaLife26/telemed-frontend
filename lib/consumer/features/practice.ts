@@ -101,7 +101,9 @@ export function peakGrid(cells: PeakHourCell[] | undefined): number[][] {
     if (cell.day_of_week == null) continue;
     if (cell.day_of_week < 0 || cell.day_of_week > 6) continue;
     if (cell.hour_of_day < 0 || cell.hour_of_day > 23) continue;
-    grid[cell.day_of_week][cell.hour_of_day] = cell.bookings;
+    const row = grid[cell.day_of_week];
+    if (!row) continue;
+    row[cell.hour_of_day] = cell.bookings;
   }
   return grid;
 }

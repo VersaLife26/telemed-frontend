@@ -28,8 +28,8 @@ test("peakGrid fills a sparse week and busiestLabel names the cell", () => {
     { day_of_week: 1, hour_of_day: 9, bookings: 4 },
     { day_of_week: 1, hour_of_day: 10, bookings: 1 },
   ]);
-  assert.equal(grid[1][9], 4);
-  assert.equal(grid[0][0], 0);
+  assert.equal(grid[1]?.[9], 4);
+  assert.equal(grid[0]?.[0], 0);
   assert.equal(
     busiestLabel({ day_of_week: 1, hour_of_day: 9, bookings: 4 }),
     "Mon 09:00 · 4 bookings",
@@ -42,8 +42,8 @@ test("fillWorkingHours keeps stored days and fills the rest", () => {
     { day_of_week: 1, start_time: "08:00", end_time: "12:00", is_available: true },
   ]);
   assert.equal(filled.length, 7);
-  assert.equal(filled[1].start_time, "08:00");
-  assert.equal(filled[0].is_available, false);
+  assert.equal(filled[1]?.start_time, "08:00");
+  assert.equal(filled[0]?.is_available, false);
 });
 
 test("availabilityPutBody omits unset buffer and empty holidays", () => {

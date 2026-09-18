@@ -12,6 +12,7 @@ import type { AdminUserRecord } from "@/lib/admin/api/types";
 import { formatDate, shortId } from "@/lib/admin/format";
 
 import { SuspensionDialog } from "./suspension-dialog";
+import { ActivityDialog } from "./activity-dialog";
 import { UserDetailDialog } from "./user-detail-dialog";
 
 /**
