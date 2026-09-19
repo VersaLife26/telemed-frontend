@@ -49,6 +49,11 @@ export function foldersListPath(ownerUserId?: string, parentId?: string | null):
   return qs ? `/records/folders?${qs}` : "/records/folders";
 }
 
+/** An older records service treats /folders and /patients as /{id}. */
+export function isCapturedRecordId(error: unknown): boolean {
+  return error instanceof Error && /^id must be a valid UUID$/i.test(error.message);
+}
+
 export function patientsListPath(): string {
   return "/records/patients";
 }

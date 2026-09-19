@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   folderCrumbs,
+  isCapturedRecordId,
   previewKind,
   recordsListPath,
   recordDownloadPath,
@@ -37,4 +38,9 @@ test("recordsListPath scopes a folder and an owner", () => {
   assert.equal(recordsListPath("scan", null, "user-1"), "/records?document_type=scan&folder_id=root&owner_user_id=user-1");
   assert.equal(recordDownloadPath("doc-1", true), "/records/doc-1/download?disposition=attachment");
   assert.equal(recordDownloadPath("doc-1"), "/records/doc-1/download");
+});
+
+test("isCapturedRecordId is the old /records/{id} collision", () => {
+  assert.equal(isCapturedRecordId(new Error("id must be a valid UUID")), true);
+  assert.equal(isCapturedRecordId(new Error("folder_id must be a valid UUID")), false);
 });

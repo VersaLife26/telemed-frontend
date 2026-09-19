@@ -36,6 +36,7 @@ import {
   folderCrumbs,
   foldersListPath,
   formatBytes,
+  isCapturedRecordId,
   patientsListPath,
   previewKind,
   recordsListPath,
@@ -92,14 +93,21 @@ export function VaultBrowser({
 
   const loadPatients = useCallback(async () => {
     if (mode !== "doctor") return;
-    const data = await browserApi<VaultPatient[]>(patientsListPath());
-    const list = scopedPatients(Array.isArray(data) ? data : [], lockedRoot);
-    setPatients(list);
-    setSelectedPatient((current) => {
-      if (lockedRoot) return lockedRoot;
-      if (current && list.some((p) => p.user_id === current)) return current;
-      return list[0]?.user_id;
-    });
+    if (lockedRoot) {
+      setSelectedPatient(lockedRoot);
+      return;
+    }
+    try {
+      const data = await browserApi<VaultPatient[]>(patientsListPath());
+      const list = scopedPatients(Array.isArray(data) ? data : [], lockedRoot);
+      setPatients(list);
+      setSelectedPatient((current) => {
+        if (current && list.some((p) => p.user_id === current)) return current;
+        return list[0]?.user_id;
+      });
+    } catch (e) {
+      if (!isCapturedRecordId(e)) throw e;
+    }
   }, [lockedRoot, mode]);
 
   const load = useCallback(async () => {
@@ -109,13 +117,20 @@ export function VaultBrowser({
       setPath([]);
       return;
     }
-    const [listing, files] = await Promise.all([
+    const [folderResult, fileResult] = await Promise.allSettled([
       browserApi<VaultFolderListing>(foldersListPath(vaultOwner, folderId)),
       browserApi<VaultDocument[]>(recordsListPath(filter, folderId, vaultOwner)),
     ]);
-    setFolders(listing?.folders ?? []);
-    setPath(listing?.path ?? []);
-    setDocs(Array.isArray(files) ? files : []);
+    if (fileResult.status === "rejected") throw fileResult.reason;
+    if (folderResult.status === "rejected") {
+      if (!isCapturedRecordId(folderResult.reason)) throw folderResult.reason;
+      setFolders([]);
+      setPath([]);
+    } else {
+      setFolders(folderResult.value?.folders ?? []);
+      setPath(folderResult.value?.path ?? []);
+    }
+    setDocs(Array.isArray(fileResult.value) ? fileResult.value : []);
   }, [filter, folderId, mode, vaultOwner]);
 
   useEffect(() => {
