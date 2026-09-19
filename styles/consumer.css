@@ -1,35 +1,216 @@
 @import "tailwindcss";
 
+/*
+ * VersaLife Health — patient + doctor design tokens.
+ *
+ * Three blocks, and the split matters:
+ *
+ *   :root          raw values, and every name that existing code dereferences
+ *                  with `var(--x)` inside an arbitrary utility.
+ *   @theme         literal tokens. Emits the custom property AND generates the
+ *                  utility, so `rounded-lg` and `var(--radius-lg)` both work.
+ *   @theme inline  aliases onto :root values. `inline` makes `bg-brand` emit
+ *                  `var(--brand)` rather than a snapshot -- but it does not
+ *                  publish the alias as a custom property, so nothing declared
+ *                  there may be referenced as `var(--color-…)` from CSS.
+ *
+ * Derived from the VersaLife Health design kit (tokens/*.css). Fonts are NOT
+ * imported here: the kit's Google Fonts @import would be a third-party request
+ * on every page load, and `font-src 'self' data:` on static responses blocks
+ * it. next/font self-hosts them -- see components/consumer/layouts/root.tsx,
+ * which puts the font variables on <html> so :root can dereference them.
+ */
+
+:root {
+  /* Primary — royal blue */
+  --blue-50:  oklch(97.5% 0.012 258);
+  --blue-100: oklch(94%   0.03  258);
+  --blue-200: oklch(88%   0.06  258);
+  --blue-300: oklch(80%   0.09  258);
+  --blue-400: oklch(70%   0.13  258);
+  --blue-500: oklch(62%   0.17  258);
+  --blue-600: oklch(55%   0.19  258);
+  --blue-700: oklch(46%   0.18  258);
+  --blue-800: oklch(36%   0.15  258);
+  --blue-900: oklch(24%   0.10  258);
+
+  /* Neutral ink — cool near-black navy, never pure gray */
+  --ink-0:   oklch(99%   0.002 258);
+  --ink-50:  oklch(97.5% 0.004 258);
+  --ink-100: oklch(94%   0.006 258);
+  --ink-200: oklch(88%   0.008 258);
+  --ink-300: oklch(78%   0.01  258);
+  --ink-400: oklch(64%   0.014 258);
+  --ink-500: oklch(52%   0.018 258);
+  --ink-600: oklch(42%   0.03  258);
+  --ink-700: oklch(32%   0.045 258);
+  --ink-800: oklch(24%   0.05  258);
+  --ink-900: oklch(17%   0.045 258);
+
+  /* Accent — teal, for positive / live states */
+  --teal-100: oklch(93% 0.05 178);
+  --teal-500: oklch(58% 0.10 178);
+  --teal-700: oklch(40% 0.09 178);
+
+  /* Semantic hues, matched in lightness+chroma to the blue ramp */
+  --amber-100: oklch(94% 0.06 80);
+  --amber-500: oklch(75% 0.15 80);
+  --amber-700: oklch(48% 0.12 60);
+  --red-100:   oklch(94% 0.04 25);
+  --red-500:   oklch(58% 0.19 25);
+  --red-700:   oklch(42% 0.17 25);
+
+  /* Surfaces */
+  --page:        var(--ink-0);
+  --surface:     #ffffff;
+  --tint:        var(--blue-50);
+  --tint-strong: var(--blue-100);
+  --inverted:    var(--ink-900);
+
+  /* Lines */
+  --border-subtle:  var(--ink-100);
+  --border-default: var(--ink-200);
+  --border-strong:  var(--ink-300);
+
+  /* Text */
+  --ink:      var(--ink-900);
+  --muted:    var(--ink-500);
+  --faint:    var(--ink-400);
+  --on-brand: #ffffff;
+  --on-tint:  var(--blue-700);
+
+  /* Brand. --brand-accent is the mint in logo.svg, which had no token before. */
+  --brand:        var(--blue-600);
+  --brand-hover:  var(--blue-700);
+  --brand-active: var(--blue-800);
+  --brand-tint:   var(--blue-100);
+  --brand-accent: #50c898;
+
+  /* Status */
+  --success:      var(--teal-700);
+  --success-tint: var(--teal-100);
+  --warning:      var(--amber-700);
+  --warning-tint: var(--amber-100);
+  --danger:       var(--red-700);
+  --danger-tint:  var(--red-100);
+  --skeleton:     var(--ink-100);
+
+  /* Type families. next/font declares --font-jakarta / --font-manrope on
+     <html>, which is this same element, so these resolve. */
+  --family-display: var(--font-jakarta), "Segoe UI", system-ui, sans-serif;
+  --family-body:    var(--font-manrope), "Segoe UI", system-ui, sans-serif;
+
+  /* Gradients — heroes and CTAs are never a flat colour */
+  --gradient-hero: linear-gradient(135deg, var(--blue-200) 0%, var(--blue-100) 45%, var(--blue-50) 100%);
+  --gradient-cta:  linear-gradient(120deg, var(--blue-600) 0%, var(--blue-500) 100%);
+
+  /* Glassmorphism. Always over the gradient, a photo or a tint -- on flat
+     white it is invisible, which is what the @supports fallback covers.
+     Never stack one glass surface on another. */
+  --glass-bg-light:  oklch(99% 0.002 258 / 0.55);
+  --glass-bg-medium: oklch(99% 0.002 258 / 0.38);
+  --glass-bg-strong: oklch(99% 0.002 258 / 0.22);
+  --glass-bg-tint:   oklch(85% 0.05  258 / 0.28);
+  --glass-bg-dark:   oklch(20% 0.03  258 / 0.45);
+  --glass-border:      1px solid oklch(99% 0.002 258 / 0.45);
+  --glass-border-dark: 1px solid oklch(99% 0.002 258 / 0.18);
+  --glass-blur-sm: blur(8px);
+  --glass-blur-md: blur(16px);
+  --glass-blur-lg: blur(28px);
+  --glass-shadow: 0 8px 32px oklch(24% 0.05 258 / 0.14), inset 0 1px 0 oklch(99% 0.002 258 / 0.5);
+
+  --duration-fast: 160ms;
+  --duration-base: 220ms;
+  --duration-slow: 320ms;
+  --stagger-step:  60ms;
+
+  --content-max-width: 1200px;
+}
+
+/*
+ * Hover on a touch device fires on tap and then sticks, so a lift or a colour
+ * shift reads as a stuck state rather than feedback. Every decorative hover in
+ * this codebase goes behind `can-hover:`; `:active` and `:focus-visible` are
+ * what touch actually gets.
+ */
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
+
 @theme {
-  --color-primary: #015591;
-  --color-primary-light: #69aad8;
-  --color-ink: #12202a;
-  --color-linen: #eef2f4;
-  --color-paper: #ffffff;
-  --color-bg-gray: #f8f8f8;
-  --color-bg-gray-300: #f3f3f3;
-  --color-text-muted: #5c6b75;
-  --color-text-placeholder: #b9b9b9;
-  --color-text-label: #6b7780;
-  --color-border: #d5dee4;
-  --color-border-light: #e8e8e8;
-  --color-border-input: #f3f3f3;
-  --color-border-card: #d7e6f0;
-  --color-danger: #b42318;
-  --color-stamp: #b45309;
-  --color-stamp-soft: #f8eadb;
-  --color-ward: #1f6b5a;
-  --color-ward-soft: #e3f0ec;
-  --color-skeleton: #e3eaee;
-  --font-manrope: "Manrope", sans-serif;
-  --radius-auth: 38px;
-  --radius-card: 16px;
-  --radius-pill: 32px;
-  --radius-input: 8px;
-  --shadow-soft: 0px 4px 6px rgba(18, 32, 42, 0.04);
-  --shadow-otp: 0px 4px 12px rgba(18, 32, 42, 0.04);
-  --shadow-ticket: 0 10px 28px rgba(18, 32, 42, 0.08);
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Literals: emitted as custom properties AND as utilities. */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
+  --radius-xl:   28px;
+  --radius-pill: 999px;
+
+  /* Blue-tinted, never neutral black. */
+  --shadow-sm:    0 1px 2px oklch(24% 0.05 258 / 0.06), 0 1px 1px oklch(24% 0.05 258 / 0.04);
+  --shadow-md:    0 8px 20px oklch(24% 0.05 258 / 0.08), 0 2px 6px oklch(24% 0.05 258 / 0.05);
+  --shadow-lg:    0 20px 40px oklch(24% 0.05 258 / 0.12), 0 6px 16px oklch(24% 0.05 258 / 0.06);
+  --shadow-brand: 0 12px 24px oklch(55% 0.19 258 / 0.28);
+
+  /* Nothing uses ease-in: it delays the first frame, the one being watched. */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@theme inline {
+  --color-blue-50:  var(--blue-50);
+  --color-blue-100: var(--blue-100);
+  --color-blue-200: var(--blue-200);
+  --color-blue-300: var(--blue-300);
+  --color-blue-400: var(--blue-400);
+  --color-blue-500: var(--blue-500);
+  --color-blue-600: var(--blue-600);
+  --color-blue-700: var(--blue-700);
+  --color-blue-800: var(--blue-800);
+  --color-blue-900: var(--blue-900);
+
+  --color-ink-0:   var(--ink-0);
+  --color-ink-50:  var(--ink-50);
+  --color-ink-100: var(--ink-100);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
+  --color-ink-600: var(--ink-600);
+  --color-ink-700: var(--ink-700);
+  --color-ink-800: var(--ink-800);
+  --color-ink-900: var(--ink-900);
+
+  --color-page:        var(--page);
+  --color-surface:     var(--surface);
+  --color-tint:        var(--tint);
+  --color-tint-strong: var(--tint-strong);
+  --color-inverted:    var(--inverted);
+
+  --color-border-subtle:  var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong:  var(--border-strong);
+
+  --color-ink:      var(--ink);
+  --color-muted:    var(--muted);
+  --color-faint:    var(--faint);
+  --color-on-brand: var(--on-brand);
+  --color-on-tint:  var(--on-tint);
+
+  --color-brand:        var(--brand);
+  --color-brand-hover:  var(--brand-hover);
+  --color-brand-active: var(--brand-active);
+  --color-brand-tint:   var(--brand-tint);
+  --color-brand-accent: var(--brand-accent);
+
+  --color-success:      var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warning:      var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-danger:       var(--danger);
+  --color-danger-tint:  var(--danger-tint);
+  --color-skeleton:     var(--skeleton);
+
+  --font-display: var(--family-display);
+  --font-body:    var(--family-body);
 }
 
 @layer base {
@@ -42,10 +223,16 @@
     margin: 0;
     padding: 0;
     min-height: 100%;
-    font-family: var(--font-manrope);
-    background: #ffffff;
-    color: var(--color-ink);
+    font-family: var(--family-body);
+    background: var(--page);
+    color: var(--ink);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--family-display);
+    margin: 0;
   }
 
   a {
@@ -64,9 +251,11 @@
   button:focus-visible,
   input:focus-visible,
   textarea:focus-visible,
-  select:focus-visible {
-    outline: 3px solid var(--color-primary);
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid var(--brand);
     outline-offset: 2px;
+    border-radius: var(--radius-sm);
   }
 }
 
@@ -76,16 +265,143 @@
     left: 1rem;
     top: -4rem;
     z-index: 100;
-    border-radius: 999px;
-    background: var(--color-primary);
+    border-radius: var(--radius-pill);
+    background: var(--brand);
     color: #fff;
     padding: 0.5rem 1rem;
     font-size: 14px;
     font-weight: 600;
+    transition: top var(--duration-fast) var(--ease-out);
   }
 
   .skip-link:focus {
     top: 1rem;
+  }
+
+  .glass-panel {
+    background: var(--glass-bg-light);
+    -webkit-backdrop-filter: var(--glass-blur-md);
+    backdrop-filter: var(--glass-blur-md);
+    border: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius-lg);
+  }
+
+  .glass-panel-strong {
+    background: var(--glass-bg-medium);
+    -webkit-backdrop-filter: var(--glass-blur-lg);
+    backdrop-filter: var(--glass-blur-lg);
+    border: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius-lg);
+  }
+
+  .glass-panel-dark {
+    background: var(--glass-bg-dark);
+    -webkit-backdrop-filter: var(--glass-blur-md);
+    backdrop-filter: var(--glass-blur-md);
+    border: var(--glass-border-dark);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius-lg);
+    color: #fff;
+  }
+
+  /* The wash every glass surface sits on: a gradient band plus a blurred
+     brand blob, so the frosting has something to actually refract. */
+  .page-wash {
+    position: relative;
+    isolation: isolate;
+    background: var(--page);
+  }
+
+  .page-wash::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 460px;
+    z-index: -1;
+    background: var(--gradient-hero);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 40%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 40%, transparent 100%);
+  }
+
+  .page-wash::after {
+    content: "";
+    position: absolute;
+    top: -140px;
+    right: -90px;
+    width: 460px;
+    height: 460px;
+    z-index: -1;
+    border-radius: 50%;
+    background: var(--blue-300);
+    opacity: 0.32;
+    filter: blur(110px);
+    pointer-events: none;
+  }
+
+  /*
+   * Modal, on a native <dialog>. showModal() brings the focus trap, Escape,
+   * an inert background and ::backdrop for free -- all of which a div-based
+   * dialog has to reimplement, usually incompletely.
+   *
+   * It materialises rather than fading: blur and scale move together so the
+   * frosted surface reads as glass arriving, not a flat image cross-fading.
+   * `allow-discrete` is what lets the exit animate at all; where it is not
+   * supported the close is instant, which is the right direction to fail.
+   */
+  .vl-modal {
+    padding: 0;
+    border: none;
+    background: transparent;
+    width: min(30rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    opacity: 0;
+    transform: scale(0.96);
+    filter: blur(4px);
+    transition:
+      opacity var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out),
+      filter var(--duration-base) var(--ease-out),
+      overlay var(--duration-base) allow-discrete,
+      display var(--duration-base) allow-discrete;
+  }
+
+  .vl-modal[open] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  @starting-style {
+    .vl-modal[open] {
+      opacity: 0;
+      transform: scale(0.96);
+      filter: blur(4px);
+    }
+  }
+
+  .vl-modal::backdrop {
+    background: oklch(20% 0.03 258 / 0.45);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+    backdrop-filter: var(--glass-blur-sm);
+    opacity: 0;
+    transition:
+      opacity var(--duration-base) var(--ease-out),
+      overlay var(--duration-base) allow-discrete,
+      display var(--duration-base) allow-discrete;
+  }
+
+  .vl-modal[open]::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .vl-modal[open]::backdrop {
+      opacity: 0;
+    }
   }
 
   .skeleton-pulse {
@@ -93,7 +409,7 @@
   }
 
   .visit-ticket-rail {
-    background-image: radial-gradient(circle at 0 12px, var(--color-linen) 6px, transparent 7px);
+    background-image: radial-gradient(circle at 0 12px, var(--tint) 6px, transparent 7px);
     background-size: 12px 24px;
     background-repeat: repeat-y;
     background-position: left center;
@@ -101,58 +417,77 @@
 }
 
 @layer utilities {
+  /*
+   * Type scale. Tracking is size-specific -- negative as display text grows,
+   * neutral at body, positive at caption -- because a single letter-spacing
+   * value is always wrong at one end of the scale.
+   */
+  .text-display {
+    font-family: var(--family-display);
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+  }
+
   .text-h1 {
-    font-size: 64px;
-    font-weight: 600;
-    line-height: 1.1;
+    font-family: var(--family-display);
+    font-size: clamp(2.25rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.08;
     letter-spacing: -0.03em;
   }
 
   .text-h2 {
-    font-size: 40px;
-    font-weight: 600;
-    line-height: 1.1;
+    font-family: var(--family-display);
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    font-weight: 700;
+    line-height: 1.12;
     letter-spacing: -0.025em;
   }
 
   .text-h3 {
-    font-size: 32px;
-    font-weight: 600;
-    line-height: 1.15;
+    font-family: var(--family-display);
+    font-size: clamp(1.4rem, 2.2vw, 1.75rem);
+    font-weight: 700;
+    line-height: 1.18;
     letter-spacing: -0.02em;
   }
 
   .text-h4 {
-    font-size: 24px;
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
-
-  .text-h5 {
-    font-size: 20px;
+    font-family: var(--family-display);
+    font-size: 1.3125rem;
     font-weight: 600;
     line-height: 1.25;
     letter-spacing: -0.015em;
   }
 
-  .text-body {
-    font-size: 16px;
-    font-weight: 400;
-    line-height: 1.5;
+  .text-h5 {
+    font-family: var(--family-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.32;
+    letter-spacing: -0.01em;
   }
 
-  .text-body-sm {
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.5;
-  }
+  .text-body-lg { font-size: 1.0625rem;  font-weight: 400; line-height: 1.6; }
+  .text-body    { font-size: 1rem;       font-weight: 400; line-height: 1.6; }
+  .text-body-sm { font-size: 0.875rem;   font-weight: 400; line-height: 1.55; }
+  .text-label   { font-size: 0.8125rem;  font-weight: 600; line-height: 1.3; }
 
   .text-caption {
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.4;
     letter-spacing: 0.04em;
+  }
+
+  .text-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .tabular-time {
@@ -160,38 +495,86 @@
     font-feature-settings: "tnum" 1;
   }
 
-  @media (max-width: 768px) {
-    .text-h1 {
-      font-size: 40px;
-    }
-    .text-h2 {
-      font-size: 28px;
-    }
-    .text-h3 {
-      font-size: 24px;
-    }
-  }
+  /* First-paint stagger for a freshly rendered list. Decorative only: it
+     never gates interaction, and it collapses under reduced motion. */
+  .stagger > * { animation: rise var(--duration-slow) var(--ease-out) both; }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: calc(var(--stagger-step) * 1); }
+  .stagger > *:nth-child(3) { animation-delay: calc(var(--stagger-step) * 2); }
+  .stagger > *:nth-child(4) { animation-delay: calc(var(--stagger-step) * 3); }
+  .stagger > *:nth-child(5) { animation-delay: calc(var(--stagger-step) * 4); }
+  .stagger > *:nth-child(n + 6) { animation-delay: calc(var(--stagger-step) * 5); }
 }
 
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Reduced motion means gentler, not absent: opacity still carries meaning. */
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-pulse {
+  .skeleton-pulse,
+  .stagger > * {
     animation: none;
+  }
+
+  .vl-modal,
+  .vl-modal[open] {
+    transform: none;
+    filter: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .chrome-blur {
+  .chrome-blur,
+  .glass-panel,
+  .glass-panel-strong {
+    -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
-    background: var(--color-paper) !important;
+    background: var(--surface) !important;
+  }
+
+  .glass-panel-dark {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: var(--ink-900) !important;
   }
 }
 
-@keyframes skeleton-pulse {
-  0%,
-  100% {
-    opacity: 1;
+@media (prefers-contrast: more) {
+  .glass-panel,
+  .glass-panel-strong {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
   }
-  50% {
-    opacity: 0.45;
+
+  .glass-panel-dark {
+    background: var(--ink-900);
+    border: 1px solid var(--ink-600);
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-panel,
+  .glass-panel-strong {
+    background: var(--surface);
+  }
+
+  .glass-panel-dark {
+    background: var(--ink-900);
   }
 }

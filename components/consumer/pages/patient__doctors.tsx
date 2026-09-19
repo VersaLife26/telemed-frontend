@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { Search, Stethoscope } from "lucide-react";
 
+import { Button } from "@/components/consumer/ui/Button";
 import { DoctorCard } from "@/components/consumer/ui/DoctorCard";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
-import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
+import { Select } from "@/components/consumer/ui/Select";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Doctor } from "@/lib/consumer/api/types";
 import { SPECIALTIES } from "@/lib/consumer/features/doctor-apply";
@@ -12,9 +14,6 @@ import {
   hasActiveDoctorFilters,
   type DoctorListFilters,
 } from "@/lib/consumer/features/doctor-search";
-
-const filterFieldClass =
-  "min-h-12 w-full rounded-[32px] border border-transparent bg-paper px-6 py-3 text-[16px] leading-[1.4] text-ink shadow-[var(--shadow-soft)] outline-none placeholder:text-text-placeholder";
 
 export default async function DoctorsPage({
   searchParams,
@@ -44,76 +43,79 @@ export default async function DoctorsPage({
     : "Approved clinicians will appear here once the directory is live.";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <header>
-        <h1 className="text-h3 text-ink">Doctors</h1>
-        <p className="mt-1 text-body text-text-muted">Search by name or specialty, then pick a slot.</p>
+        <h1 className="text-h2 text-ink">Doctors</h1>
+        <p className="mt-1 text-body-lg text-muted">
+          Search by name or specialty, then pick a slot.
+        </p>
       </header>
 
-      <form className="flex flex-col gap-3" role="search">
+      {/* A plain GET form: the directory has to be searchable before, and
+          without, JavaScript. The panel is glass because it sits on the page
+          wash rather than on a white card. */}
+      <form className="glass-panel flex flex-col gap-4 p-5 md:p-6" role="search">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <label className="sr-only" htmlFor="doctor-search">
-            Search by name
-          </label>
           <Input
             id="doctor-search"
             name="q"
             defaultValue={filters.q || ""}
             placeholder="Search by name"
+            aria-label="Search by name"
+            icon={<Search className="size-4" />}
             className="flex-1"
           />
-          <Button type="submit" className="min-h-12 sm:min-w-32">
+          <Button type="submit" size="lg" className="sm:min-w-32">
             Search
           </Button>
         </div>
 
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="px-2 text-body-sm text-text-muted">Specialty</span>
-            <select
-              name="specialty"
-              defaultValue={filters.specialty || ""}
-              className={`${filterFieldClass} appearance-none`}
-            >
-              <option value="">All specialties</option>
-              {SPECIALTIES.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <Select
+            id="filter-specialty"
+            name="specialty"
+            label="Specialty"
+            defaultValue={filters.specialty || ""}
+          >
+            <option value="">All specialties</option>
+            {SPECIALTIES.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
 
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="px-2 text-body-sm text-text-muted">Min fee (LKR)</span>
-            <Input
-              name="min_fee"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={100}
-              defaultValue={filters.min_fee || ""}
-              placeholder="e.g. 2000"
-            />
-          </label>
+          <Input
+            id="filter-min-fee"
+            name="min_fee"
+            label="Min fee (LKR)"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={100}
+            defaultValue={filters.min_fee || ""}
+            placeholder="e.g. 2000"
+          />
 
-          <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="px-2 text-body-sm text-text-muted">Max fee (LKR)</span>
-            <Input
-              name="max_fee"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={100}
-              defaultValue={filters.max_fee || ""}
-              placeholder="e.g. 6000"
-            />
-          </label>
+          <Input
+            id="filter-max-fee"
+            name="max_fee"
+            label="Max fee (LKR)"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={100}
+            defaultValue={filters.max_fee || ""}
+            placeholder="e.g. 6000"
+          />
         </div>
 
         {filtered ? (
-          <p className="px-2 text-body-sm text-text-muted">
-            <Link href="/doctors" className="font-semibold text-primary underline-offset-2 hover:underline">
+          <p className="text-body-sm text-muted">
+            <Link
+              href="/doctors"
+              className="font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+            >
               Clear filters
             </Link>
           </p>
@@ -121,18 +123,25 @@ export default async function DoctorsPage({
       </form>
 
       {error ? (
-        <EmptyState title="Couldn’t load doctors" body={error} action={{ href: "/doctors", label: "Try again" }} />
-      ) : null}
-
-      {!error && doctors.length === 0 ? (
-        <EmptyState title="No doctors found" body={emptyBody} />
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {doctors.map((d) => (
-          <DoctorCard key={d.id} doctor={d} />
-        ))}
-      </div>
+        <EmptyState
+          title="Couldn’t load doctors"
+          body={error}
+          icon={<Stethoscope className="size-5" />}
+          action={{ href: "/doctors", label: "Try again" }}
+        />
+      ) : doctors.length === 0 ? (
+        <EmptyState
+          title="No doctors found"
+          body={emptyBody}
+          icon={<Stethoscope className="size-5" />}
+        />
+      ) : (
+        <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {doctors.map((d) => (
+            <DoctorCard key={d.id} doctor={d} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

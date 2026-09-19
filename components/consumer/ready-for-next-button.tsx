@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { BellRing } from "lucide-react";
+
 import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import { ApiError } from "@/lib/consumer/api/envelope";
@@ -51,12 +53,25 @@ export function ReadyForNextButton({ appointmentId }: { appointmentId?: string }
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Button type="button" variant="outline" fullWidth={false} disabled={busy} onClick={() => void ping()}>
-        {busy ? "Asking…" : "Ready for next patient"}
+    <div className="flex flex-col items-start gap-2">
+      <Button
+        variant="outline"
+        busy={busy}
+        leading={<BellRing className="size-4" />}
+        onClick={() => void ping()}
+      >
+        Ready for next patient
       </Button>
-      {note ? <p className="text-body-sm text-text-muted">{note}</p> : null}
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+      {note ? (
+        <p role="status" className="text-body-sm text-muted">
+          {note}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-body-sm text-danger">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

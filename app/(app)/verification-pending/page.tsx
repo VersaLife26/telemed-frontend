@@ -1,18 +1,23 @@
-import Link from "next/link";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { Button } from "@/components/consumer/ui/Button";
+import { ShieldCheck } from "lucide-react";
+
+import { ButtonLink } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
 
 export default function VerificationPendingPage() {
   return (
-    <Card className="flex max-w-xl flex-col gap-4">
-      <h1 className="text-h4 text-black">Verification pending</h1>
-      <p className="text-body text-text-muted">
-        SLMC documents are reviewed in the admin console. Once approved, slots generate and patients
-        can book you.
+    <Card variant="glass" className="flex max-w-xl flex-col items-start gap-4 p-8">
+      <span
+        aria-hidden="true"
+        className="flex size-12 items-center justify-center rounded-full bg-tint text-brand"
+      >
+        <ShieldCheck className="size-6" />
+      </span>
+      <h1 className="text-h2 text-ink">Verification pending</h1>
+      <p className="text-body text-muted">
+        SLMC documents are reviewed in the admin console. Once approved, slots generate and
+        patients can book you.
       </p>
-      <Link href="/dashboard" className="max-w-xs">
-        <Button>Back to dashboard</Button>
-      </Link>
+      <ButtonLink href="/dashboard">Back to dashboard</ButtonLink>
     </Card>
   );
 }

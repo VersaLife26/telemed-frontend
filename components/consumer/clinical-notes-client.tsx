@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { ArrowRight } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
+import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
@@ -214,36 +219,50 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
   const hasContent = hasSoapContent(draft, diagnoses);
 
   if (loading) {
-    return <p className="text-body text-text-muted">Loading clinical notes…</p>;
+    return <FormSkeleton />;
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-h4 text-black">Clinical notes</h1>
-          <p className="mt-1 text-body-sm text-text-muted">
-            SOAP note · {status === "finalised" ? "signed" : "draft"}
-            {saveState === "saving" ? " · saving…" : saveState === "saved" ? " · saved" : ""}
-          </p>
+          <h1 className="text-h2 text-ink">Clinical notes</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge tone={status === "finalised" ? "success" : "warning"}>
+              {status === "finalised" ? "Signed" : "Draft"}
+            </Badge>
+            {/* Autosave state as a badge, not a sentence: it changes every few
+                seconds and should not push the layout around when it does. */}
+            {saveState === "saving" ? (
+              <Badge tone="neutral">Saving…</Badge>
+            ) : saveState === "saved" ? (
+              <Badge tone="success">Saved</Badge>
+            ) : null}
+          </div>
         </div>
-        <Link href={`/appointments/${appointmentId}/prescription`} className="text-body-sm text-primary">
-          Write prescription →
+        <Link
+          href={`/appointments/${appointmentId}/prescription`}
+          className="inline-flex min-h-11 items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+        >
+          Write prescription
+          <ArrowRight aria-hidden="true" className="size-4" />
         </Link>
       </div>
 
       <ReadyForNextButton appointmentId={appointmentId} />
 
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
       {SOAP_SECTIONS.map((section) => (
-        <Card key={section.key} className="flex flex-col gap-2">
-          <label className="text-body font-medium text-black" htmlFor={section.key}>
-            {section.label}
-            <span className="ml-2 font-normal text-text-label">{section.hint}</span>
-          </label>
+        <Card key={section.key}>
           <Textarea
             id={section.key}
+            label={
+              <>
+                {section.label}
+                <span className="ml-2 font-normal text-faint">{section.hint}</span>
+              </>
+            }
             value={draft[section.key]}
             onChange={(e) => patchSection(section.key, e.target.value)}
             maxLength={20000}
@@ -251,74 +270,100 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
         </Card>
       ))}
 
-      <Card className="flex flex-col gap-3">
-        <p className="text-body font-medium text-black">ICD-10 diagnoses</p>
+      <Card className="flex flex-col gap-4">
+        <h2 className="text-h4 text-ink">ICD-10 diagnoses</h2>
+
         <div className="relative">
-            <Input
-              value={icdQuery}
-              onChange={(e) => setIcdQuery(e.target.value)}
-              placeholder="Search code or term (dengue, E11, lepto…)"
-            />
-            {icdHits.length ? (
-              <ul className="absolute z-10 mt-2 max-h-56 w-full overflow-auto rounded-[16px] bg-white p-2 shadow-[var(--shadow-soft)]">
-                {icdHits.map((hit) => (
-                  <li key={hit.code}>
-                    <button
-                      type="button"
-                      className="w-full rounded-[12px] px-3 py-2 text-left text-body-sm hover:bg-bg-gray"
-                      onClick={() => addDiagnosis(hit)}
-                    >
-                      <span className="font-medium">{hit.code}</span> {hit.description}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
+          <Input
+            id="icd-search"
+            value={icdQuery}
+            onChange={(e) => setIcdQuery(e.target.value)}
+            placeholder="Search code or term (dengue, E11, lepto…)"
+            aria-label="Search ICD-10 codes"
+          />
+          {icdHits.length ? (
+            <ul className="absolute z-10 mt-2 max-h-56 w-full overflow-auto rounded-md border border-border-subtle bg-surface p-2 shadow-lg">
+              {icdHits.map((hit) => (
+                <li key={hit.code}>
+                  <button
+                    type="button"
+                    className="w-full cursor-pointer rounded-sm px-3 py-2 text-left text-body-sm text-ink transition-colors duration-[160ms] ease-out can-hover:hover:bg-tint"
+                    onClick={() => addDiagnosis(hit)}
+                  >
+                    <span className="font-semibold">{hit.code}</span> {hit.description}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
         {diagnoses.length ? (
           <ul className="flex flex-col gap-2">
             {diagnoses.map((d) => (
-              <li key={d.code} className="flex flex-wrap items-center justify-between gap-2 rounded-[16px] bg-white px-4 py-2">
-                <p className="text-body-sm">
-                  <span className="font-medium">{d.code}</span> {d.description || ""}
-                  {d.is_primary ? <span className="ml-2 text-primary">primary</span> : null}
-                </p>
-                <div className="flex gap-2">
-                  {!d.is_primary ? (
-                    <button type="button" className="text-body-sm text-primary" onClick={() => setPrimary(d.code)}>
-                      Make primary
-                    </button>
+              <li
+                key={d.code}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-tint px-4 py-3"
+              >
+                <p className="text-body-sm text-ink">
+                  <span className="font-semibold">{d.code}</span> {d.description || ""}
+                  {d.is_primary ? (
+                    <Badge tone="brand" className="ml-2">
+                      primary
+                    </Badge>
                   ) : null}
-                  <button type="button" className="text-body-sm text-danger" onClick={() => removeDiagnosis(d.code)}>
+                </p>
+                <div className="flex gap-1">
+                  {!d.is_primary ? (
+                    <Button size="sm" variant="ghost" onClick={() => setPrimary(d.code)}>
+                      Make primary
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-danger"
+                    onClick={() => removeDiagnosis(d.code)}
+                  >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-body-sm text-text-muted">No coded diagnoses yet.</p>
+          <p className="text-body-sm text-muted">No coded diagnoses yet.</p>
         )}
       </Card>
 
       {locked ? (
-        <Card className="flex flex-col gap-3">
-          <p className="text-body font-medium text-black">Amend signed note</p>
-          <p className="text-body-sm text-text-muted">
-            Changes write a revision. The original signed text stays in the trail.
-          </p>
+        <Card className="flex flex-col items-start gap-4">
+          <div>
+            <h2 className="text-h4 text-ink">Amend signed note</h2>
+            <p className="mt-1 text-body-sm text-muted">
+              Changes write a revision. The original signed text stays in the trail.
+            </p>
+          </div>
           <Input
+            id="amend-reason"
+            label="Reason for amendment"
+            fieldClassName="w-full"
             value={amendReason}
             onChange={(e) => setAmendReason(e.target.value)}
-            placeholder="Reason for amendment"
           />
-          <Button type="button" onClick={() => void amend()} disabled={amending} fullWidth={false}>
-            {amending ? "Amending…" : "Save amendment"}
+          <Button busy={amending} onClick={() => void amend()}>
+            Save amendment
           </Button>
         </Card>
       ) : (
-          <Button type="button" onClick={() => void finalise()} disabled={finalising || !hasContent} fullWidth>
-          {finalising ? "Signing…" : "Finalise note"}
+        <Button
+          size="lg"
+          fullWidth
+          busy={finalising}
+          disabled={finalising || !hasContent}
+          onClick={() => void finalise()}
+        >
+          Finalise note
         </Button>
       )}
     </div>

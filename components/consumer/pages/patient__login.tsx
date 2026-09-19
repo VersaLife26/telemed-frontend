@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthDivider, GoogleButton } from "@/components/consumer/auth/GoogleButton";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
+import { Reveal } from "@/components/consumer/ui/Reveal";
 import { assets } from "@/lib/consumer/assets";
 
 function readError(json: unknown, fallback: string): string {
@@ -86,55 +88,68 @@ export default function LoginPage() {
   const busy = loading !== null;
 
   return (
-    <AuthLayout blurb="VersaLife Telemedicine. Consult trusted doctors online — anytime, anywhere in Sri Lanka.">
-      <div className="flex w-full flex-col gap-6">
-        <AuthHeading
-          title={
-            <>
-              <p>Sign in</p>
-            </>
-          }
-          subtitle="Use Google, email, or your mobile number."
-        />
-        <GoogleButton onCredential={onGoogle} disabled={busy} />
-        <form onSubmit={onEmail} className="flex w-full flex-col gap-4">
-          <Input
-            type="email"
-            autoComplete="email"
-            required
-            focused
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-          />
-          <Input
-            type="password"
-            autoComplete="current-password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-          />
-          {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-          <Button type="submit" fullWidth busy={loading === "email"} disabled={busy}>
-            {loading === "email" ? "Signing in…" : "Sign in with email"}
-          </Button>
-        </form>
-        <AuthDivider label="or use mobile" />
-        <form onSubmit={onOtp} className="flex w-full flex-col gap-4">
-          <Input
-            type="tel"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+9477XXXXXXX"
-          />
-          <Button type="submit" fullWidth busy={loading === "otp"} disabled={busy} icon={assets.phoneIcon} iconAlt="">
-            {loading === "otp" ? "Sending…" : "Send OTP"}
-          </Button>
-        </form>
-        <AuthFooterLink text="New here?" linkText="Create an account" href="/register" />
+    <AuthLayout>
+      <div className="flex w-full flex-col gap-7">
+        <AuthHeading title="Sign in" subtitle="Use Google, email, or your mobile number." />
+
+        <Reveal delay={1} className="flex flex-col gap-7">
+          <GoogleButton onCredential={onGoogle} disabled={busy} />
+
+          <form onSubmit={onEmail} className="flex w-full flex-col gap-4">
+            <Input
+              id="login-email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+            <Input
+              id="login-password"
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+            {error ? <Alert tone="danger">{error}</Alert> : null}
+            <Button type="submit" size="lg" fullWidth busy={loading === "email"} disabled={busy}>
+              {loading === "email" ? "Signing in…" : "Sign in with email"}
+            </Button>
+          </form>
+
+          <AuthDivider label="or use mobile" />
+
+          <form onSubmit={onOtp} className="flex w-full flex-col gap-4">
+            <Input
+              id="login-phone"
+              label="Mobile number"
+              type="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+9477XXXXXXX"
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              size="lg"
+              fullWidth
+              busy={loading === "otp"}
+              disabled={busy}
+              icon={assets.phoneIcon}
+            >
+              {loading === "otp" ? "Sending…" : "Send OTP"}
+            </Button>
+          </form>
+
+          <AuthFooterLink text="New here?" linkText="Create an account" href="/register" />
+        </Reveal>
       </div>
     </AuthLayout>
   );

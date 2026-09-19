@@ -1,23 +1,25 @@
 import { cx } from "@/lib/consumer/cx";
-import { statusLabel, statusTone, type BadgeTone } from "@/lib/consumer/features/patient-appointment";
+import {
+  statusLabel,
+  statusTone,
+  type BadgeTone as StatusTone,
+} from "@/lib/consumer/features/patient-appointment";
 
-const TONE: Record<BadgeTone, string> = {
-  amber: "bg-stamp-soft text-stamp",
-  teal: "bg-ward-soft text-ward",
-  muted: "bg-linen text-text-label",
-  danger: "bg-[#fde8e6] text-danger",
+import { Badge, type BadgeTone } from "./Badge";
+
+/** The feature module's tone vocabulary, mapped onto the design system's. */
+const TONE: Record<StatusTone, BadgeTone> = {
+  amber: "warning",
+  teal: "success",
+  muted: "neutral",
+  danger: "danger",
 };
 
-export function StatusBadge({ status }: { status?: string }) {
-  const tone = statusTone(status);
+export function StatusBadge({ status, className }: { status?: string; className?: string }) {
+  const tone = TONE[statusTone(status)];
   return (
-    <span
-      className={cx(
-        "inline-flex min-h-8 items-center rounded-full px-3 py-1 text-caption font-medium capitalize",
-        TONE[tone],
-      )}
-    >
+    <Badge tone={tone} dot={tone === "success"} className={cx("capitalize", className)}>
       {statusLabel(status)}
-    </span>
+    </Badge>
   );
 }

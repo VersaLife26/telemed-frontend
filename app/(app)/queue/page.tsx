@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { Button } from "@/components/consumer/ui/Button";
+import { CalendarDays, FileText, Pill, Video } from "lucide-react";
+
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
+import { Alert } from "@/components/consumer/ui/Alert";
+import { ButtonLink } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, RescheduleRequest } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { afterEndPath, callPath } from "@/lib/consumer/features/consult";
+import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
 
 async function pendingByAppointment(
@@ -20,7 +26,8 @@ async function pendingByAppointment(
           `/api/v1/appointments/${a.id}/reschedule-requests`,
           { token },
         );
-        const pending = (Array.isArray(items) ? items : []).find((r) => r.status === "pending") ?? null;
+        const pending =
+          (Array.isArray(items) ? items : []).find((r) => r.status === "pending") ?? null;
         return [a.id, pending] as const;
       } catch {
         return [a.id, null] as const;
@@ -34,11 +41,9 @@ export default async function QueuePage() {
   const token = await getAccessToken();
   if (!token) {
     return (
-      <Card className="flex flex-col gap-4">
-        <p className="text-body text-text-muted">Sign in to load your consultation queue.</p>
-        <Link href="/login" className="max-w-xs">
-          <Button>Sign in</Button>
-        </Link>
+      <Card className="flex max-w-xl flex-col items-start gap-4">
+        <p className="text-body text-muted">Sign in to load your consultation queue.</p>
+        <ButtonLink href="/login">Sign in</ButtonLink>
       </Card>
     );
   }
@@ -58,71 +63,96 @@ export default async function QueuePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex flex-col gap-2">
-        <p className="text-body font-medium text-black">Finished early?</p>
-        <p className="text-body-sm text-text-muted">
-          After you end a call, you can ask only the next patient if they can join now. Later
+    <div className="flex flex-col gap-6">
+      <Card variant="glass" className="flex flex-col items-start gap-3">
+        <h2 className="text-h5 text-ink">Finished early?</h2>
+        <p className="max-w-prose text-body-sm text-muted">
+          After you end a call you can ask only the next patient whether they can join now. Later
           slots stay where they are.
         </p>
         <ReadyForNextButton />
       </Card>
+
       {error ? (
-        <Card>
-          <p className="text-body-sm text-danger">{error}</p>
-          <p className="mt-2 text-body-sm text-text-muted">
-            Doctor appointment lists need a JWT with telemed_doctor_id. If you see a claim error,
-            the user-service token for this doctor account may need that claim set.
-          </p>
-        </Card>
+        <Alert tone="danger" title="Couldn’t load the queue">
+          {error} Doctor appointment lists need a JWT carrying <code>telemed_doctor_id</code>; if
+          you see a claim error, that claim may be missing on this account.
+        </Alert>
       ) : null}
-      {appointments.map((a) => {
-        return (
-        <Card
-          key={a.id}
-          className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div>
-            <p className="text-body font-medium text-black">{a.specialty || "Consultation"}</p>
-            <p className="text-body-sm text-text-muted">
-              {a.start_at_local || a.start_at} · {a.status}
-            </p>
-          </div>
-          <div className="flex flex-col items-stretch gap-2 sm:items-end">
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={callPath(a.id)}
-                className="rounded-full bg-primary px-4 py-2 text-body-sm text-white"
-              >
-                Join call
-              </Link>
-              <Link
-                href={afterEndPath("doctor", a.id)}
-                className="rounded-full bg-white px-4 py-2 text-body-sm text-primary"
-              >
-                Notes
-              </Link>
-              <Link
-                href={prescriptionPagePath(a.id)}
-                className="rounded-full bg-white px-4 py-2 text-body-sm text-primary"
-              >
-                Rx
-              </Link>
-            </div>
-            <RescheduleRequestForm
-              appointmentId={a.id}
-              pending={pending[a.id] ?? null}
-              startAt={a.start_at}
-            />
-          </div>
-        </Card>
-        );
-      })}
+
       {!error && appointments.length === 0 ? (
-        <Card>
-          <p className="text-body text-text-muted">No confirmed appointments in queue.</p>
-        </Card>
-      ) : null}
+        <EmptyState
+          title="Nothing in the queue"
+          body="Confirmed appointments appear here on the day, with a way to join, write notes and issue a prescription."
+          icon={<CalendarDays className="size-5" />}
+        />
+      ) : (
+        <ul className="stagger flex flex-col gap-3">
+          {appointments.map((a) => {
+            const when = a.start_at_local || a.start_at;
+            return (
+              <Card
+                as="li"
+                key={a.id}
+                className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+              >
+                <div className="flex min-w-0 gap-4">
+                  <span
+                    aria-hidden="true"
+                    className="hidden size-11 shrink-0 items-center justify-center rounded-full bg-tint text-brand sm:flex"
+                  >
+                    <CalendarDays className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-body font-semibold text-ink">
+                        {a.specialty || "Consultation"}
+                      </p>
+                      <StatusBadge status={a.status} />
+                    </div>
+                    <p className="mt-1 text-body-sm text-muted tabular-time">
+                      {formatVisitDate(when)} · {formatVisitClock(when)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-stretch gap-3 lg:items-end">
+                  <div className="flex flex-wrap gap-2">
+                    <ButtonLink
+                      href={callPath(a.id)}
+                      size="sm"
+                      leading={<Video className="size-4" />}
+                    >
+                      Join call
+                    </ButtonLink>
+                    <ButtonLink
+                      href={afterEndPath("doctor", a.id)}
+                      size="sm"
+                      variant="secondary"
+                      leading={<FileText className="size-4" />}
+                    >
+                      Notes
+                    </ButtonLink>
+                    <ButtonLink
+                      href={prescriptionPagePath(a.id)}
+                      size="sm"
+                      variant="secondary"
+                      leading={<Pill className="size-4" />}
+                    >
+                      Rx
+                    </ButtonLink>
+                  </div>
+                  <RescheduleRequestForm
+                    appointmentId={a.id}
+                    pending={pending[a.id] ?? null}
+                    startAt={a.start_at}
+                  />
+                </div>
+              </Card>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

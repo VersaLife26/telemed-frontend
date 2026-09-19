@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Banknote, PiggyBank, Wallet } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
+import { Card } from "@/components/consumer/ui/Card";
+import { StatCard } from "@/components/consumer/ui/StatCard";
+import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import {
   type DoctorEarnings,
@@ -39,72 +45,87 @@ export function EarningsClient() {
   const payouts = earnings?.payouts ?? [];
 
   if (loading) {
-    return <p className="text-body text-text-muted">Loading earnings…</p>;
+    return <FormSkeleton />;
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <h1 className="text-h4 text-black">Earnings</h1>
-      <p className="text-body-sm text-text-muted">
-        {earnings?.from && earnings?.to
-          ? `${periodLabel(earnings.from, earnings.to)}${earnings.timezone ? ` · ${earnings.timezone}` : ""}`
-          : "Settled consults from your practice ledger."}
-      </p>
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <header>
+        <h1 className="text-h2 text-ink">Earnings</h1>
+        <p className="mt-1 text-body-lg text-muted">
+          {earnings?.from && earnings?.to
+            ? `${periodLabel(earnings.from, earnings.to)}${earnings.timezone ? ` · ${earnings.timezone}` : ""}`
+            : "Settled consults from your practice ledger."}
+        </p>
+      </header>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card>
-          <p className="text-body-sm text-text-label">Earned (net)</p>
-          <p className="mt-2 text-h4 text-black">{formatMoney(totals.earned, totals.currency)}</p>
-          <p className="mt-1 text-body-sm text-text-muted">{totals.status}</p>
-        </Card>
-        <Card>
-          <p className="text-body-sm text-text-label">Paid out</p>
-          <p className="mt-2 text-h4 text-black">{formatMoney(totals.paid, totals.currency)}</p>
-        </Card>
-        <Card>
-          <p className="text-body-sm text-text-label">Unpaid</p>
-          <p className="mt-2 text-h4 text-black">{formatMoney(totals.pending, totals.currency)}</p>
-        </Card>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          icon={<Wallet className="size-5" />}
+          value={formatMoney(totals.earned, totals.currency)}
+          label="Earned (net)"
+          trend={totals.status}
+        />
+        <StatCard
+          icon={<Banknote className="size-5" />}
+          value={formatMoney(totals.paid, totals.currency)}
+          label="Paid out"
+        />
+        <StatCard
+          icon={<PiggyBank className="size-5" />}
+          value={formatMoney(totals.pending, totals.currency)}
+          label="Unpaid"
+        />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card>
-          <p className="text-body-sm text-text-label">Gross</p>
-          <p className="mt-2 text-h5 text-black">{formatMoney(totals.gross, totals.currency)}</p>
-        </Card>
-        <Card>
-          <p className="text-body-sm text-text-label">Commission</p>
-          <p className="mt-2 text-h5 text-black">{formatMoney(totals.commission, totals.currency)}</p>
-        </Card>
-      </div>
-
-      <h2 className="text-body font-medium text-black">Payout batches</h2>
-      {payouts.length === 0 ? (
-        <Card>
-          <p className="text-body text-text-muted">
-            No payout batches in this window yet. Finance settles captured consults on a cycle;
-            this list fills after that job.
+      {/* Gross and commission are the arithmetic behind the net figure above,
+          so they sit together on one tinted card rather than competing with
+          it as two more tiles. */}
+      <Card variant="tint" className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <p className="text-eyebrow text-brand">Gross</p>
+          <p className="mt-1 text-h4 text-ink tabular-time">
+            {formatMoney(totals.gross, totals.currency)}
           </p>
-        </Card>
-      ) : (
-        payouts.map((p) => (
-          <Card
-            key={p.payout_id}
-            className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p className="text-body font-medium text-black">
-                {formatMoney(p.amount_cents, p.currency || totals.currency)}
-              </p>
-              <p className="text-body-sm text-text-muted">
-                {periodLabel(p.period_start, p.period_end)}
-                {p.sent_at ? ` · sent ${p.sent_at.slice(0, 10)}` : ""}
-              </p>
-            </div>
-          </Card>
-        ))
-      )}
+        </div>
+        <div>
+          <p className="text-eyebrow text-brand">Commission</p>
+          <p className="mt-1 text-h4 text-ink tabular-time">
+            {formatMoney(totals.commission, totals.currency)}
+          </p>
+        </div>
+      </Card>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-h3 text-ink">Payout batches</h2>
+        {payouts.length === 0 ? (
+          <EmptyState
+            title="No payouts in this window"
+            body="Finance settles captured consults on a cycle; this list fills after that job runs."
+            icon={<Banknote className="size-5" />}
+          />
+        ) : (
+          <ul className="stagger flex flex-col gap-3">
+            {payouts.map((p) => (
+              <Card
+                as="li"
+                key={p.payout_id}
+                className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p className="text-h5 text-ink tabular-time">
+                  {formatMoney(p.amount_cents, p.currency || totals.currency)}
+                </p>
+                <p className="text-body-sm text-muted tabular-time">
+                  {periodLabel(p.period_start, p.period_end)}
+                  {p.sent_at ? ` · sent ${p.sent_at.slice(0, 10)}` : ""}
+                </p>
+              </Card>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

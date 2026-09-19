@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { AvailabilityEditor } from "@/components/consumer/availability-editor";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { Button } from "@/components/consumer/ui/Button";
+import { Alert } from "@/components/consumer/ui/Alert";
+import { ButtonLink } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { WorkingHour } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
@@ -11,11 +11,9 @@ export default async function AvailabilityPage() {
   const token = await getAccessToken();
   if (!token) {
     return (
-      <Card className="flex flex-col gap-4">
-        <p className="text-body text-text-muted">Sign in to manage availability.</p>
-        <Link href="/login" className="max-w-xs">
-          <Button>Sign in</Button>
-        </Link>
+      <Card className="flex max-w-xl flex-col items-start gap-4">
+        <p className="text-body text-muted">Sign in to manage availability.</p>
+        <ButtonLink href="/login">Sign in</ButtonLink>
       </Card>
     );
   }
@@ -39,10 +37,10 @@ export default async function AvailabilityPage() {
 
   if (error) {
     return (
-      <Card className="flex flex-col gap-3">
-        <h1 className="text-h4 text-black">Working hours</h1>
-        <p className="text-body-sm text-danger">{error}</p>
-      </Card>
+      <div className="flex max-w-xl flex-col gap-4">
+        <h1 className="text-h2 text-ink">Working hours</h1>
+        <Alert tone="danger">{error}</Alert>
+      </div>
     );
   }
 

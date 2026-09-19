@@ -1,45 +1,72 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+
 import { cx } from "@/lib/consumer/cx";
 
-type Variant = "primary" | "secondary" | "outline";
-type Size = "md" | "lg";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "glass" | "danger";
+export type ButtonSize = "sm" | "md" | "lg";
 
+const SIZE: Record<ButtonSize, string> = {
+  sm: "min-h-9 gap-1.5 px-4 text-[0.8125rem]",
+  md: "min-h-11 gap-2 px-6 text-[0.9375rem]",
+  lg: "min-h-12 gap-2.5 px-8 text-[1rem]",
+};
+
+const VARIANT: Record<ButtonVariant, string> = {
+  primary:
+    "bg-[image:var(--gradient-cta)] text-on-brand shadow-brand can-hover:hover:brightness-[1.06]",
+  secondary: "bg-brand-tint text-brand can-hover:hover:bg-blue-200",
+  outline:
+    "border border-border-default bg-surface text-ink shadow-sm can-hover:hover:border-border-strong",
+  ghost: "text-muted can-hover:hover:bg-tint can-hover:hover:text-ink",
+  glass: "glass-panel text-ink can-hover:hover:bg-[var(--glass-bg-medium)]",
+  danger: "bg-danger text-white shadow-sm can-hover:hover:brightness-110",
+};
+
+/**
+ * Press feedback is the point: `active:scale-[0.97]` fires on pointer-down, so
+ * the control answers before the handler does. Hover is a 1px lift and lives
+ * behind `can-hover:` -- on a touch screen it would stick after the tap.
+ *
+ * Only transform, box-shadow, colour and filter transition. `transition-all`
+ * would animate layout properties too, off the compositor.
+ */
 function buttonClass({
   variant = "primary",
   size = "md",
   fullWidth = false,
-  inactive = false,
-  className = "",
+  className,
 }: {
-  variant?: Variant;
-  size?: Size;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   fullWidth?: boolean;
-  inactive?: boolean;
   className?: string;
 }) {
   return cx(
-    "inline-flex min-h-11 items-center justify-center gap-2.5 rounded-[32px] px-6 py-3 shadow-[var(--shadow-soft)] transition-[transform,opacity] duration-[120ms] ease-[var(--ease-out)]",
-    "active:scale-[0.97]",
-    variant === "primary" && "bg-primary text-[16px] font-bold leading-[1.4] text-white",
-    variant === "secondary" && "bg-linen text-[16px] font-medium leading-[1.4] text-ink",
-    variant === "outline" &&
-      "border border-border bg-paper text-[16px] font-medium leading-[1.4] text-text-muted",
-    size === "lg" && "py-3 text-[18px] font-semibold tracking-[-0.02em]",
+    "inline-flex cursor-pointer select-none items-center justify-center rounded-pill font-semibold leading-none",
+    "transition-[transform,box-shadow,background-color,border-color,color,filter] duration-[160ms] ease-out",
+    "can-hover:hover:-translate-y-px active:scale-[0.97]",
+    "disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none",
+    "aria-disabled:pointer-events-none aria-disabled:opacity-50",
+    SIZE[size],
+    VARIANT[variant],
     fullWidth ? "w-full" : "w-auto",
-    inactive ? "cursor-not-allowed opacity-60" : "cursor-pointer",
     className,
   );
 }
 
-type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: Variant;
-  size?: Size;
+type ButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   fullWidth?: boolean;
   busy?: boolean;
+  /** Path to an SVG/PNG in /public. For a Lucide component use `leading`. */
   icon?: string;
   iconAlt?: string;
+  /** Rendered before the label — a Lucide icon, a dot, an avatar. */
+  leading?: ReactNode;
+  children?: ReactNode;
 };
 
 export function Button({
@@ -49,54 +76,58 @@ export function Button({
   busy = false,
   icon,
   iconAlt = "",
-  className = "",
+  leading,
+  className,
   children,
   disabled,
   type = "button",
   ...props
 }: ButtonProps) {
-  const inactive = Boolean(disabled || busy);
-
   return (
     <button
       type={type}
-      className={buttonClass({ variant, size, fullWidth, inactive, className })}
-      disabled={inactive}
+      className={buttonClass({ variant, size, fullWidth, className })}
+      disabled={Boolean(disabled || busy)}
       aria-busy={busy || undefined}
       {...props}
     >
       {busy ? (
         <span
-          className="size-[18px] shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+          className="size-[1.125rem] shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
           aria-hidden="true"
         />
       ) : icon ? (
-        <span className="relative size-[18px] shrink-0 overflow-hidden">
+        <span className="relative size-[1.125rem] shrink-0 overflow-hidden">
           <Image src={icon} alt={iconAlt} fill className="object-contain" />
         </span>
-      ) : null}
-      <span>{children}</span>
+      ) : (
+        leading
+      )}
+      {children}
     </button>
   );
 }
 
+type ButtonLinkProps = Omit<React.ComponentPropsWithoutRef<typeof Link>, "children"> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  fullWidth?: boolean;
+  leading?: ReactNode;
+  children?: ReactNode;
+};
+
 export function ButtonLink({
-  href,
-  children,
   variant = "primary",
   size = "md",
   fullWidth = false,
-  className = "",
-}: {
-  href: string;
-  children: ReactNode;
-  variant?: Variant;
-  size?: Size;
-  fullWidth?: boolean;
-  className?: string;
-}) {
+  leading,
+  className,
+  children,
+  ...props
+}: ButtonLinkProps) {
   return (
-    <Link href={href} className={buttonClass({ variant, size, fullWidth, className })}>
+    <Link className={buttonClass({ variant, size, fullWidth, className })} {...props}>
+      {leading}
       {children}
     </Link>
   );

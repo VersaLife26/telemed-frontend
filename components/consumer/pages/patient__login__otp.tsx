@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
+import { Reveal } from "@/components/consumer/ui/Reveal";
 import { OtpInput } from "@/components/consumer/ui/OtpInput";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 
@@ -81,48 +83,48 @@ function OtpForm() {
 
   return (
     <AuthLayout>
-      <div className="flex w-full max-w-[580px] flex-col gap-6">
+      <div className="flex w-full max-w-xl flex-col gap-7">
         <AuthHeading
-          title={
-            <>
-              <p>Enter the</p>
-              <p>verification code</p>
-            </>
-          }
+          title="Enter the verification code"
           subtitle={`Code sent to ${phone || "your phone"}`}
         />
-        <form onSubmit={onSubmit} className="flex flex-col gap-6">
-          <OtpInput length={6} value={code} onChange={setCode} />
-          {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-          {info ? <p className="text-body-sm text-primary">{info}</p> : null}
-          <Button type="submit" fullWidth busy={loading} disabled={loading || resending || code.length < 6}>
-            {loading ? "Verifying…" : "Verify & continue"}
-          </Button>
-        </form>
-        <div className="flex w-full flex-col items-center gap-3 text-center">
-          <button
-            type="button"
-            onClick={() => void onResend()}
-            disabled={!phone || cooldown > 0 || resending || loading}
-            className={`text-body ${
-              !phone || cooldown > 0 || resending || loading
-                ? "cursor-not-allowed text-text-muted opacity-60"
-                : "cursor-pointer text-primary"
-            }`}
-          >
-            {resending
-              ? "Sending…"
-              : cooldown > 0
-                ? `Resend code in ${cooldown}s`
-                : "Resend code"}
-          </button>
-          <p className="text-body text-text-muted">
-            Wrong number?{" "}
-            <Link href="/login" className="text-primary">
-              Change phone
-            </Link>
-          </p>
-        </div>
+
+        <Reveal delay={1} className="flex flex-col gap-6">
+          <form onSubmit={onSubmit} className="flex flex-col gap-5">
+            <OtpInput length={6} value={code} onChange={setCode} />
+            {error ? <Alert tone="danger">{error}</Alert> : null}
+            {info ? <Alert tone="success">{info}</Alert> : null}
+            <Button
+              type="submit"
+              size="lg"
+              fullWidth
+              busy={loading}
+              disabled={loading || resending || code.length < 6}
+            >
+              {loading ? "Verifying…" : "Verify & continue"}
+            </Button>
+          </form>
+
+          <div className="flex w-full flex-col items-center gap-3 text-center">
+            <button
+              type="button"
+              onClick={() => void onResend()}
+              disabled={!phone || cooldown > 0 || resending || loading}
+              className="min-h-11 cursor-pointer rounded-pill px-4 text-body font-semibold text-brand transition-colors duration-[160ms] ease-out disabled:cursor-not-allowed disabled:text-faint can-hover:hover:bg-tint"
+            >
+              {resending ? "Sending…" : cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+            </button>
+            <p className="text-body text-muted">
+              Wrong number?{" "}
+              <Link
+                href="/login"
+                className="font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+              >
+                Change phone
+              </Link>
+            </p>
+          </div>
+        </Reveal>
       </div>
     </AuthLayout>
   );

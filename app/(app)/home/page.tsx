@@ -1,4 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
+import { ArrowRight, CalendarDays, Stethoscope } from "lucide-react";
+
 import { Card } from "@/components/consumer/ui/Card";
 import { DoctorCard } from "@/components/consumer/ui/DoctorCard";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
@@ -6,6 +9,7 @@ import { EmptyVisitTicket, VisitTicket } from "@/components/consumer/ui/VisitTic
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
+import { stock } from "@/lib/consumer/assets";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import {
   appointmentAction,
@@ -16,6 +20,7 @@ import {
   greetingForHour,
   pickNextAppointment,
 } from "@/lib/consumer/features/patient-appointment";
+import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 
 async function loadDoctors() {
   try {
@@ -57,51 +62,81 @@ export default async function HomePage() {
     await Promise.all([loadDoctors(), loadAppointments(token), loadMe(token)]);
 
   const next = pickNextAppointment(appointments);
-  const doctorName = next?.doctor_id
-    ? doctors.find((d) => d.id === next.doctor_id)?.display_name
-    : null;
+  const nextDoctor = next?.doctor_id ? doctors.find((d) => d.id === next.doctor_id) : undefined;
   const name = firstName(me?.name);
   const hello = greetingForHour(colomboHour());
   const later = appointments.filter((a) => a.id !== next?.id).slice(0, 4);
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-h3 text-ink sm:text-h2">
-          {hello}
-          {name ? `, ${name}` : ""}
-        </h1>
-        <p className="text-body text-text-muted">
-          {next ? "Your next consult is ready when you are." : "Book a video consult when you need care."}
-        </p>
-      </header>
+    <div className="flex flex-col gap-12">
+      {/* Hero band. The ticket sits on the gradient rather than on the page,
+          which is what gives the most important thing on the screen its own
+          plane instead of making it one more card in a stack. */}
+      <section className="relative overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6 md:p-8">
+        <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="min-w-0">
+            <p className="text-body text-blue-800">
+              {hello}
+              {name ? `, ${name}` : ""}
+            </p>
+            <h1 className="mt-1 text-h2 text-ink">
+              {next ? "Your next visit" : "Book a video consult"}
+            </h1>
+            <div className="mt-6">
+              {next ? (
+                <VisitTicket
+                  appointment={next}
+                  doctorName={nextDoctor?.display_name}
+                  doctorPhoto={profilePhotoSrc(nextDoctor?.photo_url)}
+                />
+              ) : (
+                <EmptyVisitTicket />
+              )}
+            </div>
+          </div>
 
-      {next ? <VisitTicket appointment={next} doctorName={doctorName} /> : <EmptyVisitTicket />}
+          <Image
+            src={stock.patientHero}
+            alt=""
+            width={520}
+            height={640}
+            unoptimized
+            className="hidden h-full max-h-80 w-full rounded-lg object-cover shadow-lg lg:block"
+          />
+        </div>
+      </section>
 
       {appointmentsError ? (
         <p className="text-body-sm text-danger">Couldn’t load visits: {appointmentsError}</p>
       ) : null}
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-5">
         <div className="flex items-end justify-between gap-4">
-          <h2 className="text-h5 text-ink">Doctors</h2>
-          <Link href="/doctors" className="text-body-sm font-medium text-primary">
+          <h2 className="text-h3 text-ink">Featured doctors</h2>
+          <Link
+            href="/doctors"
+            className="inline-flex items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+          >
             Browse all
+            <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         </div>
+
         {doctorsError ? (
           <EmptyState
             title="Couldn’t load doctors"
             body={doctorsError}
+            icon={<Stethoscope className="size-5" />}
             action={{ href: "/doctors", label: "Try the directory" }}
           />
         ) : doctors.length === 0 ? (
           <EmptyState
             title="No doctors listed yet"
             body="Approved clinicians will appear here once the directory is live."
+            icon={<Stethoscope className="size-5" />}
           />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {doctors.map((d) => (
               <DoctorCard key={d.id} doctor={d} />
             ))}
@@ -109,39 +144,52 @@ export default async function HomePage() {
         )}
       </section>
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-5">
         <div className="flex items-end justify-between gap-4">
-          <h2 className="text-h5 text-ink">Later visits</h2>
-          <Link href="/appointments" className="text-body-sm font-medium text-primary">
+          <h2 className="text-h3 text-ink">Later visits</h2>
+          <Link
+            href="/appointments"
+            className="inline-flex items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+          >
             View all
+            <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         </div>
+
         {!token ? (
           <EmptyState
             title="Sign in to see visits"
             body="Your bookings stay on this device after you sign in with email or OTP."
+            icon={<CalendarDays className="size-5" />}
             action={{ href: "/login", label: "Sign in" }}
           />
         ) : later.length === 0 && !next ? (
           <EmptyState
             title="No visits yet"
             body="When you book a consult, it will show up here with a way to pay or join."
+            icon={<CalendarDays className="size-5" />}
             action={{ href: "/doctors", label: "Find a doctor" }}
           />
         ) : later.length === 0 ? (
-          <p className="text-body-sm text-text-muted">No other visits on the list.</p>
+          <p className="text-body-sm text-muted">No other visits on the list.</p>
         ) : (
-          <ul className="grid gap-3">
+          <ul className="stagger grid gap-3">
             {later.map((a) => {
               const action = appointmentAction(a.id, a.status);
               const when = a.start_at_local || a.start_at;
               const inner = (
                 <>
-                  <div className="min-w-0">
-                    <p className="truncate text-body font-medium text-ink">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-tint text-brand"
+                  >
+                    <CalendarDays className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-body font-semibold text-ink">
                       {a.specialty || "Consultation"}
                     </p>
-                    <p className="mt-1 text-body-sm text-text-muted">
+                    <p className="mt-0.5 text-body-sm text-muted tabular-time">
                       {formatVisitDate(when)} · {formatVisitClock(when)}
                     </p>
                   </div>
@@ -153,12 +201,12 @@ export default async function HomePage() {
                   {action ? (
                     <Link
                       href={action.href}
-                      className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-paper px-5 py-4 shadow-[var(--shadow-soft)]"
+                      className="flex items-center gap-4 rounded-lg border border-border-subtle bg-surface px-5 py-4 shadow-sm transition-[transform,box-shadow] duration-[200ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md"
                     >
                       {inner}
                     </Link>
                   ) : (
-                    <Card className="flex items-center justify-between gap-3 px-5 py-4">{inner}</Card>
+                    <Card className="flex items-center gap-4 px-5 py-4">{inner}</Card>
                   )}
                 </li>
               );

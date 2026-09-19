@@ -1,10 +1,39 @@
-type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
+import { cx } from "@/lib/consumer/cx";
 
-export function Textarea({ className = "", ...props }: TextareaProps) {
-  return (
+import { Field, fieldControlClass } from "./Field";
+
+type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: React.ReactNode;
+  hint?: React.ReactNode;
+  error?: React.ReactNode;
+  fieldClassName?: string;
+};
+
+export function Textarea({
+  label,
+  hint,
+  error,
+  className,
+  fieldClassName,
+  id,
+  required,
+  ...props
+}: TextareaProps) {
+  const control = (
     <textarea
-      className={`w-full min-h-[112px] resize-y rounded-[16px] bg-white px-6 py-3 text-[16px] font-light leading-[1.4] text-black shadow-[var(--shadow-soft)] outline-none placeholder:text-text-placeholder border border-transparent focus:border-primary-light ${className}`}
+      id={id}
+      required={required}
+      aria-invalid={error ? true : undefined}
+      className={cx(fieldControlClass, "min-h-28 resize-y", className)}
       {...props}
     />
+  );
+
+  if (!label && !hint && !error) return control;
+
+  return (
+    <Field label={label} hint={hint} error={error} htmlFor={id} required={required} className={fieldClassName}>
+      {control}
+    </Field>
   );
 }

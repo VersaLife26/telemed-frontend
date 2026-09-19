@@ -1,95 +1,54 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { assets } from "@/lib/consumer/assets";
 
-export function AppShell({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+import { Avatar } from "@/components/consumer/ui/Avatar";
+import { NavBar, type NavItem } from "@/components/consumer/ui/NavBar";
+
+export function AppShell({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex min-h-screen flex-col gap-8 bg-white p-4 lg:p-8 ${className}`}>
+    <div className={`mx-auto w-full max-w-6xl flex-1 px-4 pb-10 pt-6 md:px-8 ${className}`}>
       {children}
     </div>
   );
 }
 
-/** Doctor / shared panel. Patient pages use `@/components/consumer/ui/Card`. */
-export function Card({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-[var(--radius-card)] border-2 border-white bg-bg-gray p-6 ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
+/**
+ * Doctor-surface header. Same floating glass pill as the patient surface --
+ * the two used to carry different chrome, which is how they drifted.
+ */
 export function AppHeader({
   title,
   subtitle,
-  nav,
+  pathname = "",
+  nav = [],
 }: {
   title?: ReactNode;
   subtitle?: string;
-  nav?: { href: string; label: string; active?: boolean }[];
+  pathname?: string;
+  nav?: ReadonlyArray<NavItem>;
 }) {
   return (
-    <header className="flex w-full flex-col gap-6">
-      <div className="flex w-full items-start justify-between gap-4">
-        <div className="flex items-center gap-6 sm:gap-8">
-          <Link href="/" className="relative h-16 w-[62px] shrink-0 sm:h-20 sm:w-[77px]">
-            <Image src={assets.logoSmall} alt="Versalife Health" fill className="object-contain" />
-          </Link>
-          {title ? (
-            <div className="flex flex-col gap-2">
-              <div className="text-h2 text-ink">{title}</div>
-              {subtitle ? <p className="text-body text-text-muted">{subtitle}</p> : null}
-            </div>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+    <>
+      <NavBar
+        homeHref="/dashboard"
+        pathname={pathname}
+        items={nav}
+        trailing={
           <Link
             href="/profile"
             aria-label="Profile"
-            className="relative size-[50px] overflow-hidden rounded-full border-2 border-primary"
+            className="flex min-h-11 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
           >
-            <Image
-              src={assets.avatarPlaceholder}
-              alt=""
-              fill
-              className="object-cover"
-            />
+            <Avatar name={title ? String(title) : null} size={40} ring className="ring-brand/30" />
           </Link>
+        }
+      />
+      {title ? (
+        <div className="mx-auto w-full max-w-6xl px-4 pt-8 md:px-8">
+          <h1 className="text-h2 text-ink">{title}</h1>
+          {subtitle ? <p className="mt-1 text-body text-muted">{subtitle}</p> : null}
         </div>
-      </div>
-      {nav?.length ? (
-        <nav className="flex flex-wrap gap-2">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={item.active ? "page" : undefined}
-              className={`rounded-[32px] px-5 py-2 text-body-sm ${
-                item.active
-                  ? "bg-primary text-white"
-                  : "bg-bg-gray text-text-muted hover:text-ink"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
       ) : null}
-    </header>
+    </>
   );
 }

@@ -28,12 +28,14 @@ const META: Record<Surface, Metadata> = {
     applicationName: "Telemed Admin",
   },
   doctor: {
-    title: "VersaLife Doctor",
-    description: "Telemedicine doctor web app",
+    title: { default: "VersaLife Health · Doctor", template: "%s · VersaLife Health" },
+    description: "Consult patients online — availability, queue and earnings in one place.",
+    applicationName: "VersaLife Health",
   },
   patient: {
-    title: "VersaLife Patient",
-    description: "Telemedicine patient web app",
+    title: { default: "VersaLife Health", template: "%s · VersaLife Health" },
+    description: "Consult trusted doctors online — anytime, anywhere in Sri Lanka.",
+    applicationName: "VersaLife Health",
   },
 };
 
@@ -43,6 +45,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   colorScheme: SURFACE === "admin" ? "light dark" : "light",
+  themeColor: SURFACE === "admin" ? undefined : "#ffffff",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

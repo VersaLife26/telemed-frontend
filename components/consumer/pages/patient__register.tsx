@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthDivider, GoogleButton } from "@/components/consumer/auth/GoogleButton";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
+import { Reveal } from "@/components/consumer/ui/Reveal";
 import { Input } from "@/components/consumer/ui/Input";
 
 function readError(json: unknown, fallback: string): string {
@@ -65,51 +67,57 @@ export default function RegisterPage() {
   const busy = loading !== null;
 
   return (
-    <AuthLayout blurb="VersaLife Telemedicine. Consult trusted doctors online — anytime, anywhere in Sri Lanka.">
-      <div className="flex w-full flex-col gap-6">
+    <AuthLayout>
+      <div className="flex w-full flex-col gap-7">
         <AuthHeading
-          title={
-            <>
-              <p>Create your</p>
-              <p>account</p>
-            </>
-          }
+          title="Create your account"
           subtitle="Register with Google or an email and password."
         />
-        <GoogleButton onCredential={onGoogle} disabled={busy} />
-        <AuthDivider />
-        <form onSubmit={onRegister} className="flex w-full flex-col gap-4">
-          <Input
-            type="text"
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Full name"
-          />
-          <Input
-            type="email"
-            autoComplete="email"
-            required
-            focused
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-          />
-          <Input
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (8+ characters)"
-          />
-          {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-          <Button type="submit" fullWidth busy={loading === "email"} disabled={busy}>
-            {loading === "email" ? "Creating…" : "Create account"}
-          </Button>
-        </form>
-        <AuthFooterLink text="Already have an account?" linkText="Sign in" href="/login" />
+
+        <Reveal delay={1} className="flex flex-col gap-7">
+          <GoogleButton onCredential={onGoogle} disabled={busy} />
+          <AuthDivider />
+
+          <form onSubmit={onRegister} className="flex w-full flex-col gap-4">
+            <Input
+              id="register-name"
+              label="Full name"
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+            />
+            <Input
+              id="register-email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+            <Input
+              id="register-password"
+              label="Password"
+              hint="At least 8 characters."
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+            {error ? <Alert tone="danger">{error}</Alert> : null}
+            <Button type="submit" size="lg" fullWidth busy={loading === "email"} disabled={busy}>
+              {loading === "email" ? "Creating…" : "Create account"}
+            </Button>
+          </form>
+
+          <AuthFooterLink text="Already have an account?" linkText="Sign in" href="/login" />
+        </Reveal>
       </div>
     </AuthLayout>
   );

@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CalendarDays } from "lucide-react";
+
 import { EarlyJoinDecision } from "@/components/consumer/early-join-decision";
 import { RescheduleDecision } from "@/components/consumer/reschedule-decision";
+import { Alert } from "@/components/consumer/ui/Alert";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
+import { Tabs } from "@/components/consumer/ui/Tabs";
 import { AppointmentsSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, EarlyJoinOffer, RescheduleRequest } from "@/lib/consumer/api/types";
@@ -31,7 +35,8 @@ async function pendingByAppointment(
     confirmed.map(async (a) => {
       try {
         const items = await browserApi<RescheduleRequest[]>(appointmentReschedulePath(a.id));
-        const pending = (Array.isArray(items) ? items : []).find((r) => r.status === "pending") ?? null;
+        const pending =
+          (Array.isArray(items) ? items : []).find((r) => r.status === "pending") ?? null;
         return [a.id, pending] as const;
       } catch {
         return [a.id, null] as const;
@@ -73,28 +78,41 @@ function AppointmentRow({
   const when = appointment.start_at_local || appointment.start_at;
 
   return (
-    <Card className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-body font-medium text-ink">{appointment.specialty || "Consultation"}</p>
-          <StatusBadge status={appointment.status} />
+    <Card as="li" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-1 gap-4">
+        <span
+          aria-hidden="true"
+          className="hidden size-11 shrink-0 items-center justify-center rounded-full bg-tint text-brand sm:flex"
+        >
+          <CalendarDays className="size-5" />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-body font-semibold text-ink">
+              {appointment.specialty || "Consultation"}
+            </p>
+            <StatusBadge status={appointment.status} />
+          </div>
+          <p className="mt-1 text-body-sm text-muted tabular-time">
+            {formatVisitDate(when)} · {formatVisitClock(when)}
+          </p>
+
+          {request ? (
+            <div className="mt-4">
+              <RescheduleDecision request={request} onChanged={onChanged} />
+            </div>
+          ) : null}
+          {offer ? (
+            <div className="mt-4">
+              <EarlyJoinDecision offer={offer} onChanged={onChanged} />
+            </div>
+          ) : null}
         </div>
-        <p className="mt-1 text-body-sm text-text-muted">
-          {formatVisitDate(when)} · {formatVisitClock(when)}
-        </p>
-        {request ? (
-          <div className="mt-3">
-            <RescheduleDecision request={request} onChanged={onChanged} />
-          </div>
-        ) : null}
-        {offer ? (
-          <div className="mt-3">
-            <EarlyJoinDecision offer={offer} onChanged={onChanged} />
-          </div>
-        ) : null}
       </div>
+
       {action ? (
-        <ButtonLink href={action.href} className="min-h-11 shrink-0">
+        <ButtonLink href={action.href} className="shrink-0">
           {action.label}
         </ButtonLink>
       ) : null}
@@ -102,12 +120,15 @@ function AppointmentRow({
   );
 }
 
+type Pane = "upcoming" | "past";
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [pending, setPending] = useState<Record<string, RescheduleRequest | null>>({});
   const [earlyJoin, setEarlyJoin] = useState<Record<string, EarlyJoinOffer | null>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pane, setPane] = useState<Pane>("upcoming");
 
   const load = useCallback(async () => {
     setError(null);
@@ -139,68 +160,75 @@ export default function AppointmentsPage() {
     return <AppointmentsSkeleton />;
   }
 
-  if (error && appointments.length === 0) {
-    const signIn = /sign in|unauthorized|unauthorised|401/i.test(error);
-    if (signIn) {
-      return (
-        <EmptyState
-          title="Sign in to view visits"
-          body="Your upcoming and past consults live here after you sign in."
-          action={{ href: "/login", label: "Sign in" }}
-        />
-      );
-    }
+  if (error && appointments.length === 0 && /sign in|unauthorized|unauthorised|401/i.test(error)) {
+    return (
+      <EmptyState
+        title="Sign in to view visits"
+        body="Your upcoming and past consults live here after you sign in."
+        icon={<CalendarDays className="size-5" />}
+        action={{ href: "/login", label: "Sign in" }}
+      />
+    );
   }
 
   const upcoming = appointments.filter((a) => isUpcomingAppointment(a));
   const past = appointments.filter((a) => !isUpcomingAppointment(a));
+  const shown = pane === "upcoming" ? upcoming : past;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-h3 text-ink">Appointments</h1>
-        <p className="mt-1 text-body text-text-muted">Pay, join, or read a visit summary from here.</p>
+        <h1 className="text-h2 text-ink">Appointments</h1>
+        <p className="mt-1 text-body-lg text-muted">
+          Pay, join, or read a visit summary from here.
+        </p>
       </header>
 
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+      {error ? (
+        <Alert tone="danger" title="Couldn’t load visits">
+          {error}
+        </Alert>
+      ) : null}
 
       {!error && appointments.length === 0 ? (
         <EmptyState
           title="No visits yet"
           body="Book a video consult and it will show up here with the next step."
+          icon={<CalendarDays className="size-5" />}
           action={{ href: "/doctors", label: "Find a doctor" }}
         />
-      ) : null}
+      ) : (
+        <>
+          <Tabs
+            label="Visit history"
+            value={pane}
+            onChange={setPane}
+            items={[
+              { value: "upcoming", label: `Upcoming (${upcoming.length})` },
+              { value: "past", label: `Past (${past.length})` },
+            ]}
+            className="self-start"
+          />
 
-      {upcoming.length ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h5 text-ink">Upcoming</h2>
-          {upcoming.map((a) => (
-            <AppointmentRow
-              key={a.id}
-              appointment={a}
-              request={pending[a.id] ?? null}
-              offer={earlyJoin[a.id] ?? null}
-              onChanged={() => void load()}
-            />
-          ))}
-        </section>
-      ) : null}
-
-      {past.length ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h5 text-ink">Past</h2>
-          {past.map((a) => (
-            <AppointmentRow
-              key={a.id}
-              appointment={a}
-              request={pending[a.id] ?? null}
-              offer={earlyJoin[a.id] ?? null}
-              onChanged={() => void load()}
-            />
-          ))}
-        </section>
-      ) : null}
+          {shown.length === 0 ? (
+            <p className="text-body text-muted">
+              {pane === "upcoming" ? "Nothing booked right now." : "No past visits yet."}
+            </p>
+          ) : (
+            <ul className="stagger flex flex-col gap-3">
+              {shown.map((a) => (
+                <AppointmentRow
+                  key={a.id}
+                  appointment={a}
+                  request={pending[a.id] ?? null}
+                  offer={earlyJoin[a.id] ?? null}
+                  onChanged={() => void load()}
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
 }

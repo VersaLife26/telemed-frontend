@@ -2,11 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { EarlyJoinOffer } from "@/lib/consumer/api/types";
 import { earlyJoinRespondPath, waitingRoomPath } from "@/lib/consumer/features/consult";
 
+/**
+ * Both answers here are cheap and reversible-ish, so neither gets a
+ * confirmation step -- a dialog on a low-stakes choice just trains people to
+ * dismiss dialogs.
+ */
 export function EarlyJoinDecision({
   offer,
   onChanged,
@@ -20,19 +27,13 @@ export function EarlyJoinDecision({
 
   if (offer.response === "accepted") {
     return (
-      <div className="mt-3 rounded-[16px] bg-bg-gray px-4 py-3">
-        <p className="text-body-sm text-black">
-          You chose to join early. Head to the waiting room when you are ready.
-        </p>
-      </div>
+      <Alert tone="success" title="Joining early">
+        Head to the waiting room when you are ready.
+      </Alert>
     );
   }
   if (offer.response === "declined") {
-    return (
-      <div className="mt-3 rounded-[16px] bg-bg-gray px-4 py-3">
-        <p className="text-body-sm text-text-muted">Keeping your original booked time.</p>
-      </div>
-    );
+    return <Alert tone="info">Keeping your original booked time.</Alert>;
   }
 
   async function act(kind: "accept" | "decline") {
@@ -57,23 +58,23 @@ export function EarlyJoinDecision({
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-[16px] bg-bg-gray px-4 py-3">
-      <p className="text-body-sm text-black">
+    <div className="flex flex-col gap-3 rounded-md bg-brand-tint p-4">
+      <p className="text-body-sm text-ink">
         The doctor is free a few minutes early. Can you join now, or keep your booked time?
       </p>
       {error ? <p className="text-body-sm text-danger">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" fullWidth={false} disabled={busy !== null} onClick={() => void act("accept")}>
-          {busy === "accept" ? "Joining…" : "Join now"}
+        <Button size="sm" busy={busy === "accept"} disabled={busy !== null} onClick={() => void act("accept")}>
+          Join now
         </Button>
         <Button
-          type="button"
+          size="sm"
           variant="outline"
-          fullWidth={false}
+          busy={busy === "decline"}
           disabled={busy !== null}
           onClick={() => void act("decline")}
         >
-          {busy === "decline" ? "Saving…" : "Keep my booked time"}
+          Keep my booked time
         </Button>
       </div>
     </div>

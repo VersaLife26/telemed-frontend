@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Card } from "@/components/consumer/ui/Card";
+import { LogOut, UserRound } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
@@ -143,6 +146,7 @@ export default function ProfilePage() {
       <EmptyState
         title="Sign in to view your profile"
         body={error || "Your name and contact details live here after you sign in."}
+        icon={<UserRound className="size-5" />}
         action={{ href: "/login", label: "Sign in" }}
       />
     );
@@ -154,12 +158,15 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <header>
-        <h1 className="text-h3 text-ink">Profile</h1>
-        <p className="mt-1 text-body text-text-muted">How this account appears on visits.</p>
+        <h1 className="text-h2 text-ink">Profile</h1>
+        <p className="mt-1 text-body-lg text-muted">How this account appears on visits.</p>
       </header>
-      <Card className="flex flex-col gap-5">
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-          <div className="relative size-28 shrink-0 overflow-hidden rounded-full border-2 border-primary bg-linen">
+
+      {/* Identity sits on the gradient, the editable record sits on a card.
+          Two planes, because they are two different kinds of thing. */}
+      <section className="overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6">
+        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+          <div className="relative size-28 shrink-0 overflow-hidden rounded-full bg-surface shadow-md ring-4 ring-white/70">
             <Image
               src={photoSrc}
               alt=""
@@ -168,8 +175,13 @@ export default function ProfilePage() {
               unoptimized={Boolean(previewUrl || user.photo_url)}
             />
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-2 text-center sm:text-left">
-            <p className="text-body-sm text-text-muted">JPEG, PNG or WebP · up to 2 MB</p>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-3 text-center sm:text-left">
+            <div>
+              <p className="text-h4 text-ink">{user.name || "Your profile"}</p>
+              <p className="mt-0.5 text-body-sm text-blue-800">JPEG, PNG or WebP · up to 2 MB</p>
+            </div>
+
             <input
               ref={fileInputRef}
               type="file"
@@ -177,73 +189,80 @@ export default function ProfilePage() {
               className="sr-only"
               onChange={(e) => void onPhotoSelected(e.target.files?.[0] ?? null)}
             />
+
             <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
               <Button
-                type="button"
-                variant="secondary"
+                size="sm"
                 busy={photoBusy}
                 onClick={() => fileInputRef.current?.click()}
               >
                 {hasStoredPhoto ? "Change photo" : "Upload photo"}
               </Button>
               {hasStoredPhoto ? (
-                <Button type="button" variant="outline" busy={photoBusy} onClick={() => void removePhoto()}>
+                <Button size="sm" variant="glass" busy={photoBusy} onClick={() => void removePhoto()}>
                   Remove
                 </Button>
               ) : null}
             </div>
           </div>
         </div>
+      </section>
 
-        <form onSubmit={(e) => void save(e)} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-2">
-            <span className="text-caption text-text-label">Name</span>
-            <Input
-              value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              autoComplete="name"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-caption text-text-label">Phone</span>
-            <Input
-              type="tel"
-              value={draft.phone}
-              onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
-              autoComplete="tel"
-              placeholder="0771234567"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-caption text-text-label">Address</span>
-            <Textarea
-              value={draft.address}
-              onChange={(e) => setDraft((d) => ({ ...d, address: e.target.value }))}
-              autoComplete="street-address"
-              rows={3}
-              maxLength={500}
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-caption text-text-label">Date of birth</span>
-            <Input
-              type="date"
-              value={draft.dateOfBirth}
-              onChange={(e) => setDraft((d) => ({ ...d, dateOfBirth: e.target.value }))}
-              autoComplete="bday"
-            />
-          </label>
-          {notice ? <p className="text-body-sm text-primary">{notice}</p> : null}
-          {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-          <Button type="submit" fullWidth busy={saving}>
+      <Card>
+        <form onSubmit={(e) => void save(e)} className="flex flex-col gap-5">
+          <Input
+            id="profile-name"
+            label="Name"
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            autoComplete="name"
+            required
+          />
+          <Input
+            id="profile-phone"
+            label="Phone"
+            type="tel"
+            value={draft.phone}
+            onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+            autoComplete="tel"
+            placeholder="0771234567"
+          />
+          <Textarea
+            id="profile-address"
+            label="Address"
+            value={draft.address}
+            onChange={(e) => setDraft((d) => ({ ...d, address: e.target.value }))}
+            autoComplete="street-address"
+            rows={3}
+            maxLength={500}
+          />
+          <Input
+            id="profile-dob"
+            label="Date of birth"
+            type="date"
+            value={draft.dateOfBirth}
+            onChange={(e) => setDraft((d) => ({ ...d, dateOfBirth: e.target.value }))}
+            autoComplete="bday"
+          />
+
+          {notice ? <Alert tone="success">{notice}</Alert> : null}
+          {error ? <Alert tone="danger">{error}</Alert> : null}
+
+          <Button type="submit" size="lg" fullWidth busy={saving}>
             {saving ? "Saving…" : "Save profile"}
           </Button>
         </form>
-        <Button type="button" variant="outline" fullWidth busy={signingOut} onClick={() => void logout()}>
-          Sign out
-        </Button>
       </Card>
+
+      <Button
+        variant="ghost"
+        fullWidth
+        busy={signingOut}
+        leading={<LogOut className="size-4" />}
+        onClick={() => void logout()}
+      >
+        Sign out
+      </Button>
     </div>
   );
 }

@@ -1,28 +1,25 @@
-type ProfileFieldProps = {
-  label: string;
-  value: string;
-  labelWidth?: string;
-  fullWidth?: boolean;
-};
-
+/**
+ * A read-only profile fact. Label above value rather than beside it: the
+ * side-by-side form broke as soon as a label wrapped, and a fixed label column
+ * cannot survive a user's larger text size.
+ */
 export function ProfileField({
   label,
   value,
-  labelWidth = "w-[115px]",
   fullWidth = false,
-}: ProfileFieldProps) {
+}: {
+  label: string;
+  value: string;
+  fullWidth?: boolean;
+}) {
   return (
-    <div className={`flex gap-4 ${fullWidth ? "w-full" : ""}`}>
-      <div className={`flex shrink-0 items-center p-2 ${labelWidth}`}>
-        <span className="text-body text-black">{label}</span>
-      </div>
-      <div className="flex min-w-0 flex-1 items-center rounded-[var(--radius-input)] bg-white p-2">
-        <span className="text-body text-text-label">{value}</span>
-      </div>
+    <div className={fullWidth ? "w-full" : "min-w-0 flex-1"}>
+      <dt className="text-eyebrow text-faint">{label}</dt>
+      <dd className="mt-1 truncate text-body text-ink">{value || "—"}</dd>
     </div>
   );
 }
 
 export function ProfileFieldRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex w-full flex-col gap-4 lg:flex-row">{children}</div>;
+  return <div className="flex w-full flex-col gap-5 sm:flex-row sm:gap-8">{children}</div>;
 }

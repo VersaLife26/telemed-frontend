@@ -46,19 +46,17 @@ export default function AppError({
 
   return (
     <Card className="mx-auto flex max-w-xl flex-col items-start gap-4">
-      <h1 className="text-h4 text-ink">This page failed to load</h1>
-      <p className="text-body text-text-muted">
+      <h1 className="text-h3 text-ink">This page failed to load</h1>
+      <p className="text-body text-muted">
         Something went wrong while rendering. Your session is unaffected — try again, or
         open another page.
       </p>
       {error.digest ? (
-        <p className="font-mono text-caption text-text-label">Error digest: {error.digest}</p>
+        <p className="font-mono text-caption text-faint">Error digest: {error.digest}</p>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={reset}>
-          Try again
-        </Button>
-        <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+        <Button onClick={reset}>Try again</Button>
+        <Button variant="outline" onClick={() => window.location.reload()}>
           Reload the page
         </Button>
       </div>

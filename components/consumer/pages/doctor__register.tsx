@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
@@ -22,16 +23,21 @@ import {
   type DoctorApplyForm,
 } from "@/lib/consumer/features/doctor-apply";
 
+// The application form's own controls, held to the same field chrome as the
+// design system's Input so a long form does not read as assembled parts.
 const selectClass =
-  "w-full rounded-[32px] bg-white px-6 py-3 text-[16px] font-light leading-[1.4] text-black shadow-[var(--shadow-soft)] outline-none border border-transparent focus:border-primary-light appearance-none";
+  "min-h-11 w-full appearance-none rounded-md border border-border-default bg-surface px-4 py-3 text-body text-ink outline-none transition-[border-color,box-shadow] duration-[160ms] ease-out focus:border-brand focus:shadow-[0_0_0_3px_var(--brand-tint)]";
 
 const fileClass =
-  "w-full rounded-[16px] bg-white px-4 py-3 text-[14px] font-light text-black shadow-[var(--shadow-soft)] file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-1.5 file:text-[13px] file:font-medium file:text-white";
+  "w-full rounded-md border border-border-default bg-surface px-4 py-3 text-body-sm text-ink file:mr-4 file:cursor-pointer file:rounded-pill file:border-0 file:bg-brand-tint file:px-4 file:py-1.5 file:text-[13px] file:font-semibold file:text-brand";
+
+const radioClass =
+  "inline-flex min-h-11 cursor-pointer items-center gap-2 text-body text-ink";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <fieldset className="flex w-full flex-col gap-3">
-      <legend className="text-[15px] font-medium text-black">{title}</legend>
+    <fieldset className="flex w-full flex-col gap-4">
+      <legend className="mb-1 text-h5 text-ink">{title}</legend>
       {children}
     </fieldset>
   );
@@ -52,23 +58,23 @@ function YesNo({
 }) {
   return (
     <div className="flex flex-wrap gap-4 px-1">
-      <label className="inline-flex cursor-pointer items-center gap-2 text-body text-black">
+      <label className={radioClass}>
         <input
           type="radio"
           name={name}
           checked={value === true}
           onChange={() => onChange(true)}
-          className="size-4 accent-[var(--color-primary)]"
+          className="size-4 accent-[var(--brand)]"
         />
         {yesLabel}
       </label>
-      <label className="inline-flex cursor-pointer items-center gap-2 text-body text-black">
+      <label className={radioClass}>
         <input
           type="radio"
           name={name}
           checked={value === false}
           onChange={() => onChange(false)}
-          className="size-4 accent-[var(--color-primary)]"
+          className="size-4 accent-[var(--brand)]"
         />
         {noLabel}
       </label>
@@ -213,16 +219,11 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       scroll
-      blurb="VersaLife for doctors. Apply to join the network — after approval you can sign in with email and password, or OTP."
+      blurb="VersaLife Health for doctors. Apply to join the network — after approval you can sign in with email and password, or OTP."
     >
       <div className="flex w-full flex-col gap-6">
         <AuthHeading
-          title={
-            <>
-              <p>Doctor</p>
-              <p>registration</p>
-            </>
-          }
+          title="Doctor registration"
           subtitle={
             submitted
               ? undefined
@@ -232,7 +233,7 @@ export default function RegisterPage() {
 
         {submitted ? (
           <div className="flex w-full flex-col gap-6">
-            <p className="text-body text-text-muted">
+            <p className="text-body text-muted">
               Your application has been received and is under review. After approval you will get
               an email, then you can sign in with the email and password you chose here, or with
               OTP on your phone.
@@ -248,7 +249,6 @@ export default function RegisterPage() {
                   required
                   minLength={1}
                   maxLength={100}
-                  focused
                   value={form.firstName}
                   onChange={(e) => patch({ firstName: e.target.value })}
                   placeholder="First name"
@@ -301,20 +301,20 @@ export default function RegisterPage() {
                   autoComplete="tel"
                 />
                 <fieldset className="flex w-full flex-col gap-2">
-                  <legend className="text-body-sm text-text-label">
+                  <legend className="text-label text-ink">
                     What languages you consult in
                   </legend>
                   <div className="flex flex-wrap gap-4 px-1">
                     {LANGUAGE_OPTIONS.map((lang) => (
                       <label
                         key={lang.code}
-                        className="inline-flex cursor-pointer items-center gap-2 text-body text-black"
+                        className={radioClass}
                       >
                         <input
                           type="checkbox"
                           checked={form.languages.includes(lang.code)}
                           onChange={() => toggleLanguage(lang.code)}
-                          className="size-4 accent-[var(--color-primary)]"
+                          className="size-4 accent-[var(--brand)]"
                         />
                         {lang.label}
                       </label>
@@ -332,7 +332,7 @@ export default function RegisterPage() {
                   />
                 ) : null}
                 <label className="flex w-full flex-col gap-2">
-                  <span className="text-body-sm text-text-label">
+                  <span className="text-label text-ink">
                     For specializations, are you PGIM board certified?
                   </span>
                   <YesNo
@@ -377,20 +377,20 @@ export default function RegisterPage() {
                   placeholder="How much you like to charge per consultation (LKR)"
                 />
                 <fieldset className="flex w-full flex-col gap-2">
-                  <legend className="text-body-sm text-text-label">
+                  <legend className="text-label text-ink">
                     Available times for consultation
                   </legend>
                   <div className="flex flex-wrap gap-3 px-1">
                     {WEEKDAYS.map((d) => (
                       <label
                         key={d.day}
-                        className="inline-flex cursor-pointer items-center gap-2 text-body-sm text-black"
+                        className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-body-sm text-ink"
                       >
                         <input
                           type="checkbox"
                           checked={form.availableDays.includes(d.day)}
                           onChange={() => toggleDay(d.day)}
-                          className="size-4 accent-[var(--color-primary)]"
+                          className="size-4 accent-[var(--brand)]"
                         />
                         {d.label.slice(0, 3)}
                       </label>
@@ -398,7 +398,7 @@ export default function RegisterPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <label className="flex flex-col gap-1">
-                      <span className="text-body-sm text-text-label">From</span>
+                      <span className="text-label text-ink">From</span>
                       <Input
                         type="time"
                         value={form.availableStart}
@@ -406,7 +406,7 @@ export default function RegisterPage() {
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-body-sm text-text-label">To</span>
+                      <span className="text-label text-ink">To</span>
                       <Input
                         type="time"
                         value={form.availableEnd}
@@ -482,7 +482,7 @@ export default function RegisterPage() {
               <Section title="Documents">
                 {APPLY_DOCUMENT_TYPES.map((doc) => (
                   <label key={doc.type} className="flex w-full flex-col gap-2">
-                    <span className="text-body-sm text-text-label">{doc.label}</span>
+                    <span className="text-label text-ink">{doc.label}</span>
                     <input
                       className={fileClass}
                       type="file"
@@ -508,7 +508,7 @@ export default function RegisterPage() {
                   placeholder="Practicing locations / hospitals (one per line)"
                 />
                 <label className="flex w-full flex-col gap-2">
-                  <span className="text-body-sm text-text-label">Are you a general practitioner?</span>
+                  <span className="text-label text-ink">Are you a general practitioner?</span>
                   <YesNo
                     name="gp"
                     value={form.isGeneralPractitioner}
@@ -516,7 +516,7 @@ export default function RegisterPage() {
                   />
                 </label>
                 <label className="flex w-full flex-col gap-2">
-                  <span className="text-body-sm text-text-label">Specialty</span>
+                  <span className="text-label text-ink">Specialty</span>
                   <select
                     className={selectClass}
                     required
@@ -531,12 +531,12 @@ export default function RegisterPage() {
                   </select>
                 </label>
                 <label className="flex w-full flex-col gap-2">
-                  <span className="text-body-sm text-text-label">
+                  <span className="text-label text-ink">
                     Do you agree to the terms and conditions as stated in the VersaLife service
                     retention agreement?
                   </span>
-                  <p className="text-body-sm text-text-muted">
-                    <Link href={TERMS_HREF} className="text-primary underline" target="_blank">
+                  <p className="text-body-sm text-muted">
+                    <Link href={TERMS_HREF} className="font-semibold text-brand underline underline-offset-4" target="_blank">
                       Read the VersaLife service retention agreement
                     </Link>
                   </p>
@@ -550,7 +550,7 @@ export default function RegisterPage() {
                 </label>
               </Section>
 
-              {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+              {error ? <Alert tone="danger">{error}</Alert> : null}
               <Button type="submit" fullWidth busy={loading}>
                 {loading
                   ? "Submitting…"

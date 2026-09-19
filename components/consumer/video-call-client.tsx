@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
+import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Consultation, JoinResult, WaitingRoomStatus } from "@/lib/consumer/api/types";
@@ -316,96 +319,106 @@ export function VideoCallClient({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-      <div className="relative overflow-hidden rounded-[16px] bg-black aspect-video">
-        <video
-          ref={remoteRef}
-          autoPlay
-          playsInline
-          className="h-full w-full object-cover"
-        />
+      {/* Controls float on the video as a dark glass bar rather than sitting
+          in a strip beneath it: the call is the content, and the chrome
+          should sit on top of it without taking a band of the screen. */}
+      <div className="relative aspect-video overflow-hidden rounded-xl bg-ink-900 shadow-lg">
+        <video ref={remoteRef} autoPlay playsInline className="h-full w-full object-cover" />
+
         <video
           ref={localRef}
           autoPlay
           muted
           playsInline
-          className="absolute bottom-3 right-3 h-28 w-40 rounded-[12px] border-2 border-white object-cover"
+          className="absolute bottom-4 right-4 h-28 w-40 rounded-md object-cover shadow-lg ring-2 ring-white/70"
         />
-        {!live ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 p-6 text-center">
-            <p className="text-h4 text-white">
+
+        {live ? (
+          <div className="absolute left-4 top-4">
+            <Badge tone="success" dot className="bg-white/90">
+              Live
+            </Badge>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ink-900/70 p-6 text-center">
+            <p className="text-h3 text-white">
               {connecting ? "Connecting…" : waiting ? "Waiting room" : "Video call"}
             </p>
             {role === "patient" && waiting ? (
-              <p className="text-body-sm text-white/80">
+              <p className="text-body text-white/80 tabular-time">
                 Position #{queue?.position ?? "—"} · {formatWait(queue?.estimated_wait_seconds)}
               </p>
             ) : null}
             {role === "doctor" && status === "scheduled" ? (
-              <p className="text-body-sm text-white/80">
+              <p className="max-w-sm text-body-sm text-white/80">
                 Waiting for the patient to join. The booked slot is the visit window.
               </p>
             ) : null}
           </div>
-        ) : null}
-      </div>
+        )}
 
-      {notice ? (
-        <Card>
-          <p className="text-body-sm">{notice}</p>
-        </Card>
-      ) : null}
-
-      {error ? (
-        <Card>
-          <p className="text-body-sm text-danger">{error}</p>
-        </Card>
-      ) : null}
-
-      {noRelay && !live ? (
-        <Card>
-          <p className="text-body-sm text-white/80">
-            No relay server is configured. The call may not connect on mobile data.
-          </p>
-        </Card>
-      ) : null}
-
-      {live && join?.recording_mode === "client" ? (
-        <Card>
-          <p className="text-body-sm">
-            Any recording of this consultation is saved on the doctor&rsquo;s device, not
-            by the platform.
-          </p>
-        </Card>
-      ) : null}
-
-      <div className="flex flex-wrap gap-3">
-        {role === "doctor" && waiting && status !== "active" ? (
-          <div className="min-w-[160px]">
-            <Button type="button" fullWidth={false} onClick={() => void admit()} disabled={admitting || admitDisabled(status)}>
-              {admitting ? "Admitting…" : "Admit patient"}
+        {live ? (
+          <div className="glass-panel-dark absolute inset-x-0 bottom-0 mx-auto mb-4 flex w-fit items-center gap-2 rounded-pill px-3 py-2">
+            <Button
+              variant="glass"
+              size="sm"
+              aria-pressed={muted}
+              aria-label={muted ? "Unmute" : "Mute"}
+              leading={muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+              onClick={toggleMute}
+            >
+              {muted ? "Unmute" : "Mute"}
+            </Button>
+            <Button
+              variant="glass"
+              size="sm"
+              aria-pressed={cameraOff}
+              aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}
+              leading={cameraOff ? <VideoOff className="size-4" /> : <Video className="size-4" />}
+              onClick={toggleCamera}
+            >
+              {cameraOff ? "Camera on" : "Camera off"}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              busy={ending}
+              leading={<PhoneOff className="size-4" />}
+              onClick={() => void endCall()}
+            >
+              End call
             </Button>
           </div>
         ) : null}
-        {live ? (
-          <>
-            <div className="min-w-[140px]">
-              <Button type="button" variant="secondary" fullWidth={false} onClick={toggleMute}>
-                {muted ? "Unmute" : "Mute"}
-              </Button>
-            </div>
-            <div className="min-w-[140px]">
-              <Button type="button" variant="secondary" fullWidth={false} onClick={toggleCamera}>
-                {cameraOff ? "Camera on" : "Camera off"}
-              </Button>
-            </div>
-            <div className="min-w-[140px]">
-              <Button type="button" fullWidth={false} onClick={() => void endCall()} disabled={ending}>
-                {ending ? "Ending…" : "End call"}
-              </Button>
-            </div>
-          </>
-        ) : null}
       </div>
+
+      {role === "doctor" && waiting && status !== "active" ? (
+        <Button
+          size="lg"
+          className="self-start"
+          busy={admitting}
+          disabled={admitting || admitDisabled(status)}
+          onClick={() => void admit()}
+        >
+          Admit patient
+        </Button>
+      ) : null}
+
+      {notice ? <Alert tone="info">{notice}</Alert> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      {noRelay && !live ? (
+        <Alert tone="warning" title="No relay server configured">
+          The call may not connect on mobile data.
+        </Alert>
+      ) : null}
+
+      {live && join?.recording_mode === "client" ? (
+        <Alert tone="info">
+          Any recording of this consultation is saved on the doctor&rsquo;s device, not by the
+          platform.
+        </Alert>
+      ) : null}
     </div>
   );
 }

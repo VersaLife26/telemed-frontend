@@ -23,7 +23,14 @@ const nextConfig: NextConfig = {
   // cache on every admin server, where it would outlive the presigned URL's
   // expiry. The document viewer uses plain <img>/<iframe> instead, so the
   // optimiser is switched off rather than left enabled and unused.
-  images: { unoptimized: true },
+  // `remotePatterns` is not enforced while `unoptimized` is on -- the loader
+  // is bypassed entirely -- but the editorial photography in
+  // lib/consumer/assets.ts does come from this host, and recording it here
+  // keeps the config honest if the optimiser is ever switched back on.
+  images: {
+    unoptimized: true,
+    remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
+  },
 
   // Source maps in production would ship the admin console's route table and
   // API surface to anyone who opens DevTools on the login page.

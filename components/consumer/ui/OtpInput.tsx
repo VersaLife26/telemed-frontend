@@ -11,16 +11,18 @@ export function OtpInput({ length = 6, value = "", onChange }: OtpInputProps) {
 
   function updateAt(index: number, char: string) {
     const next = digits.slice();
-    next[index] = char.replace(/\D/g, "").slice(-1);
+    next[index] = char.replace(/\D/g, "").slice(-1) ?? "";
     onChange?.(next.join("").replace(/\s/g, ""));
   }
 
   return (
-    <div className="flex w-full gap-3 sm:gap-4">
+    <div className="flex w-full gap-2 sm:gap-3">
       {digits.map((digit, index) => (
         <input
           key={index}
           inputMode="numeric"
+          autoComplete={index === 0 ? "one-time-code" : "off"}
+          aria-label={`Digit ${index + 1}`}
           maxLength={1}
           value={digit}
           onChange={(e) => {
@@ -35,7 +37,7 @@ export function OtpInput({ length = 6, value = "", onChange }: OtpInputProps) {
               prev?.focus();
             }
           }}
-          className="h-[46px] min-w-0 flex-1 rounded-[16px] border border-border-input bg-white text-center text-[16px] font-medium text-black shadow-[var(--shadow-otp)] outline-none focus:border-primary-light"
+          className="h-14 min-w-0 flex-1 rounded-md border border-border-default bg-surface text-center text-h5 text-ink outline-none transition-[border-color,box-shadow] duration-[160ms] ease-out focus:border-brand focus:shadow-[0_0_0_3px_var(--brand-tint)]"
         />
       ))}
     </div>

@@ -2,9 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Alert } from "@/components/consumer/ui/Alert";
+import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
 import { Input } from "@/components/consumer/ui/Input";
+import { Select } from "@/components/consumer/ui/Select";
+import { Switch } from "@/components/consumer/ui/Switch";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { WorkingHour } from "@/lib/consumer/api/types";
 import { weekdayLabel } from "@/lib/consumer/features/availability";
@@ -152,54 +156,49 @@ export function AvailabilityEditor({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex flex-col gap-3">
-        <h1 className="text-h4 text-black">Working hours</h1>
-        <p className="text-body-sm text-text-muted">
-          Asia/Colombo. Slot length, buffer and daily cap save with the week.
-          Leave dates are additive — they do not replace previous leave.
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-h2 text-ink">Working hours</h1>
+        <p className="mt-1 max-w-prose text-body-lg text-muted">
+          Asia/Colombo. Slot length, buffer and daily cap save with the week. Leave dates are
+          additive — they do not replace previous leave.
         </p>
-      </Card>
+      </header>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="flex flex-col gap-2">
-          <label className="text-body-sm text-text-label">Slot duration</label>
-          <select
-            className="min-h-12 rounded-[32px] border border-transparent bg-paper px-6 text-[16px]"
-            value={slot}
-            onChange={(e) => setSlot(Number(e.target.value))}
-          >
-            <option value={15}>15 minutes</option>
-            <option value={20}>20 minutes</option>
-            <option value={30}>30 minutes</option>
-          </select>
-        </Card>
-        <Card className="flex flex-col gap-2">
-          <label className="text-body-sm text-text-label">Buffer between slots</label>
-          <select
-            className="min-h-12 rounded-[32px] border border-transparent bg-paper px-6 text-[16px]"
-            value={buffer}
-            onChange={(e) => setBuffer(e.target.value)}
-          >
-            <option value="">Platform default</option>
-            <option value="0">None (back to back)</option>
-            <option value="5">5 minutes</option>
-            <option value="10">10 minutes</option>
-            <option value="15">15 minutes</option>
-          </select>
-        </Card>
-        <Card className="flex flex-col gap-2">
-          <label className="text-body-sm text-text-label">Daily appointment cap</label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            value={maxPerDay}
-            onChange={(e) => setMaxPerDay(Number(e.target.value) || 0)}
-          />
-          <p className="text-body-sm text-text-muted">0 means no cap.</p>
-        </Card>
-      </div>
+      <Card variant="glass" className="grid gap-4 sm:grid-cols-3">
+        <Select
+          id="slot-duration"
+          label="Slot duration"
+          value={slot}
+          onChange={(e) => setSlot(Number(e.target.value))}
+        >
+          <option value={15}>15 minutes</option>
+          <option value={20}>20 minutes</option>
+          <option value={30}>30 minutes</option>
+        </Select>
+        <Select
+          id="slot-buffer"
+          label="Buffer between slots"
+          value={buffer}
+          onChange={(e) => setBuffer(e.target.value)}
+        >
+          <option value="">Platform default</option>
+          <option value="0">None (back to back)</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+          <option value="15">15 minutes</option>
+        </Select>
+        <Input
+          id="daily-cap"
+          label="Daily appointment cap"
+          hint="0 means no cap."
+          type="number"
+          min={0}
+          max={100}
+          value={maxPerDay}
+          onChange={(e) => setMaxPerDay(Number(e.target.value) || 0)}
+        />
+      </Card>
 
       {[0, 1, 2, 3, 4, 5, 6].map((day) => {
         const isDayAvailable = available[day] ?? false;
@@ -207,26 +206,21 @@ export function AvailabilityEditor({
 
         return (
           <Card key={day} className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 sm:w-36 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isDayAvailable}
-                  onChange={(e) => toggleDay(day, e.target.checked)}
-                  className="size-4 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <span className="text-body font-medium text-black">{weekdayLabel(day)}</span>
-              </label>
-              {!isDayAvailable && (
-                <span className="text-body-sm text-text-muted">Unavailable</span>
-              )}
+            <div className="flex items-center justify-between gap-4">
+              <Switch
+                checked={isDayAvailable}
+                onChange={(next) => toggleDay(day, next)}
+                label={weekdayLabel(day)}
+                className="flex-1"
+              />
+              {!isDayAvailable ? <Badge>Unavailable</Badge> : null}
             </div>
 
             {isDayAvailable && (
               <div className="flex flex-col gap-3 pl-0 sm:pl-6">
                 {dayWins.map((win, winIndex) => (
                   <div key={winIndex} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <span className="text-body-sm text-text-muted sm:w-24 shrink-0">
+                    <span className="shrink-0 text-body-sm text-muted sm:w-24">
                       {dayWins.length > 1 ? `Shift ${winIndex + 1}` : "Hours"}
                     </span>
                     <div className="flex flex-1 items-center gap-2">
@@ -236,7 +230,7 @@ export function AvailabilityEditor({
                         onChange={(e) => updateWindow(day, winIndex, "start_time", e.target.value)}
                         className="flex-1"
                       />
-                      <span className="text-text-muted text-body-sm shrink-0">to</span>
+                      <span className="shrink-0 text-body-sm text-muted">to</span>
                       <Input
                         type="time"
                         value={win.end_time}
@@ -248,7 +242,7 @@ export function AvailabilityEditor({
                       <button
                         type="button"
                         onClick={() => removeWindow(day, winIndex)}
-                        className="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
+                        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-[160ms] ease-out active:scale-[0.94] can-hover:hover:bg-danger-tint can-hover:hover:text-danger"
                         title="Remove shift"
                         aria-label={`Remove shift ${winIndex + 1} for ${weekdayLabel(day)}`}
                       >
@@ -262,7 +256,7 @@ export function AvailabilityEditor({
                   <button
                     type="button"
                     onClick={() => addWindow(day)}
-                    className="inline-flex items-center gap-1.5 text-body-sm font-medium text-primary hover:underline cursor-pointer"
+                    className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-label text-brand underline-offset-4 can-hover:hover:underline"
                   >
                     <Plus className="size-4" />
                     <span>Add Shift (Morning / Evening Window)</span>
@@ -274,16 +268,26 @@ export function AvailabilityEditor({
         );
       })}
 
-      <Card className="flex flex-col gap-3">
-        <p className="text-h5 text-black">Leave days</p>
-        <p className="text-body-sm text-text-muted">
+      <Card className="flex flex-col gap-4">
+        <h2 className="text-h4 text-ink">Leave days</h2>
+        <p className="max-w-prose text-body-sm text-muted">
           Adds blackout dates. If patients are already booked, save is refused unless you
           cancel those bookings separately.
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input type="date" value={holidayDate} onChange={(e) => setHolidayDate(e.target.value)} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Input
-            placeholder="Reason (optional)"
+            id="leave-date"
+            label="Date"
+            type="date"
+            fieldClassName="sm:flex-1"
+            value={holidayDate}
+            onChange={(e) => setHolidayDate(e.target.value)}
+          />
+          <Input
+            id="leave-reason"
+            label="Reason"
+            placeholder="Optional"
+            fieldClassName="sm:flex-1"
             value={holidayReason}
             onChange={(e) => setHolidayReason(e.target.value)}
           />
@@ -304,18 +308,25 @@ export function AvailabilityEditor({
             Add date
           </Button>
         </div>
-        {holidays.map((h) => (
-          <p key={h.date} className="text-body-sm text-text-muted">
-            {h.date}
-            {h.reason ? ` · ${h.reason}` : ""}
-          </p>
-        ))}
+        {holidays.length ? (
+          <ul className="flex flex-wrap gap-2">
+            {holidays.map((h) => (
+              <li key={h.date}>
+                <Badge tone="warning">
+                  {h.date}
+                  {h.reason ? ` · ${h.reason}` : ""}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </Card>
 
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-      {notice ? <p className="text-body-sm text-primary">{notice}</p> : null}
-      <Button type="button" onClick={() => void save()} disabled={saving}>
-        {saving ? "Saving…" : "Save schedule"}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
+
+      <Button size="lg" className="self-start" busy={saving} onClick={() => void save()}>
+        Save schedule
       </Button>
     </div>
   );

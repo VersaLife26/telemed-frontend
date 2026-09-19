@@ -2,8 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
+import { Modal } from "@/components/consumer/ui/Modal";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { RescheduleRequest } from "@/lib/consumer/api/types";
@@ -30,7 +33,7 @@ export function RescheduleRequestForm({
 
   if (pending) {
     return (
-      <p className="text-body-sm text-text-muted">
+      <p className="text-body-sm text-muted">
         Waiting for patient or admin — proposed{" "}
         {pending.proposed_start_at_local || pending.proposed_start_at}
       </p>
@@ -39,20 +42,6 @@ export function RescheduleRequestForm({
 
   if (startAt && Number.isFinite(Date.parse(startAt)) && Date.parse(startAt) <= Date.now()) {
     return null;
-  }
-
-  if (!open) {
-    return (
-      <Button
-        type="button"
-        variant="outline"
-        fullWidth={false}
-        className="text-body-sm"
-        onClick={() => setOpen(true)}
-      >
-        Can’t attend — ask to reschedule
-      </Button>
-    );
   }
 
   async function submit(e: React.FormEvent) {
@@ -82,32 +71,46 @@ export function RescheduleRequestForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-2">
-      <label className="text-body-sm text-text-muted" htmlFor={`reschedule-when-${appointmentId}`}>
-        New date and time
-      </label>
-      <Input
-        id={`reschedule-when-${appointmentId}`}
-        type="datetime-local"
-        required
-        value={when}
-        onChange={(e) => setWhen(e.target.value)}
-      />
-      <Textarea
-        maxLength={500}
-        placeholder="Reason for admin (optional)"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-      />
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" fullWidth={false} disabled={saving}>
-          {saving ? "Sending…" : "Send to admin"}
-        </Button>
-        <Button type="button" variant="outline" fullWidth={false} onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        Can’t attend — ask to reschedule
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Ask to reschedule"
+        description="An administrator reviews the request before the patient sees it."
+      >
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <Input
+            id={`reschedule-when-${appointmentId}`}
+            label="New date and time"
+            type="datetime-local"
+            required
+            value={when}
+            onChange={(e) => setWhen(e.target.value)}
+          />
+          <Textarea
+            id={`reschedule-reason-${appointmentId}`}
+            label="Reason"
+            hint="Optional. Seen by the administrator reviewing this."
+            maxLength={500}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          {error ? <Alert tone="danger">{error}</Alert> : null}
+
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" busy={saving}>
+              Send to admin
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

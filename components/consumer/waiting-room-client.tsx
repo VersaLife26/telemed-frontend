@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { JoinResult, WaitingRoomStatus } from "@/lib/consumer/api/types";
@@ -73,32 +73,48 @@ export function WaitingRoomClient({ appointmentId }: { appointmentId: string }) 
     router.push(callPath(appointmentId));
   }
 
+  const ahead = queue?.patients_ahead ?? 0;
+
   return (
-    <Card className="mx-auto flex max-w-lg flex-col gap-4">
-      <h1 className="text-h4 text-black">Waiting room</h1>
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-5">
+      <h1 className="text-h2 text-ink">Waiting room</h1>
+
       {error ? (
-        <p className="text-body-sm text-danger">{error}</p>
+        <Alert tone="danger" title="Couldn’t join">
+          {error}
+        </Alert>
       ) : join ? (
         <>
-          <p className="text-body text-text-muted">
-            You are in the queue. The doctor will admit you when ready.
-          </p>
-          <div className="rounded-[16px] bg-white p-4">
-            <p className="text-h2 text-primary">#{queue?.position ?? 1}</p>
-            <p className="text-body-sm text-text-muted">
-              {queue?.patients_ahead
-                ? `${queue.patients_ahead} ahead · ${formatWait(queue.estimated_wait_seconds)}`
+          {/* Queue position is the whole reason this screen exists, so it is
+              the only thing on it rendered at display size. */}
+          <div
+            role="status"
+            aria-live="polite"
+            className="glass-panel flex flex-col items-center gap-2 p-8 text-center"
+          >
+            <p className="text-eyebrow text-brand">Your place in the queue</p>
+            <p className="text-display text-ink tabular-time">#{queue?.position ?? 1}</p>
+            <p className="text-body text-muted">
+              {ahead
+                ? `${ahead} ahead · about ${formatWait(queue?.estimated_wait_seconds)}`
                 : "You are next"}
             </p>
           </div>
-          <p className="text-body-sm text-text-muted">Status: {join.status}</p>
+
+          <p className="text-body text-muted">
+            Stay on this page — you are admitted automatically when the doctor is ready.
+          </p>
+          <p className="text-body-sm text-faint">Status: {join.status}</p>
         </>
       ) : (
-        <p className="text-body text-text-muted">Joining the waiting room…</p>
+        <div className="glass-panel p-8 text-center" role="status" aria-busy="true">
+          <p className="text-body text-muted">Joining the waiting room…</p>
+        </div>
       )}
-      <Button type="button" fullWidth onClick={enterCall} disabled={!join}>
+
+      <Button size="lg" fullWidth onClick={enterCall} disabled={!join}>
         Enter call
       </Button>
-    </Card>
+    </div>
   );
 }

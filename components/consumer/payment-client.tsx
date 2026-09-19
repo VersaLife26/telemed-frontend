@@ -2,8 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Card } from "@/components/consumer/ui/Card";
+import { ShieldCheck } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
@@ -187,71 +190,68 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
   }
 
   return (
-    <Card className="mx-auto flex max-w-lg flex-col gap-4">
-      <h1 className="text-h4 text-ink">Payment</h1>
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-5">
+      <h1 className="text-h2 text-ink">Payment</h1>
 
-      <div className="rounded-[16px] bg-linen p-4">
-        <p className="text-body-sm text-text-muted">Consultation fee</p>
-        <p className="text-h3 text-ink tabular-time">{formatMoney(total, currency)}</p>
+      {/* The amount is the largest thing on the screen. Everything below it is
+          about how it gets paid, which matters less than what it is. */}
+      <Card variant="tint" className="p-5">
+        <p className="text-eyebrow text-brand">Consultation fee</p>
+        <p className="mt-2 text-h1 text-ink tabular-time">{formatMoney(total, currency)}</p>
         {order?.discount_cents ? (
-          <p className="mt-1 text-body-sm text-text-muted">
+          <p className="mt-1 text-body-sm text-muted tabular-time">
             Discount {formatMoney(order.discount_cents, currency)}
           </p>
         ) : null}
-      </div>
+      </Card>
 
       {authorized ? (
-        <div className="rounded-[16px] border border-blue-200 bg-blue-50 p-4 text-blue-900">
-          <p className="text-body font-semibold">Card Pre-Authorized</p>
-          <p className="mt-1 text-body-sm text-blue-800">
-            {formatMoney(total, currency)} has been held on your card. You will only be
-            charged after your consultation is completed.
-          </p>
-        </div>
+        <Alert tone="info" title="Card pre-authorised">
+          {formatMoney(total, currency)} is held on your card. You are only charged after the
+          consultation is completed.
+        </Alert>
       ) : settled ? (
-        <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-          <p className="text-body font-semibold">Payment Confirmed</p>
-          <p className="mt-1 text-body-sm text-emerald-800">
-            Your appointment is confirmed. You can proceed to the waiting room.
-          </p>
-        </div>
+        <Alert tone="success" title="Payment confirmed">
+          Your appointment is confirmed. You can go through to the waiting room.
+        </Alert>
       ) : (
-        <div className="rounded-[16px] border border-stone-200 bg-stone-50 p-4">
-          <p className="text-body font-medium text-ink">Pay with Card (PayHere)</p>
-          <p className="mt-1 text-body-sm text-text-muted">
-            Visa and Mastercard supported. Funds are held on card and only charged once the
-            doctor completes your visit.
-          </p>
-        </div>
+        <Card className="flex gap-3 p-5">
+          <span
+            aria-hidden="true"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-tint text-brand"
+          >
+            <ShieldCheck className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-body font-semibold text-ink">Pay with card (PayHere)</p>
+            <p className="mt-1 text-body-sm text-muted">
+              Visa and Mastercard supported. Funds are held on the card and charged once the doctor
+              completes your visit.
+            </p>
+          </div>
+        </Card>
       )}
 
       {paymentStatus(intent, payment) ? (
-        <p className="text-body-sm text-text-muted">
+        <p className="text-body-sm text-muted" role="status">
           Status: {paymentStatus(intent, payment)}
           {polling ? " · waiting for confirmation…" : ""}
         </p>
       ) : null}
 
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
       {settled ? (
-        <Button type="button" fullWidth onClick={goWaiting}>
+        <Button size="lg" fullWidth onClick={goWaiting}>
           Continue to waiting room
         </Button>
       ) : (
-        <div className="flex flex-col gap-2">
-          <Button
-            type="button"
-            fullWidth
-            busy={loading || polling}
-            onClick={() => void payPayHere()}
-          >
-            {loading ? "Redirecting…" : polling ? "Verifying authorization…" : "Pay with Card (PayHere)"}
+        <div className="flex flex-col gap-3">
+          <Button size="lg" fullWidth busy={loading || polling} onClick={() => void payPayHere()}>
+            {loading ? "Redirecting…" : polling ? "Verifying authorisation…" : "Pay with card"}
           </Button>
-
           <Button
-            type="button"
-            variant="secondary"
+            variant="outline"
             fullWidth
             busy={loading || polling}
             onClick={() => void payMock()}
@@ -262,10 +262,11 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
       )}
 
       {polling ? (
-        <p className="text-body-sm text-text-muted">
-          Waiting for confirmation from PayHere. This updates automatically once your card is authorized.
+        <p className="text-body-sm text-muted">
+          Waiting for confirmation from PayHere. This updates on its own once your card is
+          authorised.
         </p>
       ) : null}
-    </Card>
+    </div>
   );
 }

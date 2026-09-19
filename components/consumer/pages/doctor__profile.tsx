@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
-import { Button } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { LogOut } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
+import { Badge } from "@/components/consumer/ui/Badge";
+import { Button, ButtonLink } from "@/components/consumer/ui/Button";
+import { Select } from "@/components/consumer/ui/Select";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
@@ -164,78 +170,102 @@ export default function ProfilePage() {
     );
   }
 
-  if (loading) return <p className="text-body text-text-muted">Loading…</p>;
+  if (loading) return <FormSkeleton />;
 
   if (error && !me) {
     return (
-      <Card className="flex flex-col gap-4">
-        <p className="text-body text-text-muted">{error || "Sign in required"}</p>
-        <Link href="/login" className="max-w-xs">
-          <Button fullWidth>Sign in</Button>
-        </Link>
+      <Card className="flex max-w-xl flex-col items-start gap-4">
+        <p className="text-body text-muted">{error || "Sign in required"}</p>
+        <ButtonLink href="/login">Sign in</ButtonLink>
       </Card>
     );
   }
 
   return (
-    <div className="flex max-w-xl flex-col gap-4">
-      <Card className="flex flex-col gap-4">
-        <h1 className="text-h4 text-black">{me?.display_name || "Doctor"}</h1>
-        <p className="text-body text-text-muted">{me?.specialty}</p>
-        <p className="text-body-sm text-text-label">SLMC {me?.slmc_number || "—"}</p>
-        <p className="text-body-sm text-text-label">Status: {me?.verification_status || "—"}</p>
+    <div className="flex w-full max-w-xl flex-col gap-6">
+      <section className="overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6">
+        <h1 className="text-h2 text-ink">{me?.display_name || "Doctor"}</h1>
+        <p className="mt-1 text-body text-blue-800">{me?.specialty}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Badge tone="brand">SLMC {me?.slmc_number || "—"}</Badge>
+          <Badge tone={me?.verification_status === "approved" ? "success" : "warning"}>
+            {me?.verification_status || "unverified"}
+          </Badge>
+        </div>
+      </section>
 
-        <form onSubmit={(e) => void savePractice(e)} className="flex flex-col gap-3">
-          <label className="text-body-sm text-text-label">Bio</label>
+      <Card>
+        <h2 className="text-h4 text-ink">Practice profile</h2>
+        <form onSubmit={(e) => void savePractice(e)} className="mt-5 flex flex-col gap-5">
           <Textarea
+            id="doctor-bio"
+            label="Bio"
             maxLength={2000}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             placeholder="What patients should know about your practice"
           />
-          <label className="text-body-sm text-text-label">Consultation fee (LKR)</label>
           <Input
+            id="doctor-fee"
+            label="Consultation fee (LKR)"
             type="number"
             min={0}
             step="0.01"
             value={feeRupees}
             onChange={(e) => setFeeRupees(e.target.value)}
           />
-          <label className="text-body-sm text-text-label">Years of experience</label>
           <Input
+            id="doctor-experience"
+            label="Years of experience"
             type="number"
             min={0}
             max={70}
             value={experienceYears}
             onChange={(e) => setExperienceYears(Number(e.target.value) || 0)}
           />
-          <p className="text-body-sm text-text-label">Languages</p>
-          <div className="flex flex-wrap gap-3">
-            {PRACTICE_LANGUAGES.map((lang) => (
-              <label key={lang.code} className="flex items-center gap-2 text-body-sm text-black">
-                <input
-                  type="checkbox"
-                  checked={languages.includes(lang.code)}
-                  onChange={() => toggleLanguage(lang.code)}
-                />
-                {lang.label}
-              </label>
-            ))}
-          </div>
-          <Button type="submit" fullWidth disabled={saving !== null}>
-            {saving === "practice" ? "Saving…" : "Save practice profile"}
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-label text-ink">Consultation languages</legend>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {PRACTICE_LANGUAGES.map((lang) => {
+                const on = languages.includes(lang.code);
+                return (
+                  <label
+                    key={lang.code}
+                    className={
+                      on
+                        ? "inline-flex min-h-10 cursor-pointer items-center rounded-pill bg-brand px-4 text-label text-on-brand transition-[background-color,color] duration-[160ms] ease-out"
+                        : "inline-flex min-h-10 cursor-pointer items-center rounded-pill border border-border-default px-4 text-label text-muted transition-[background-color,border-color,color] duration-[160ms] ease-out can-hover:hover:border-brand can-hover:hover:text-ink"
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={on}
+                      onChange={() => toggleLanguage(lang.code)}
+                    />
+                    {lang.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <Button type="submit" size="lg" fullWidth busy={saving === "practice"} disabled={saving !== null}>
+            Save practice profile
           </Button>
         </form>
       </Card>
 
-      <Card className="flex flex-col gap-3">
-        <h2 className="text-h5 text-black">Credential documents</h2>
-        <p className="text-body-sm text-text-muted">
+      <Card>
+        <h2 className="text-h4 text-ink">Credential documents</h2>
+        <p className="mt-1 text-body-sm text-muted">
           Records document type and filename only. File bytes are not sent on this call.
         </p>
-        <form onSubmit={(e) => void saveDocument(e)} className="flex flex-col gap-3">
-          <select
-            className="min-h-12 rounded-[32px] border border-transparent bg-paper px-6 text-[16px]"
+        <form onSubmit={(e) => void saveDocument(e)} className="mt-5 flex flex-col gap-5">
+          <Select
+            id="doc-type"
+            label="Document type"
             value={docType}
             onChange={(e) =>
               setDocType(e.target.value as (typeof CREDENTIAL_DOC_TYPES)[number]["value"])
@@ -246,56 +276,68 @@ export default function ProfilePage() {
                 {t.label}
               </option>
             ))}
-          </select>
+          </Select>
           <Input
+            id="doc-filename"
+            label="Filename"
             value={docFilename}
             onChange={(e) => setDocFilename(e.target.value)}
             placeholder="slmc-certificate.pdf"
           />
-          <Button type="submit" variant="outline" fullWidth disabled={saving !== null}>
-            {saving === "document" ? "Saving…" : "Record document"}
+          <Button
+            type="submit"
+            variant="outline"
+            fullWidth
+            busy={saving === "document"}
+            disabled={saving !== null}
+          >
+            Record document
           </Button>
         </form>
       </Card>
 
-      <Card className="flex flex-col gap-4">
-        <form onSubmit={(e) => void saveEmail(e)} className="flex flex-col gap-3">
-          <label className="text-body-sm text-text-label">
-            Login email (for Google and email sign-in)
-          </label>
+      <Card>
+        <h2 className="text-h4 text-ink">Sign-in details</h2>
+
+        <form onSubmit={(e) => void saveEmail(e)} className="mt-5 flex flex-col gap-4">
           <Input
+            id="doctor-email"
+            label="Login email"
+            hint="Used for Google and email sign-in."
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.lk"
           />
-          <Button type="submit" fullWidth disabled={saving !== null}>
-            {saving === "email" ? "Saving…" : "Save email"}
+          <Button type="submit" fullWidth busy={saving === "email"} disabled={saving !== null}>
+            Save email
           </Button>
         </form>
 
-        <form onSubmit={(e) => void savePassword(e)} className="flex flex-col gap-3">
-          <label className="text-body-sm text-text-label">Set a password</label>
+        <form onSubmit={(e) => void savePassword(e)} className="mt-6 flex flex-col gap-4">
           <Input
+            id="doctor-password"
+            label="Set a password"
+            hint="At least 8 characters."
             type="password"
             minLength={8}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (8+ characters)"
+            placeholder="••••••••"
           />
-          <Button type="submit" fullWidth disabled={saving !== null}>
-            {saving === "password" ? "Saving…" : "Save password"}
+          <Button type="submit" fullWidth busy={saving === "password"} disabled={saving !== null}>
+            Save password
           </Button>
         </form>
 
-        {notice ? <p className="text-body-sm text-primary">{notice}</p> : null}
-        {error ? <p className="text-body-sm text-danger">{error}</p> : null}
-
-        <Button type="button" variant="outline" fullWidth onClick={() => void logout()}>
-          Sign out
-        </Button>
+        {notice ? <Alert tone="success" className="mt-5">{notice}</Alert> : null}
+        {error ? <Alert tone="danger" className="mt-5">{error}</Alert> : null}
       </Card>
+
+      <Button variant="ghost" fullWidth leading={<LogOut className="size-4" />} onClick={() => void logout()}>
+        Sign out
+      </Button>
     </div>
   );
 }

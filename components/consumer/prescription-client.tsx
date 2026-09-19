@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Card } from "@/components/consumer/layout/AppShell";
+import { Card } from "@/components/consumer/ui/Card";
+import { ArrowLeft, Download, Plus } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
+import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
+import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { browserApi } from "@/lib/consumer/api/client";
 import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
@@ -132,44 +137,50 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
   }
 
   if (loading) {
-    return <p className="text-body text-text-muted">Loading prescription…</p>;
+    return <FormSkeleton />;
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-h4 text-black">E-prescription</h1>
-          <p className="mt-1 text-body-sm text-text-muted">
-            {issued ? `Issued ${issued.issued_at || ""}` : "PDF with QR after the consult ends"}
-          </p>
+          <h1 className="text-h2 text-ink">E-prescription</h1>
+          <div className="mt-2">
+            {issued ? (
+              <Badge tone="success">Issued {issued.issued_at || ""}</Badge>
+            ) : (
+              <Badge tone="neutral">PDF with QR once issued</Badge>
+            )}
+          </div>
         </div>
-        <Link href={`/appointments/${appointmentId}/clinical-notes`} className="text-body-sm text-primary">
-          ← Clinical notes
+        <Link
+          href={`/appointments/${appointmentId}/clinical-notes`}
+          className="inline-flex min-h-11 items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Clinical notes
         </Link>
       </div>
 
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Card className="flex flex-col gap-3">
-        <p className="text-body-sm text-text-label">
-          Prescriber: {doctor?.display_name || "Doctor"} · SLMC {doctor?.slmc_number || "—"}
+      <Card className="flex flex-col gap-5">
+        <p className="text-body-sm text-muted">
+          Prescriber: <span className="font-semibold text-ink">{doctor?.display_name || "Doctor"}</span>{" "}
+          · SLMC {doctor?.slmc_number || "—"}
         </p>
-        <label className="text-body-sm text-text-label" htmlFor="patient-name">
-          Patient name (printed on PDF)
-        </label>
         <Input
           id="patient-name"
+          label="Patient name"
+          hint="Printed on the PDF."
           value={patientName}
           onChange={(e) => setPatientName(e.target.value)}
           placeholder="Kamala Silva"
           disabled={Boolean(issued)}
         />
-        <label className="text-body-sm text-text-label" htmlFor="patient-age">
-          Age
-        </label>
         <Input
           id="patient-age"
+          label="Age"
           type="number"
           min={0}
           max={130}
@@ -181,16 +192,17 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
 
       {items.map((item, index) => (
         <Card key={item.key} className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-body font-medium text-black">Item {index + 1}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-h5 text-ink">Item {index + 1}</p>
             {!issued && items.length > 1 ? (
-              <button
-                type="button"
-                className="text-body-sm text-danger"
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-danger"
                 onClick={() => setItems((prev) => prev.filter((it) => it.key !== item.key))}
               >
                 Remove
-              </button>
+              </Button>
             ) : null}
           </div>
           <div className="relative">
@@ -209,12 +221,12 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
               disabled={Boolean(issued)}
             />
             {activeItem === item.key && drugHits.length ? (
-              <ul className="absolute z-10 mt-2 max-h-56 w-full overflow-auto rounded-[16px] bg-white p-2 shadow-[var(--shadow-soft)]">
+              <ul className="absolute z-10 mt-2 max-h-56 w-full overflow-auto rounded-md border border-border-subtle bg-surface p-2 shadow-lg">
                 {drugHits.map((hit) => (
                   <li key={hit.id}>
                     <button
                       type="button"
-                      className="w-full rounded-[12px] px-3 py-2 text-left text-body-sm hover:bg-bg-gray"
+                      className="w-full cursor-pointer rounded-sm px-3 py-2 text-left text-body-sm text-ink transition-colors duration-[160ms] ease-out can-hover:hover:bg-tint"
                       onClick={() => pickDrug(item.key, hit)}
                     >
                       {hit.name}
@@ -278,21 +290,22 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
       ))}
 
       {!issued ? (
-        <button
-          type="button"
-          className="text-left text-body-sm text-primary"
+        <Button
+          variant="outline"
+          className="self-start"
+          leading={<Plus className="size-4" />}
           onClick={() => setItems((prev) => [...prev, blankItem(`item-${prev.length + 1}`)])}
         >
-          + Add another drug
-        </button>
+          Add another drug
+        </Button>
       ) : null}
 
       {issued ? (
-        <Button type="button" fullWidth onClick={() => void openPdf(issued.id)}>
+        <Button size="lg" fullWidth leading={<Download className="size-4" />} onClick={() => void openPdf(issued.id)}>
           Download PDF
         </Button>
       ) : (
-        <Button type="button" fullWidth busy={issuing} onClick={() => void issue()}>
+        <Button size="lg" fullWidth busy={issuing} onClick={() => void issue()}>
           {issuing ? "Generating PDF…" : "Issue e-prescription"}
         </Button>
       )}

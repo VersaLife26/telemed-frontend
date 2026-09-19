@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card } from "@/components/consumer/ui/Card";
+import { Download, FileText } from "lucide-react";
+
+import { Alert } from "@/components/consumer/ui/Alert";
 import { Button, ButtonLink } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
+import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import { isNotFound } from "@/lib/consumer/api/envelope";
@@ -100,58 +104,76 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
-      <h1 className="text-h4 text-ink">Visit summary</h1>
-      {error ? <p className="text-body-sm text-danger">{error}</p> : null}
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-5">
+      <h1 className="text-h2 text-ink">Visit summary</h1>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Card className="flex flex-col gap-2">
-        <p className="text-body font-medium text-ink">{appointment?.specialty || "Consultation"}</p>
-        <p className="text-body-sm text-text-muted">
-          {appointment?.start_at_local || appointment?.start_at || appointmentId}
-          {appointment?.status ? ` · ${appointment.status}` : ""}
-        </p>
+      <Card variant="tint" className="flex items-start justify-between gap-3 p-5">
+        <div className="min-w-0">
+          <p className="text-h5 text-ink">{appointment?.specialty || "Consultation"}</p>
+          <p className="mt-1 text-body-sm text-muted tabular-time">
+            {appointment?.start_at_local || appointment?.start_at || appointmentId}
+          </p>
+        </div>
+        {appointment?.status ? <StatusBadge status={appointment.status} /> : null}
       </Card>
 
       <Card className="flex flex-col gap-3">
-        <p className="text-body font-medium text-black">Clinical note</p>
+        <h2 className="text-h5 text-ink">Clinical note</h2>
         {noteVisibleToPatient(note) ? (
           <>
-            {note.assessment ? <p className="text-body text-black">{note.assessment}</p> : null}
-            {note.plan ? <p className="text-body-sm text-text-muted">{note.plan}</p> : null}
+            {note.assessment ? <p className="text-body text-ink">{note.assessment}</p> : null}
+            {note.plan ? <p className="text-body-sm text-muted">{note.plan}</p> : null}
             {note.diagnoses?.length ? (
-              <ul className="text-body-sm text-text-muted">
+              <ul className="flex flex-col gap-1 text-body-sm text-muted">
                 {note.diagnoses.map((d) => (
                   <li key={d.code}>
-                    {d.code} {d.description || ""}
+                    <span className="font-semibold text-ink">{d.code}</span> {d.description || ""}
                   </li>
                 ))}
               </ul>
             ) : null}
           </>
         ) : note ? (
-          <p className="text-body-sm text-text-muted">The doctor has a draft note. It appears here once signed.</p>
+          <p className="text-body-sm text-muted">
+            The doctor has a draft note. It appears here once it is signed.
+          </p>
         ) : (
-          <p className="text-body-sm text-text-muted">Waiting for the doctor to finalise notes…</p>
+          <p className="text-body-sm text-muted">Waiting for the doctor to finalise notes…</p>
         )}
       </Card>
 
-      <Card className="flex flex-col gap-3">
-        <p className="text-body font-medium text-black">Prescription</p>
+      <Card className="flex flex-col gap-4">
+        <h2 className="text-h5 text-ink">Prescription</h2>
         {rx ? (
           <>
-            <ul className="text-body-sm text-text-muted">
+            <ul className="flex flex-col gap-2">
               {(rx.items || []).map((it, i) => (
-                <li key={`${it.drug_name}-${i}`}>
-                  {it.drug_name} {it.strength || ""} — {it.dosage}, {it.frequency}
+                <li key={`${it.drug_name}-${i}`} className="flex gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-tint text-brand"
+                  >
+                    <FileText className="size-4" />
+                  </span>
+                  <span className="min-w-0 text-body-sm text-muted">
+                    <span className="font-semibold text-ink">
+                      {it.drug_name} {it.strength || ""}
+                    </span>
+                    <br />
+                    {it.dosage}, {it.frequency}
+                  </span>
                 </li>
               ))}
             </ul>
-            <Button type="button" fullWidth onClick={() => void downloadRx()}>
+            <Button fullWidth leading={<Download className="size-4" />} onClick={() => void downloadRx()}>
               Download e-Rx PDF
             </Button>
           </>
         ) : (
-          <p className="text-body-sm text-text-muted">No e-prescription yet. This updates when the doctor issues one.</p>
+          <p className="text-body-sm text-muted">
+            No e-prescription yet. This updates when the doctor issues one.
+          </p>
         )}
       </Card>
 
