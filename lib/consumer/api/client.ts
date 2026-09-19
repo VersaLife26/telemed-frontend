@@ -52,22 +52,42 @@ export async function apiFetch<T>(
 }
 
 /** Browser-side helper: goes through same-origin BFF so cookies attach the JWT. */
+let browserRefresh: Promise<boolean> | null = null;
+
+function refreshBrowserSession(): Promise<boolean> {
+  if (!browserRefresh) {
+    browserRefresh = fetch("/api/auth/refresh", { method: "POST", cache: "no-store" })
+      .then((res) => res.ok)
+      .finally(() => {
+        browserRefresh = null;
+      });
+  }
+  return browserRefresh;
+}
+
 export async function browserApi<T>(
   path: string,
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
-  const res = await fetch(`/api/proxy${path.startsWith("/") ? path : `/${path}`}`, {
-    method: options.method || (options.body !== undefined ? "POST" : "GET"),
-    headers: options.body !== undefined && !isForm ? { "Content-Type": "application/json" } : undefined,
-    body:
-      options.body === undefined
-        ? undefined
-        : isForm
-          ? (options.body as FormData)
-          : JSON.stringify(options.body),
-    cache: "no-store",
-  });
+  const send = () =>
+    fetch(`/api/proxy${path.startsWith("/") ? path : `/${path}`}`, {
+      method: options.method || (options.body !== undefined ? "POST" : "GET"),
+      headers: options.body !== undefined && !isForm ? { "Content-Type": "application/json" } : undefined,
+      body:
+        options.body === undefined
+          ? undefined
+          : isForm
+            ? (options.body as FormData)
+            : JSON.stringify(options.body),
+      cache: "no-store",
+    });
+
+  let res = await send();
+  if (res.status === 401) {
+    const refreshed = await refreshBrowserSession();
+    if (refreshed) res = await send();
+  }
   const text = await res.text();
   let json: unknown = null;
   if (text) {

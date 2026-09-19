@@ -1,17 +1,11 @@
 import { cookies } from "next/headers";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/consumer/env";
-
-const cookieBase = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  path: "/",
-  secure: process.env.NODE_ENV === "production",
-};
+import { ACCESS_MAX_AGE, REFRESH_MAX_AGE, authCookieOptions } from "@/lib/consumer/auth/cookie-options";
 
 export async function setAuthCookies(accessToken: string, refreshToken: string) {
   const jar = await cookies();
-  jar.set(ACCESS_COOKIE, accessToken, { ...cookieBase, maxAge: 60 * 15 });
-  jar.set(REFRESH_COOKIE, refreshToken, { ...cookieBase, maxAge: 60 * 60 * 24 * 7 });
+  jar.set(ACCESS_COOKIE, accessToken, authCookieOptions(ACCESS_MAX_AGE));
+  jar.set(REFRESH_COOKIE, refreshToken, authCookieOptions(REFRESH_MAX_AGE));
 }
 
 export async function clearAuthCookies() {
@@ -23,4 +17,9 @@ export async function clearAuthCookies() {
 export async function getAccessToken(): Promise<string | undefined> {
   const jar = await cookies();
   return jar.get(ACCESS_COOKIE)?.value;
+}
+
+export async function getRefreshToken(): Promise<string | undefined> {
+  const jar = await cookies();
+  return jar.get(REFRESH_COOKIE)?.value;
 }

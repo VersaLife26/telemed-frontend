@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { apiFetch } from "@/lib/consumer/api/client";
 import { ApiError } from "@/lib/consumer/api/envelope";
-import { setAuthCookies } from "@/lib/consumer/auth/cookies";
+import { clearAuthCookies, getRefreshToken, setAuthCookies } from "@/lib/consumer/auth/cookies";
+import { fetchRefreshedTokens } from "@/lib/consumer/auth/refresh";
 import { SURFACE } from "@/lib/consumer/surface";
 import type { TelemedUser } from "@/lib/consumer/api/types";
 
@@ -98,4 +99,30 @@ export async function finishAuth(data: AuthTokens, requireRole?: string) {
   }
   await setAuthCookies(data.access_token, data.refresh_token);
   return NextResponse.json({ data: { ok: true, user: data.user ?? null } });
+}
+
+export async function completeRefresh() {
+  const refresh = await getRefreshToken();
+  if (!refresh) {
+    return NextResponse.json({ message: "Not signed in" }, { status: 401 });
+  }
+  const result = await fetchRefreshedTokens(refresh);
+  if (!result.ok) {
+    if (result.invalidate) await clearAuthCookies();
+    return NextResponse.json({ message: "Session expired. Sign in again." }, { status: 401 });
+  }
+  return finishAuth(result.tokens, requiredRole());
+}
+
+/** Rotate the access cookie when it is missing and a refresh cookie is still live. */
+export async function refreshAuthCookies(): Promise<string | undefined> {
+  const refresh = await getRefreshToken();
+  if (!refresh) return undefined;
+  const result = await fetchRefreshedTokens(refresh);
+  if (!result.ok) {
+    if (result.invalidate) await clearAuthCookies();
+    return undefined;
+  }
+  await setAuthCookies(result.tokens.access_token, result.tokens.refresh_token);
+  return result.tokens.access_token;
 }

@@ -20,4 +20,5 @@ test("File Station hides other patients during a call", () => {
 test("the doctor surface publishes /workspace", () => {
   assert.equal(servedBy("doctor", "/workspace"), true);
   assert.equal(servedBy("patient", "/workspace"), false);
+  assert.equal(servedBy("doctor", "/api/auth/refresh"), true);
 });

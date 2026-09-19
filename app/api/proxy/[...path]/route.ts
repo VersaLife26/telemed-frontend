@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_BASE_URL } from "@/lib/consumer/env";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
+import { refreshAuthCookies } from "@/lib/consumer/auth/session";
 import { gatewayUrl, isNullBodyStatus, shouldForwardBody } from "@/lib/consumer/proxy";
 
 type Ctx = { params: Promise<{ path: string[] }> };
@@ -10,36 +11,33 @@ async function forward(req: Request, ctx: Ctx) {
   const incoming = new URL(req.url);
   const target = gatewayUrl(API_BASE_URL, path, incoming.search);
 
-  const headers = new Headers();
-  headers.set("Accept", "application/json");
   const contentType = req.headers.get("content-type");
-  if (contentType) headers.set("Content-Type", contentType);
-
-  const token = await getAccessToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const init: RequestInit = {
-    method: req.method,
-    headers,
-    cache: "no-store",
-  };
+  const streamMultipart =
+    Boolean(contentType?.toLowerCase().includes("multipart/form-data")) && Boolean(req.body);
+  let body: BodyInit | undefined;
   if (shouldForwardBody(req.method)) {
-    const isMultipart = (contentType || "").toLowerCase().includes("multipart/form-data");
-    if (isMultipart && req.body) {
-      // Stream multipart through. Buffering with arrayBuffer() can desync the
-      // boundary in Content-Type from the bytes the gateway parses.
-      init.body = req.body;
-      Object.assign(init, { duplex: "half" });
+    if (streamMultipart && req.body) {
+      body = req.body;
     } else {
-      init.body = await req.arrayBuffer();
+      body = await req.arrayBuffer();
     }
   }
 
+  let token = await getAccessToken();
+  let refreshed = false;
+  if (!token) {
+    token = await refreshAuthCookies();
+    refreshed = Boolean(token);
+  }
+
+  const run = (bearer?: string) => fetchUpstream(target, req.method, contentType, bearer, body, streamMultipart);
+
   try {
-    const upstream = await fetch(target, init);
-    // Vault DELETE (and similar) returns 204 with an empty body. Building a
-    // NextResponse with even an empty string body for a null-body status
-    // throws in undici, which this catch turned into Cloudflare's 502 page.
+    let upstream = await run(token);
+    if (upstream.status === 401 && !refreshed && !streamMultipart) {
+      const next = await refreshAuthCookies();
+      if (next) upstream = await run(next);
+    }
     if (isNullBodyStatus(upstream.status)) {
       return new NextResponse(null, { status: upstream.status });
     }
@@ -75,6 +73,31 @@ async function forward(req: Request, ctx: Ctx) {
       { status: 502 },
     );
   }
+}
+
+async function fetchUpstream(
+  target: string,
+  method: string,
+  contentType: string | null,
+  token: string | undefined,
+  body: BodyInit | undefined,
+  streamMultipart: boolean,
+) {
+  const headers = new Headers();
+  headers.set("Accept", "application/json");
+  if (contentType) headers.set("Content-Type", contentType);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const init: RequestInit = {
+    method,
+    headers,
+    cache: "no-store",
+  };
+  if (body !== undefined) {
+    init.body = body;
+    if (streamMultipart) Object.assign(init, { duplex: "half" });
+  }
+  return fetch(target, init);
 }
 
 export const GET = forward;
