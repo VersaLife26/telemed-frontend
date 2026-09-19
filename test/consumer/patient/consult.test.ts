@@ -17,7 +17,6 @@ import {
   isWithinLateJoinGrace,
   joinPath,
   LATE_JOIN_CUTOFF_MS,
-  LATE_JOIN_GRACE_MS,
   minutesLate,
   noShowPath,
   readyForNextPath,
@@ -80,18 +79,19 @@ test("after end the doctor writes notes and the patient sees the summary", () =>
   assert.equal(afterEndPath("patient", "appt-1"), "/appointments/appt-1/summary");
 });
 
-test("late-join helpers match the ten-minute grace and cutoff", () => {
-  assert.equal(LATE_JOIN_GRACE_MS, 10 * 60 * 1000);
-  assert.equal(LATE_JOIN_CUTOFF_MS, LATE_JOIN_GRACE_MS);
+test("the booked slot is the join window and no-show is not used", () => {
+  assert.equal(LATE_JOIN_CUTOFF_MS, 15 * 60 * 1000);
   assert.equal(noShowPath("appt-1"), "/appointments/appt-1/no-show");
 
   const start = "2026-09-12T10:00:00.000Z";
   const fiveLate = Date.parse(start) + 5 * 60 * 1000;
   const elevenLate = Date.parse(start) + 11 * 60 * 1000;
+  const sixteenLate = Date.parse(start) + 16 * 60 * 1000;
 
   assert.equal(minutesLate(start, fiveLate), 5);
   assert.equal(isWithinLateJoinGrace(start, fiveLate), true);
-  assert.equal(isPastLateJoinCutoff(start, elevenLate), true);
+  assert.equal(isPastLateJoinCutoff(start, elevenLate), false);
+  assert.equal(isPastLateJoinCutoff(start, sixteenLate), true);
   assert.equal(canMarkNoShow("patient", "scheduled", start, fiveLate), false);
-  assert.equal(canMarkNoShow("doctor", "scheduled", start, fiveLate), true);
+  assert.equal(canMarkNoShow("doctor", "scheduled", start, fiveLate), false);
 });

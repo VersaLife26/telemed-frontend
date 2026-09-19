@@ -17,7 +17,6 @@ import {
   isWithinLateJoinGrace,
   joinPath,
   LATE_JOIN_CUTOFF_MS,
-  LATE_JOIN_GRACE_MS,
   minutesLate,
   noShowPath,
   readyForNextPath,
@@ -64,26 +63,23 @@ test("ending a consult sends reason completed and the doctor goes to notes", () 
   assert.equal(afterEndPath("patient", "appt-1"), "/appointments/appt-1/summary");
 });
 
-test("late-join grace and cutoff are ten minutes", () => {
-  assert.equal(LATE_JOIN_GRACE_MS, 10 * 60 * 1000);
-  assert.equal(LATE_JOIN_CUTOFF_MS, LATE_JOIN_GRACE_MS);
+test("join is allowed for the booked slot; doctors do not mark no-show", () => {
+  assert.equal(LATE_JOIN_CUTOFF_MS, 15 * 60 * 1000);
   assert.equal(noShowPath("appt-1"), "/appointments/appt-1/no-show");
 
   const start = "2026-09-12T10:00:00.000Z";
   const fiveLate = Date.parse(start) + 5 * 60 * 1000;
-  const tenLate = Date.parse(start) + 10 * 60 * 1000;
   const elevenLate = Date.parse(start) + 11 * 60 * 1000;
+  const sixteenLate = Date.parse(start) + 16 * 60 * 1000;
 
   assert.equal(minutesLate(start, fiveLate), 5);
   assert.equal(isWithinLateJoinGrace(start, fiveLate), true);
   assert.equal(isPastLateJoinCutoff(start, fiveLate), false);
-  assert.equal(isWithinLateJoinGrace(start, tenLate), false);
-  assert.equal(isPastLateJoinCutoff(start, tenLate), true);
-  assert.equal(isPastLateJoinCutoff(start, elevenLate), true);
+  assert.equal(isWithinLateJoinGrace(start, elevenLate), true);
+  assert.equal(isPastLateJoinCutoff(start, elevenLate), false);
+  assert.equal(isPastLateJoinCutoff(start, sixteenLate), true);
 
-  assert.equal(canMarkNoShow("doctor", "scheduled", start, fiveLate), true);
-  assert.equal(canMarkNoShow("doctor", "confirmed", start, fiveLate), true);
-  assert.equal(canMarkNoShow("doctor", "waiting", start, fiveLate), false);
+  assert.equal(canMarkNoShow("doctor", "scheduled", start, fiveLate), false);
+  assert.equal(canMarkNoShow("doctor", "confirmed", start, fiveLate), false);
   assert.equal(canMarkNoShow("patient", "scheduled", start, fiveLate), false);
-  assert.equal(canMarkNoShow("doctor", "scheduled", start, Date.parse(start)), false);
 });

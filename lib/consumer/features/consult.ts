@@ -60,9 +60,21 @@ export function admitDisabled(status?: string): boolean {
   return status === "scheduled";
 }
 
-/** Matches consultation-service LateJoinGrace / LateJoinCutoff. */
-export const LATE_JOIN_GRACE_MS = 10 * 60 * 1000;
-export const LATE_JOIN_CUTOFF_MS = LATE_JOIN_GRACE_MS;
+/** Fallback slot length when end_at is unknown. Matches consultation DefaultBookedSlot. */
+export const DEFAULT_SLOT_MS = 15 * 60 * 1000;
+export const LATE_JOIN_GRACE_MS = DEFAULT_SLOT_MS;
+export const LATE_JOIN_CUTOFF_MS = DEFAULT_SLOT_MS;
+
+export function slotEndMs(startAt?: string, endAt?: string): number | null {
+  if (endAt) {
+    const end = Date.parse(endAt);
+    if (Number.isFinite(end)) return end;
+  }
+  if (!startAt) return null;
+  const start = Date.parse(startAt);
+  if (!Number.isFinite(start)) return null;
+  return start + DEFAULT_SLOT_MS;
+}
 
 export function minutesLate(startAt?: string, now = Date.now()): number {
   if (!startAt) return 0;
@@ -71,46 +83,31 @@ export function minutesLate(startAt?: string, now = Date.now()): number {
   return Math.floor((now - start) / 60_000);
 }
 
-export function isWithinLateJoinGrace(startAt?: string, now = Date.now()): boolean {
+export function isWithinLateJoinGrace(startAt?: string, now = Date.now(), endAt?: string): boolean {
   if (!startAt) return false;
   const start = Date.parse(startAt);
-  if (!Number.isFinite(start)) return false;
-  return now >= start && now < start + LATE_JOIN_GRACE_MS;
+  const end = slotEndMs(startAt, endAt);
+  if (!Number.isFinite(start) || end == null) return false;
+  return now >= start && now < end;
 }
 
-export function isPastLateJoinCutoff(startAt?: string, now = Date.now()): boolean {
-  if (!startAt) return false;
-  const start = Date.parse(startAt);
-  if (!Number.isFinite(start)) return false;
-  return now >= start + LATE_JOIN_CUTOFF_MS;
+export function isPastLateJoinCutoff(startAt?: string, now = Date.now(), endAt?: string): boolean {
+  const end = slotEndMs(startAt, endAt);
+  if (end == null) return false;
+  return now >= end;
 }
 
 /**
- * Doctor can mark no-show while the visit is still waiting for a first
- * patient join (consult `scheduled`, or queue `confirmed`) and start is past.
+ * Doctors do not mark no-show. The booked slot is the visit window whether
+ * the patient is late, on time, or never joins.
  */
 export function canMarkNoShow(
-  role: string,
-  status?: string,
-  startAt?: string,
-  now = Date.now(),
+  _role?: string,
+  _status?: string,
+  _startAt?: string,
+  _now = Date.now(),
 ): boolean {
-  if (role !== "doctor") return false;
-  if (
-    status === "waiting" ||
-    status === "active" ||
-    status === "ended" ||
-    status === "abandoned" ||
-    status === "no_show" ||
-    status === "cancelled" ||
-    status === "completed"
-  ) {
-    return false;
-  }
-  if (!startAt) return false;
-  const start = Date.parse(startAt);
-  if (!Number.isFinite(start)) return false;
-  return start < now;
+  return false;
 }
 
 export function endConsultBody() {
