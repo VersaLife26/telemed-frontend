@@ -7,7 +7,8 @@ export type HeroCopy = {
   title: string;
   lede: string;
   quote: HeroQuote;
-  image: string;
+  /** Omitted on the doctor surface: stock faces there would read as other doctors. */
+  image?: string;
 };
 
 /**
@@ -91,7 +92,6 @@ export const HEROES = {
       text: "Medicine is a science of uncertainty and an art of probability.",
       author: "William Osler",
     },
-    image: assets.hero.dashboard,
   },
   calendar: {
     eyebrow: "Your schedule",
@@ -101,7 +101,6 @@ export const HEROES = {
       text: "Time and health are two precious assets that we don’t recognize and appreciate until they have been depleted.",
       author: "Denis Waitley",
     },
-    image: assets.hero.calendar,
   },
   queue: {
     eyebrow: "Today",
@@ -111,7 +110,6 @@ export const HEROES = {
       text: "Listen to your patient; he is telling you the diagnosis.",
       author: "William Osler",
     },
-    image: assets.hero.queue,
   },
   availability: {
     eyebrow: "Your hours",
@@ -121,7 +119,6 @@ export const HEROES = {
       text: "Rest when you’re weary. Refresh and renew yourself, your body, your mind, your spirit.",
       author: "Ralph Marston",
     },
-    image: assets.hero.availability,
   },
   earnings: {
     eyebrow: "Your practice",
@@ -131,7 +128,6 @@ export const HEROES = {
       text: "It is health that is real wealth and not pieces of gold and silver.",
       author: "Mahatma Gandhi",
     },
-    image: assets.hero.earnings,
   },
   doctorProfile: {
     eyebrow: "Your practice",
@@ -141,6 +137,5 @@ export const HEROES = {
       text: "The best way to find yourself is to lose yourself in the service of others.",
       author: "Mahatma Gandhi",
     },
-    image: assets.hero.doctorProfile,
   },
 } satisfies Record<string, HeroCopy>;

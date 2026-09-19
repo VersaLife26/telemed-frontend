@@ -11,6 +11,8 @@ import type { Doctor } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import type { PeakHours, PracticeSummary } from "@/lib/consumer/features/practice";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
+import { assets } from "@/lib/consumer/assets";
+import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { HEROES } from "@/lib/consumer/heroes";
 
 const SHORTCUTS = [
@@ -89,6 +91,9 @@ export default async function DashboardPage() {
       <PageHero
         {...HEROES.dashboard}
         title={me.display_name || "Doctor"}
+        image={profilePhotoSrc(me.photo_url) ?? assets.avatarPlaceholder}
+        imageAlt={me.display_name || "Your profile photo"}
+        framed
         chips={
           <>
             <HeroChip

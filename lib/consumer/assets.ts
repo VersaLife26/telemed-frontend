@@ -7,7 +7,7 @@ export const assets = {
   logoutIcon: "/assets/logout-icon.svg",
   avatarPlaceholder: "/assets/avatar-placeholder.png",
   /**
-   * Page hero cutouts, one per page (lib/consumer/heroes.ts). Unsplash
+   * Patient-surface hero cutouts (lib/consumer/heroes.ts). Unsplash
    * portraits with the background removed, so the person stands on the hero
    * gradient instead of sitting in a box. Self-hosted because the cutout is
    * our derivative, not something the CDN can serve.
@@ -20,15 +20,10 @@ export const assets = {
     appointments: "/assets/heroes/appointments.webp",
     vault: "/assets/heroes/vault.webp",
     profile: "/assets/heroes/profile.webp",
-    dashboard: "/assets/heroes/dashboard.webp",
-    calendar: "/assets/heroes/calendar.webp",
-    queue: "/assets/heroes/queue.webp",
-    availability: "/assets/heroes/availability.webp",
-    earnings: "/assets/heroes/earnings.webp",
-    doctorProfile: "/assets/heroes/doctor-profile.webp",
   },
   doctorPhoto: "/assets/doctor-photo.png",
   patientPhoto: "/assets/patient-photo.png",
+  authHero: "/assets/auth-hero.webp",
 } as const;
 
 /**
@@ -49,8 +44,8 @@ function unsplash(id: string, width: number) {
 }
 
 export const stock = {
-  /** Auth hero panel — consultation scene. */
-  authHero: unsplash("photo-1612531386530-97286d97c2d2", 900),
+  /** Auth hero panel — group of friendly doctors. */
+  authHero: "/assets/auth-hero.webp",
   /** Doctor surface hero — ward round. */
   doctorHero: unsplash("photo-1550831107-1553da8c8464", 720),
   /** Waiting room ambience. */

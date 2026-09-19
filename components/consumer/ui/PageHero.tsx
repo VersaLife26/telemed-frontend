@@ -30,7 +30,8 @@ export function PageHero({
   title: ReactNode;
   lede?: ReactNode;
   quote: HeroQuote;
-  image: string;
+  /** Omit for a text-only band. */
+  image?: string;
   imageAlt?: string;
   /**
    * For a photo with its own background (a doctor's uploaded portrait): show
@@ -46,24 +47,31 @@ export function PageHero({
     <>
       <section className="page-hero">
         <div aria-hidden="true" className="hero-pattern" />
-        <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 pt-[calc(var(--nav-h)+2.5rem)] md:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+        <div
+          className={cx(
+            "mx-auto grid w-full max-w-6xl gap-10 px-4 pt-[calc(var(--nav-h)+2.5rem)] md:px-8",
+            image && "lg:grid-cols-[1.1fr_0.9fr] lg:items-end",
+          )}
+        >
           <div className={cx("hero-in min-w-0 self-center", overlap ? "pb-24" : "pb-12")}>
             <div className="flex items-center gap-4">
-              <div
-                className={cx(
-                  "relative size-20 shrink-0 overflow-hidden lg:hidden",
-                  framed ? "rounded-lg shadow-md" : "rounded-full bg-white/60 ring-4 ring-white/50",
-                )}
-              >
-                <Image
-                  src={image}
-                  alt=""
-                  fill
-                  sizes="80px"
-                  className={framed ? "object-cover" : "object-cover object-top"}
-                  unoptimized
-                />
-              </div>
+              {image ? (
+                <div
+                  className={cx(
+                    "relative size-20 shrink-0 overflow-hidden lg:hidden",
+                    framed ? "rounded-lg shadow-md" : "rounded-full bg-white/60 ring-4 ring-white/50",
+                  )}
+                >
+                  <Image
+                    src={image}
+                    alt=""
+                    fill
+                    sizes="80px"
+                    className={framed ? "object-cover" : "object-cover object-top"}
+                    unoptimized
+                  />
+                </div>
+              ) : null}
               <div className="min-w-0">
                 {eyebrow ? <p className="text-eyebrow text-brand">{eyebrow}</p> : null}
                 <h1 className="mt-2 text-h1 text-ink">{title}</h1>
@@ -84,12 +92,14 @@ export function PageHero({
 
             {children ? <div className="mt-7">{children}</div> : null}
 
-            {/* Below lg the photo is a thumbnail, so the chips have nothing to
-                pin to and sit in the flow instead. */}
-            {chips ? <div className="mt-7 flex flex-wrap gap-3 lg:hidden">{chips}</div> : null}
+            {/* Below lg the photo is a thumbnail, and without a photo there is
+                nothing to pin to at all, so the chips sit in the flow. */}
+            {chips ? (
+              <div className={cx("mt-7 flex flex-wrap gap-3", image && "lg:hidden")}>{chips}</div>
+            ) : null}
           </div>
 
-          {framed ? (
+          {!image ? null : framed ? (
             <div
               className={cx(
                 "hero-photo-in relative hidden self-center justify-self-end lg:block",
