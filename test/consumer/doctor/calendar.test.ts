@@ -13,6 +13,7 @@ import {
   placeEvents,
   shiftWeek,
   toCalendarEvent,
+  upcomingDayKeys,
   weekDayKeys,
   weekRangeLabel,
   weekStart,
@@ -43,6 +44,14 @@ test("shiftWeek moves whole weeks in both directions", () => {
   assert.equal(shiftWeek("2026-09-21", 1), "2026-09-28");
   assert.equal(shiftWeek("2026-09-21", -1), "2026-09-14");
   assert.equal(shiftWeek("2026-09-21", 0), "2026-09-21");
+});
+
+test("upcomingDayKeys is today and the following civil days", () => {
+  assert.deepEqual(upcomingDayKeys(3, new Date("2026-09-19T12:30:00Z")), [
+    "2026-09-19",
+    "2026-09-20",
+    "2026-09-21",
+  ]);
 });
 
 test("weekDayKeys is seven consecutive days, Monday first", () => {

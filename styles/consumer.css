@@ -353,8 +353,17 @@
    * frosted surface reads as glass arriving, not a flat image cross-fading.
    * `allow-discrete` is what lets the exit animate at all; where it is not
    * supported the close is instant, which is the right direction to fail.
+   *
+   * Tailwind preflight sets `margin: 0` on every element, which removes the
+   * user-agent `margin: auto` that centres a modal <dialog>. Restore it, and
+   * pin the box with inset + fit-content height so both axes land in the
+   * middle of the viewport rather than the top-left corner.
    */
   .vl-modal {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    height: fit-content;
     padding: 0;
     border: none;
     background: transparent;

@@ -83,6 +83,22 @@ export function shiftWeek(mondayKey: string, weeks: number): string {
   return noonToKey(new Date(keyToNoon(mondayKey).getTime() + weeks * 7 * DAY_MS));
 }
 
+/** Move a yyyy-mm-dd key by a number of civil days. */
+export function shiftDay(dayKey: string, days: number): string {
+  return noonToKey(new Date(keyToNoon(dayKey).getTime() + days * DAY_MS));
+}
+
+/** The next `count` Colombo civil dates, starting at today (or `from`). */
+export function upcomingDayKeys(count: number, from: Date = new Date()): string[] {
+  const start = colomboDayKey(from);
+  return Array.from({ length: count }, (_, i) => shiftDay(start, i));
+}
+
+/** "Sat" for a day key. Noon-UTC is the same calendar day in Colombo. */
+export function dayKeyWeekday(dayKey: string): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short" }).format(keyToNoon(dayKey));
+}
+
 /** Seven yyyy-mm-dd keys, Monday first. */
 export function weekDayKeys(mondayKey: string): string[] {
   const start = keyToNoon(mondayKey).getTime();
