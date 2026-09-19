@@ -29,20 +29,21 @@ function EventBlock({
   const { top, height } = bandStyle(window, event.startMinute, event.endMinute);
   const width = 100 / event.lanes;
   const compact = event.endMinute - event.startMinute < COMPACT_MINUTES;
+  const tooltip = `${event.title} · ${event.startLabel} – ${event.endLabel}`;
 
   const body = (
     <>
-      <p className="truncate text-[0.8125rem] font-semibold leading-tight text-blue-800">
+      <p className="truncate text-[0.8125rem] font-semibold leading-[1.2] text-ink">
         {event.title}
       </p>
-      <p className="mt-0.5 truncate text-[0.6875rem] leading-tight text-blue-700 tabular-time">
+      <p className="truncate text-[0.75rem] leading-[1.2] text-blue-700 tabular-time">
         {event.startLabel} – {event.endLabel}
       </p>
       {/* The mock puts the room at the bottom edge of the block. There are no
           rooms in a video consult, so the slot carries the status instead —
           the one thing a doctor scanning the week actually needs from it. */}
       {!compact ? (
-        <p className="mt-auto truncate pt-2 text-[0.6875rem] leading-tight text-blue-600">
+        <p className="mt-auto truncate pt-2 text-[0.75rem] leading-[1.2] text-muted">
           {statusLabel(event.status)}
         </p>
       ) : null}
@@ -50,7 +51,8 @@ function EventBlock({
   );
 
   const className = cx(
-    "absolute flex flex-col overflow-hidden rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5",
+    "absolute flex flex-col overflow-hidden rounded-md border border-blue-200 border-l-[3px] border-l-brand bg-surface px-2 shadow-sm",
+    compact ? "justify-center gap-0.5 py-1" : "gap-0.5 py-1.5",
     "transition-[background-color,box-shadow,transform] duration-[160ms] ease-out",
     href && "can-hover:hover:z-10 can-hover:hover:bg-blue-100 can-hover:hover:shadow-md active:scale-[0.99]",
   );
@@ -64,14 +66,14 @@ function EventBlock({
 
   if (!href) {
     return (
-      <div className={className} style={style}>
+      <div className={className} style={style} title={tooltip}>
         {body}
       </div>
     );
   }
 
   return (
-    <Link href={href} className={className} style={style}>
+    <Link href={href} className={className} style={style} title={tooltip}>
       {body}
     </Link>
   );
@@ -98,7 +100,9 @@ export function WeekGrid({
   // One hour is a fixed height rather than a fraction of the viewport: a week
   // with a 14-hour span has to stay readable, and scrolling is the honest
   // answer to that.
-  const bodyHeight = `${(window.hours.length - 1) * 6}rem`;
+  // 8rem keeps a 20-minute consult at ~43px: enough for the title and the
+  // time on two lines without clipping either.
+  const bodyHeight = `${(window.hours.length - 1) * 8}rem`;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border-subtle bg-surface p-4 shadow-sm md:p-6">

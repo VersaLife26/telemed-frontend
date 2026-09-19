@@ -1,4 +1,5 @@
 import type { Appointment, WorkingHour } from "@/lib/consumer/api/types";
+import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 
 const COLOMBO = "Asia/Colombo";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -179,7 +180,7 @@ export function toCalendarEvent(
     dayKey,
     event: {
       id: appointment.id,
-      title: appointment.specialty || "Consultation",
+      title: appointment.specialty ? specialtyLabel(appointment.specialty) : "Consultation",
       status: appointment.status,
       startMinute,
       endMinute: Math.min(endMinute, 1440),
