@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Card } from "@/components/consumer/ui/Card";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { LogOut } from "lucide-react";
 
+import { Card } from "@/components/consumer/ui/Card";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
 import { Button, ButtonLink } from "@/components/consumer/ui/Button";
@@ -14,6 +14,7 @@ import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Doctor, TelemedUser } from "@/lib/consumer/api/types";
+import { assets } from "@/lib/consumer/assets";
 import {
   CREDENTIAL_DOC_TYPES,
   PRACTICE_LANGUAGES,
@@ -22,6 +23,7 @@ import {
   documentMetadataBody,
   practiceProfileBody,
 } from "@/lib/consumer/features/practice";
+import { profilePhotoError, profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
@@ -44,6 +46,9 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState<"email" | "password" | "practice" | "document" | null>(
     null,
   );
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([browserApi<Doctor>("/doctors/me"), browserApi<TelemedUser>("/users/me")])
@@ -59,6 +64,12 @@ export default function ProfilePage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Sign in required"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -143,6 +154,53 @@ export default function ProfilePage() {
     }
   }
 
+  async function onPhotoSelected(file: File | null) {
+    const invalid = profilePhotoError(file);
+    if (invalid || !file) {
+      setError(invalid);
+      setNotice(null);
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(URL.createObjectURL(file));
+    setPhotoBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const updated = await browserApi<Doctor>("/doctors/me/photo", {
+        method: "PUT",
+        body: form,
+      });
+      setMe(updated);
+      setNotice("Profile photo updated. Patients will see this in the directory.");
+      window.dispatchEvent(new CustomEvent("telemed:doctor-profile-updated", { detail: updated }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload photo");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    setPhotoBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const updated = await browserApi<Doctor>("/doctors/me/photo", { method: "DELETE" });
+      setMe(updated);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setNotice("Profile photo removed.");
+      window.dispatchEvent(new CustomEvent("telemed:doctor-profile-updated", { detail: updated }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove photo");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   async function saveDocument(e: React.FormEvent) {
     e.preventDefault();
     if (!docFilename.trim()) {
@@ -192,12 +250,18 @@ export default function ProfilePage() {
     );
   }
 
+  const photoSrc = previewUrl || profilePhotoSrc(me?.photo_url) || assets.avatarPlaceholder;
+  const hasStoredPhoto = Boolean(me?.photo_url) || Boolean(previewUrl);
+
   return (
     <div className="flex flex-col gap-10">
       <PageHero
         {...HEROES.doctorProfile}
         eyebrow={me?.specialty || HEROES.doctorProfile.eyebrow}
         title={me?.display_name || "Doctor"}
+        image={photoSrc}
+        imageAlt={me?.display_name || "Your profile photo"}
+        framed
       >
         <div className="flex flex-wrap gap-2">
           <Badge tone="brand">SLMC {me?.slmc_number || "—"}</Badge>
@@ -207,6 +271,56 @@ export default function ProfilePage() {
         </div>
       </PageHero>
       <div className="flex w-full max-w-xl flex-col gap-6">
+
+      <section className="overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6">
+        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+          <div className="relative size-28 shrink-0 overflow-hidden rounded-full bg-surface shadow-md ring-4 ring-white/70">
+            <Image
+              src={photoSrc}
+              alt=""
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-3 text-center sm:text-left">
+            <div>
+              <p className="text-h4 text-ink">Directory photo</p>
+              <p className="mt-0.5 text-body-sm text-blue-800">
+                JPEG, PNG or WebP · up to 2 MB. This is how patients see you.
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(e) => void onPhotoSelected(e.target.files?.[0] ?? null)}
+            />
+            <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+              <Button
+                size="sm"
+                busy={photoBusy}
+                disabled={saving !== null}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {hasStoredPhoto ? "Change photo" : "Upload photo"}
+              </Button>
+              {hasStoredPhoto ? (
+                <Button
+                  size="sm"
+                  variant="glass"
+                  busy={photoBusy}
+                  disabled={saving !== null}
+                  onClick={() => void removePhoto()}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <Card>
         <h2 className="text-h4 text-ink">Practice profile</h2>

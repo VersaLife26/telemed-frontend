@@ -63,6 +63,7 @@ test("profileUpdateBody sends name, phone, address and date of birth with the ob
 test("profilePhotoSrc prefixes the BFF proxy path", () => {
   assert.equal(profilePhotoSrc(null), null);
   assert.equal(profilePhotoSrc("/users/me/photo?v=1"), "/api/proxy/users/me/photo?v=1");
+  assert.equal(profilePhotoSrc("/doctors/d1/photo?v=9"), "/api/proxy/doctors/d1/photo?v=9");
   assert.equal(profilePhotoSrc("https://cdn.example/a.jpg"), "https://cdn.example/a.jpg");
 });
 

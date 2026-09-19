@@ -1,6 +1,11 @@
-import Link from "next/link";
-import type { ReactNode } from "react";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { browserApi } from "@/lib/consumer/api/client";
+import type { Doctor } from "@/lib/consumer/api/types";
+import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { Avatar } from "@/components/consumer/ui/Avatar";
 import { NavBar, type NavItem } from "@/components/consumer/ui/NavBar";
 
@@ -10,6 +15,32 @@ export function AppShell({ children, className = "" }: { children: ReactNode; cl
       {children}
     </div>
   );
+}
+
+function useDoctorAccount() {
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    browserApi<Doctor>("/doctors/me")
+      .then((me) => {
+        if (!cancelled) setDoctor(me);
+      })
+      .catch(() => {
+        if (!cancelled) setDoctor(null);
+      });
+
+    function onUpdated(event: Event) {
+      setDoctor((event as CustomEvent<Doctor>).detail ?? null);
+    }
+    window.addEventListener("telemed:doctor-profile-updated", onUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("telemed:doctor-profile-updated", onUpdated);
+    };
+  }, []);
+
+  return doctor;
 }
 
 /**
@@ -26,6 +57,8 @@ export function AppHeader({
   pathname?: string;
   nav?: ReadonlyArray<NavItem>;
 }) {
+  const doctor = useDoctorAccount();
+
   return (
     <NavBar
       homeHref="/dashboard"
@@ -37,9 +70,16 @@ export function AppHeader({
           aria-label="Profile"
           className="flex min-h-10 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
         >
-          <Avatar name={title ?? null} size={32} ring className="ring-brand/30" />
+          <Avatar
+            src={profilePhotoSrc(doctor?.photo_url)}
+            name={doctor?.display_name || title || null}
+            size={32}
+            ring
+            className="ring-brand/30"
+          />
         </Link>
       }
     />
   );
 }
+
