@@ -10,5 +10,5 @@ export function formatWait(seconds?: number | null) {
 }
 
 export function paymentSettled(status?: string, nextAction?: string) {
-  return status === "succeeded" || nextAction === "none";
+  return status === "succeeded" || status === "authorized" || nextAction === "none";
 }

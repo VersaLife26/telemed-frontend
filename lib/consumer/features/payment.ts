@@ -5,6 +5,14 @@ export function mockIntentBody(appointmentId: string) {
   return { appointment_id: appointmentId, provider: "mock" as const };
 }
 
+export function payhereIntentBody(appointmentId: string, returnUrl?: string) {
+  return {
+    appointment_id: appointmentId,
+    provider: "payhere" as const,
+    ...(returnUrl ? { return_url: returnUrl } : {}),
+  };
+}
+
 export function paymentStatus(
   intent: PaymentIntentView | null,
   payment: Payment | null,
@@ -17,6 +25,13 @@ export function consultationTotal(
   appointment: Appointment | null,
 ): number | undefined {
   return order?.total_cents ?? order?.consultation_fee_cents ?? appointment?.amount_cents;
+}
+
+export function isPaymentAuthorized(
+  intent: PaymentIntentView | null,
+  payment: Payment | null,
+): boolean {
+  return paymentStatus(intent, payment) === "authorized";
 }
 
 export function shouldGoToWaitingRoom(

@@ -142,6 +142,7 @@ export type PaymentIntentView = {
   payment: Payment;
   client_secret?: string;
   redirect_url?: string;
+  reference?: string;
   next_action?: string;
   order?: OrderSummary;
 };

@@ -4,7 +4,9 @@ import test from "node:test";
 import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
 import {
   consultationTotal,
+  isPaymentAuthorized,
   mockIntentBody,
+  payhereIntentBody,
   paymentStatus,
   shouldGoToWaitingRoom,
   waitingRoomPath,
@@ -14,6 +16,15 @@ const appointment: Appointment = { id: "appt-1", amount_cents: 250000, currency:
 
 test("mockIntentBody always uses the mock rail", () => {
   assert.deepEqual(mockIntentBody("appt-1"), { appointment_id: "appt-1", provider: "mock" });
+});
+
+test("payhereIntentBody uses the payhere rail with optional return url", () => {
+  assert.deepEqual(payhereIntentBody("appt-1"), { appointment_id: "appt-1", provider: "payhere" });
+  assert.deepEqual(payhereIntentBody("appt-1", "https://patient.example.com/return"), {
+    appointment_id: "appt-1",
+    provider: "payhere",
+    return_url: "https://patient.example.com/return",
+  });
 });
 
 test("consultationTotal prefers order total then fee then appointment amount", () => {
@@ -36,12 +47,26 @@ test("paymentStatus reads the payment first, then the intent", () => {
   assert.equal(paymentStatus(intent, null), "requires_action");
 });
 
-test("shouldGoToWaitingRoom after mock settlement", () => {
+test("isPaymentAuthorized detects authorized payments", () => {
+  const authorizedPayment: Payment = { id: "pay-1", appointment_id: "appt-1", status: "authorized" };
+  const pendingPayment: Payment = { id: "pay-1", appointment_id: "appt-1", status: "pending" };
+  assert.equal(isPaymentAuthorized(null, authorizedPayment), true);
+  assert.equal(isPaymentAuthorized(null, pendingPayment), false);
+});
+
+test("shouldGoToWaitingRoom after settlement or card authorization", () => {
   const settled: PaymentIntentView = {
     payment: { id: "pay-1", appointment_id: "appt-1", status: "succeeded" },
     next_action: "none",
   };
   assert.equal(shouldGoToWaitingRoom(settled, settled.payment), true);
+
+  const authorized: PaymentIntentView = {
+    payment: { id: "pay-1", appointment_id: "appt-1", status: "authorized" },
+    next_action: "none",
+  };
+  assert.equal(shouldGoToWaitingRoom(authorized, authorized.payment), true);
+
   assert.equal(
     shouldGoToWaitingRoom(
       { payment: { id: "pay-1", appointment_id: "appt-1", status: "requires_action" }, next_action: "redirect" },
