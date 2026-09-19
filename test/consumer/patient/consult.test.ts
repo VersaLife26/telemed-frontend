@@ -8,6 +8,7 @@ import {
   callPath,
   canAdmit,
   canMarkNoShow,
+  consultJoinError,
   earlyJoinPath,
   earlyJoinRespondPath,
   endConsultBody,
@@ -112,4 +113,11 @@ test("the lobby opens 15 minutes before the booked start and closes at the slot 
   assert.equal(isJoinWindow(start, end, fourteenBefore), true);
   assert.equal(isJoinWindow(start, end, Date.parse(start)), true);
   assert.equal(isJoinWindow(start, end, sixteenAfter), false);
+});
+
+test("invalid-state join errors tell the patient to come back from appointments", () => {
+  assert.equal(
+    consultJoinError("consultation is not in a state that allows this action"),
+    "This visit isn’t open yet, or it has already ended. Join from Appointments when it is time.",
+  );
 });

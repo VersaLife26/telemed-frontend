@@ -25,6 +25,7 @@ import type { Appointment, Doctor } from "@/lib/consumer/api/types";
 import { createMemoryChat } from "@/lib/consumer/features/chat";
 import {
   afterEndPath,
+  consultJoinError,
   isBeforeJoinWindow,
   isJoinWindow,
   isPastLateJoinCutoff,
@@ -215,7 +216,7 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
       {call.notice ? <Alert tone="info" className="absolute bottom-20 left-4 right-4">{call.notice}</Alert> : null}
       {call.error ? (
         <Alert tone="danger" className="absolute bottom-20 left-4 right-4">
-          {joinErrorMessage(call.error)}
+          {consultJoinError(call.error)}
         </Alert>
       ) : null}
     </div>
@@ -300,13 +301,6 @@ function Lobby({
       </div>
     </div>
   );
-}
-
-function joinErrorMessage(error: string): string {
-  if (/not in a state that allows this action/i.test(error)) {
-    return "This visit isn’t open yet, or it has already ended. Join from Appointments when it is time.";
-  }
-  return error;
 }
 
 function PipTile({ videoRef }: { videoRef: RefObject<HTMLVideoElement | null> }) {

@@ -8,6 +8,8 @@ import {
   callPath,
   canAdmit,
   canMarkNoShow,
+  consultJoinError,
+  doctorLobbyCopy,
   earlyJoinPath,
   earlyJoinRespondPath,
   endConsultBody,
@@ -54,7 +56,24 @@ test("admit is doctor-only and disabled until the patient has joined", () => {
   assert.equal(canAdmit("doctor", "waiting"), true);
   assert.equal(canAdmit("patient", "waiting"), false);
   assert.equal(canAdmit("doctor", "scheduled"), false);
+  assert.equal(canAdmit("doctor", ""), false);
   assert.equal(admitDisabled("scheduled"), true);
+});
+
+test("the doctor lobby does not treat a failed join as a waiting patient", () => {
+  assert.equal(doctorLobbyCopy("waiting"), "Patient is in the waiting room.");
+  assert.equal(
+    doctorLobbyCopy("scheduled"),
+    "Waiting for the patient to join. The booked slot is the visit window.",
+  );
+  assert.equal(
+    doctorLobbyCopy(""),
+    "Waiting for the patient to join. The booked slot is the visit window.",
+  );
+  assert.equal(
+    consultJoinError("consultation is not in a state that allows this action", "doctor"),
+    "This visit isn’t open. The patient hasn’t joined yet, or it has already ended.",
+  );
 });
 
 test("ending a consult sends reason completed and the doctor goes to notes", () => {

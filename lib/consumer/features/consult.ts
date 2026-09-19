@@ -60,6 +60,23 @@ export function admitDisabled(status?: string): boolean {
   return status === "scheduled";
 }
 
+/** Copy on the doctor Meet lobby. Only “waiting room” when the patient has joined. */
+export function doctorLobbyCopy(status?: string): string {
+  if (status === "waiting") {
+    return "Patient is in the waiting room.";
+  }
+  return "Waiting for the patient to join. The booked slot is the visit window.";
+}
+
+export function consultJoinError(error: string, role: "patient" | "doctor" = "patient"): string {
+  if (/not in a state that allows this action/i.test(error)) {
+    return role === "doctor"
+      ? "This visit isn’t open. The patient hasn’t joined yet, or it has already ended."
+      : "This visit isn’t open yet, or it has already ended. Join from Appointments when it is time.";
+  }
+  return error;
+}
+
 /** Fallback slot length when end_at is unknown. Matches consultation DefaultBookedSlot. */
 export const DEFAULT_SLOT_MS = 15 * 60 * 1000;
 export const LATE_JOIN_GRACE_MS = DEFAULT_SLOT_MS;

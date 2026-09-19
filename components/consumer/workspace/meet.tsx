@@ -11,6 +11,7 @@ import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment } from "@/lib/consumer/api/types";
 import { appointmentsListPath } from "@/lib/consumer/features/appointments";
 import { colomboDayKey } from "@/lib/consumer/features/calendar";
+import { admitDisabled, canAdmit, consultJoinError, doctorLobbyCopy } from "@/lib/consumer/features/consult";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 import type { ConsultationControls } from "@/lib/consumer/features/use-consultation";
 import { cx } from "@/lib/consumer/cx";
@@ -86,22 +87,18 @@ function MeetWaiting({ call }: { call: ConsultationControls }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center text-white">
       <p className="text-h3">{call.counterpartName || "Patient"}</p>
-      <p className="text-body text-white/70">
-        {call.status === "scheduled"
-          ? "Waiting for the patient to join. The booked slot is the visit window."
-          : "Patient is in the waiting room."}
-      </p>
-      {call.waiting && call.status !== "scheduled" ? (
+      <p className="text-body text-white/70">{doctorLobbyCopy(call.status)}</p>
+      {canAdmit("doctor", call.status, call.join?.status) ? (
         <Button
           size="lg"
           busy={call.admitting}
-          disabled={call.admitting || call.status === "scheduled"}
+          disabled={call.admitting || admitDisabled(call.status)}
           onClick={() => void call.admit()}
         >
           Admit
         </Button>
       ) : null}
-      {call.error ? <Alert tone="danger">{call.error}</Alert> : null}
+      {call.error ? <Alert tone="danger">{consultJoinError(call.error, "doctor")}</Alert> : null}
     </div>
   );
 }
