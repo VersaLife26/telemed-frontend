@@ -9,6 +9,7 @@ import { SURFACE } from "@/lib/consumer/surface";
 
 const DOCTOR_NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/queue", label: "Queue" },
   { href: "/availability", label: "Availability" },
   { href: "/earnings", label: "Earnings" },
@@ -27,12 +28,15 @@ export default function ConsumerShellLayout({ children }: { children: React.Reac
 
   if (SURFACE === "patient") {
     return (
-      <div className="page-wash flex min-h-dvh flex-col text-ink">
+      <div className="page-wash flex min-h-dvh flex-col overflow-x-clip text-ink">
         <a href="#main" className="skip-link">
           Skip to main content
         </a>
         <PatientHeader />
-        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-8 md:px-8 md:pb-12">
+        <main
+          id="main"
+          className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-[calc(var(--nav-h)+2rem)] md:px-8 md:pb-12"
+        >
           {children}
         </main>
         <PatientBottomNav />
@@ -43,16 +47,11 @@ export default function ConsumerShellLayout({ children }: { children: React.Reac
   const title = DOCTOR_NAV.find((n) => isActivePath(pathname, n.href))?.label || "VersaLife Health";
 
   return (
-    <div className="page-wash flex min-h-dvh flex-col text-ink">
+    <div className="page-wash flex min-h-dvh flex-col overflow-x-clip text-ink">
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <AppHeader
-        title={title}
-        subtitle="VersaLife Health"
-        pathname={pathname}
-        nav={DOCTOR_NAV}
-      />
+      <AppHeader title={title} pathname={pathname} nav={DOCTOR_NAV} />
       <main id="main" className="flex-1">
         <AppShell>{children}</AppShell>
       </main>

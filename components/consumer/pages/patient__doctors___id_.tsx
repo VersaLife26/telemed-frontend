@@ -1,11 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Star, Users, Wallet } from "lucide-react";
 
 import { Badge } from "@/components/consumer/ui/Badge";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Doctor, Slot } from "@/lib/consumer/api/types";
 import { fallbackPortrait } from "@/lib/consumer/assets";
@@ -13,6 +13,7 @@ import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
+import { HEROES } from "@/lib/consumer/heroes";
 import { formatMoney } from "@/lib/consumer/money";
 
 function todayColombo() {
@@ -22,15 +23,6 @@ function todayColombo() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-}
-
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-eyebrow text-faint">{label}</dt>
-      <dd className="mt-1 text-body font-medium text-ink tabular-time">{value}</dd>
-    </div>
-  );
 }
 
 export default async function DoctorDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -78,78 +70,78 @@ export default async function DoctorDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Photo and identity share one gradient plane, so the profile reads as
-          a person rather than as a record with an avatar attached. */}
-      <section className="overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-5 md:p-7">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-          <div className="relative mx-auto aspect-square w-56 shrink-0 overflow-hidden rounded-lg shadow-lg lg:mx-0 lg:w-72">
-            <Image src={photo} alt={name} fill className="object-cover" unoptimized priority />
-          </div>
+      <PageHero
+        {...HEROES.doctorDetail}
+        eyebrow={specialtyLabel(doctor.specialty)}
+        title={name}
+        lede={doctor.bio ?? undefined}
+        image={photo}
+        imageAlt={name}
+        chips={
+          <>
+            <HeroChip
+              icon={<Wallet className="size-5" />}
+              value={formatMoney(doctor.fee_cents, doctor.currency)}
+              label="Consultation fee"
+            />
+            <HeroChip
+              icon={<Star className="size-5" />}
+              value={doctor.rating != null ? doctor.rating.toFixed(1) : "—"}
+              label={`${doctor.review_count ?? 0} reviews`}
+              className="ml-10"
+            />
+            <HeroChip
+              icon={<Users className="size-5" />}
+              value={doctor.consultation_count ?? "—"}
+              label="Consultations"
+            />
+          </>
+        }
+        overlap={
+          <Card className="flex flex-col gap-4 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-h4 text-ink">Today’s slots</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="brand">{specialtyLabel(doctor.specialty)}</Badge>
+                {doctor.slmc_number ? (
+                  <Badge tone="success">
+                    <BadgeCheck aria-hidden="true" className="size-3.5" />
+                    SLMC {doctor.slmc_number}
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+            {slotsNote ? <p className="text-body-sm text-muted">{slotsNote}</p> : null}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="brand">{specialtyLabel(doctor.specialty)}</Badge>
-              {doctor.slmc_number ? (
-                <Badge tone="success">
-                  <BadgeCheck aria-hidden="true" className="size-3.5" />
-                  SLMC {doctor.slmc_number}
-                </Badge>
+            <div className="flex flex-wrap gap-2">
+              {openSlots.map((s) => {
+                const when = s.start_at_local || s.start_at;
+                const clock = formatVisitClock(when);
+                return (
+                  <Link
+                    key={s.id}
+                    href={`/doctors/${id}/intake?slot_id=${s.id}&start=${encodeURIComponent(when || "")}`}
+                    className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-pill border border-border-default bg-surface px-4 text-label text-ink tabular-time transition-[background-color,border-color,color,transform] duration-[160ms] ease-out active:scale-[0.97] can-hover:hover:border-brand can-hover:hover:bg-brand can-hover:hover:text-on-brand"
+                  >
+                    {clock !== "—" ? clock : s.id.slice(0, 8)}
+                  </Link>
+                );
+              })}
+              {!slotsNote && openSlots.length === 0 ? (
+                <p className="text-body-sm text-muted">No open slots for today.</p>
               ) : null}
             </div>
 
-            <h1 className="mt-3 text-h2 text-ink">{name}</h1>
-
-            <dl className="mt-6 grid gap-4 sm:grid-cols-3">
-              <Fact label="Fee" value={formatMoney(doctor.fee_cents, doctor.currency)} />
-              <Fact label="Consultations" value={doctor.consultation_count ?? "—"} />
-              <Fact
-                label="Rating"
-                value={
-                  doctor.rating != null
-                    ? `${doctor.rating.toFixed(1)} (${doctor.review_count ?? 0})`
-                    : "—"
-                }
-              />
-            </dl>
-
-            {doctor.bio ? (
-              <p className="mt-6 max-w-prose text-body text-blue-900/80">{doctor.bio}</p>
+            {!token ? (
+              <ButtonLink href="/login" size="lg" className="self-start">
+                Sign in to book
+              </ButtonLink>
+            ) : openSlots.length > 0 ? (
+              <p className="text-body-sm text-muted">Choose a time to continue to intake.</p>
             ) : null}
-          </div>
-        </div>
-      </section>
-
-      <Card className="flex flex-col gap-4">
-        <h2 className="text-h4 text-ink">Today’s slots</h2>
-        {slotsNote ? <p className="text-body-sm text-muted">{slotsNote}</p> : null}
-
-        <div className="flex flex-wrap gap-2">
-          {openSlots.map((s) => {
-            const when = s.start_at_local || s.start_at;
-            const clock = formatVisitClock(when);
-            return (
-              <Link
-                key={s.id}
-                href={`/doctors/${id}/intake?slot_id=${s.id}&start=${encodeURIComponent(when || "")}`}
-                className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-pill border border-border-default bg-surface px-4 text-label text-ink tabular-time transition-[background-color,border-color,color,transform] duration-[160ms] ease-out active:scale-[0.97] can-hover:hover:border-brand can-hover:hover:bg-brand can-hover:hover:text-on-brand"
-              >
-                {clock !== "—" ? clock : s.id.slice(0, 8)}
-              </Link>
-            );
-          })}
-          {!slotsNote && openSlots.length === 0 ? (
-            <p className="text-body-sm text-muted">No open slots for today.</p>
-          ) : null}
-        </div>
-
-        {!token ? (
-          <ButtonLink href="/login" size="lg" className="self-start">
-            Sign in to book
-          </ButtonLink>
-        ) : openSlots.length > 0 ? (
-          <p className="text-body-sm text-muted">Choose a time to continue to intake.</p>
-        ) : null}
-      </Card>
+          </Card>
+        }
+      />
     </div>
   );
 }

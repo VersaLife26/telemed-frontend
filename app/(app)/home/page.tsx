@@ -1,16 +1,30 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Stethoscope } from "lucide-react";
+import {
+  ArrowRight,
+  Baby,
+  BadgeCheck,
+  Brain,
+  CalendarDays,
+  Eye,
+  HeartPulse,
+  Sparkles,
+  Stethoscope,
+  Video,
+} from "lucide-react";
 
+import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { DoctorCard } from "@/components/consumer/ui/DoctorCard";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
+import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { EmptyVisitTicket, VisitTicket } from "@/components/consumer/ui/VisitTicket";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
 import { stock } from "@/lib/consumer/assets";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
+import { HEROES } from "@/lib/consumer/heroes";
 import {
   appointmentAction,
   colomboHour,
@@ -21,6 +35,45 @@ import {
   pickNextAppointment,
 } from "@/lib/consumer/features/patient-appointment";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
+
+const SPECIALTY_TILES = [
+  { code: "general_practice", label: "General practice", Icon: Stethoscope },
+  { code: "pediatrics", label: "Pediatrics", Icon: Baby },
+  { code: "cardiology", label: "Cardiology", Icon: HeartPulse },
+  { code: "psychology", label: "Counselling", Icon: Brain },
+  { code: "ophthalmology", label: "Eye care", Icon: Eye },
+  { code: "dermatology", label: "Dermatology", Icon: Sparkles },
+] as const;
+
+function SectionHead({
+  eyebrow,
+  title,
+  href,
+  linkLabel,
+}: {
+  eyebrow: string;
+  title: string;
+  href?: string;
+  linkLabel?: string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-4">
+      <div>
+        <p className="text-eyebrow text-brand">{eyebrow}</p>
+        <h2 className="mt-1.5 text-h3 text-ink">{title}</h2>
+      </div>
+      {href ? (
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+        >
+          {linkLabel}
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
 
 async function loadDoctors() {
   try {
@@ -68,21 +121,28 @@ export default async function HomePage() {
   const later = appointments.filter((a) => a.id !== next?.id).slice(0, 4);
 
   return (
-    <div className="flex flex-col gap-12">
-      {/* Hero band. The ticket sits on the gradient rather than on the page,
-          which is what gives the most important thing on the screen its own
-          plane instead of making it one more card in a stack. */}
-      <section className="relative overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6 md:p-8">
-        <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="min-w-0">
-            <p className="text-body text-blue-800">
-              {hello}
-              {name ? `, ${name}` : ""}
-            </p>
-            <h1 className="mt-1 text-h2 text-ink">
-              {next ? "Your next visit" : "Book a video consult"}
-            </h1>
-            <div className="mt-6">
+    <div className="flex flex-col gap-14">
+      <div>
+        <PageHero
+          {...HEROES.home}
+          eyebrow={`${hello}${name ? `, ${name}` : ""}`}
+          chips={
+            <>
+              <HeroChip
+                icon={<BadgeCheck className="size-5" />}
+                value="SLMC verified"
+                label="Every doctor checked"
+              />
+              <HeroChip
+                icon={<Video className="size-5" />}
+                value="Video consults"
+                label="From home, on any device"
+                className="ml-10"
+              />
+            </>
+          }
+          overlap={
+            <div className="max-w-3xl">
               {next ? (
                 <VisitTicket
                   appointment={next}
@@ -93,34 +153,44 @@ export default async function HomePage() {
                 <EmptyVisitTicket />
               )}
             </div>
-          </div>
-
-          <Image
-            src={stock.patientHero}
-            alt=""
-            width={520}
-            height={640}
-            unoptimized
-            className="hidden h-full max-h-80 w-full rounded-lg object-cover shadow-lg lg:block"
-          />
-        </div>
-      </section>
+          }
+        />
+      </div>
 
       {appointmentsError ? (
         <p className="text-body-sm text-danger">Couldn’t load visits: {appointmentsError}</p>
       ) : null}
 
-      <section className="flex flex-col gap-5">
-        <div className="flex items-end justify-between gap-4">
-          <h2 className="text-h3 text-ink">Featured doctors</h2>
-          <Link
-            href="/doctors"
-            className="inline-flex items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
-          >
-            Browse all
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
-        </div>
+      <section className="flex flex-col gap-6">
+        <SectionHead eyebrow="Our specialties" title="Care for your whole family" />
+        <ul className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {SPECIALTY_TILES.map(({ code, label, Icon }) => (
+            <li key={code}>
+              <Link
+                href={`/doctors?specialty=${code}`}
+                className="group flex h-full flex-col items-center gap-3 rounded-lg border border-border-subtle bg-surface px-3 py-6 text-center shadow-sm transition-[transform,box-shadow,background-color,border-color] duration-[200ms] ease-out active:scale-[0.98] can-hover:hover:-translate-y-1 can-hover:hover:border-brand can-hover:hover:bg-brand can-hover:hover:shadow-brand"
+              >
+                <Icon
+                  aria-hidden="true"
+                  className="size-9 text-brand transition-colors duration-[200ms] can-hover:group-hover:text-on-brand"
+                  strokeWidth={1.4}
+                />
+                <span className="text-label text-ink transition-colors duration-[200ms] can-hover:group-hover:text-on-brand">
+                  {label}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-6">
+        <SectionHead
+          eyebrow="Meet our"
+          title="Featured doctors"
+          href="/doctors"
+          linkLabel="Browse all"
+        />
 
         {doctorsError ? (
           <EmptyState
@@ -144,17 +214,13 @@ export default async function HomePage() {
         )}
       </section>
 
-      <section className="flex flex-col gap-5">
-        <div className="flex items-end justify-between gap-4">
-          <h2 className="text-h3 text-ink">Later visits</h2>
-          <Link
-            href="/appointments"
-            className="inline-flex items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
-          >
-            View all
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
-        </div>
+      <section className="flex flex-col gap-6">
+        <SectionHead
+          eyebrow="Coming up"
+          title="Later visits"
+          href="/appointments"
+          linkLabel="View all"
+        />
 
         {!token ? (
           <EmptyState
@@ -213,6 +279,32 @@ export default async function HomePage() {
             })}
           </ul>
         )}
+      </section>
+
+      <section className="relative isolate overflow-hidden rounded-xl bg-[image:var(--gradient-cta)] text-on-brand shadow-brand">
+        <div aria-hidden="true" className="hero-pattern opacity-25" />
+        <div className="grid items-end gap-6 md:grid-cols-[1fr_260px]">
+          <div className="p-8 md:p-10">
+            <h2 className="text-h2">Don’t let your health take a backseat</h2>
+            <p className="mt-3 max-w-md text-body-lg text-white/85">
+              Book a video consult with one of our experienced doctors today.
+            </p>
+            <ButtonLink href="/doctors" variant="outline" size="lg" className="mt-6 border-transparent text-brand">
+              Find a doctor
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </ButtonLink>
+          </div>
+          <div className="relative hidden h-64 md:block">
+            <Image
+              src={stock.hero.homeCta}
+              alt=""
+              fill
+              sizes="260px"
+              unoptimized
+              className="object-cover [mask-image:linear-gradient(to_right,transparent,#000_30%)]"
+            />
+          </div>
+        </div>
       </section>
     </div>
   );

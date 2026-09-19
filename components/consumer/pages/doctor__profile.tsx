@@ -22,6 +22,8 @@ import {
   documentMetadataBody,
   practiceProfileBody,
 } from "@/lib/consumer/features/practice";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 export default function ProfilePage() {
   const [me, setMe] = useState<Doctor | null>(null);
@@ -170,7 +172,16 @@ export default function ProfilePage() {
     );
   }
 
-  if (loading) return <FormSkeleton />;
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-10">
+        <PageHero {...HEROES.doctorProfile} />
+        <div className="w-full max-w-xl">
+          <FormSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   if (error && !me) {
     return (
@@ -182,17 +193,20 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex w-full max-w-xl flex-col gap-6">
-      <section className="overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6">
-        <h1 className="text-h2 text-ink">{me?.display_name || "Doctor"}</h1>
-        <p className="mt-1 text-body text-blue-800">{me?.specialty}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+    <div className="flex flex-col gap-10">
+      <PageHero
+        {...HEROES.doctorProfile}
+        eyebrow={me?.specialty || HEROES.doctorProfile.eyebrow}
+        title={me?.display_name || "Doctor"}
+      >
+        <div className="flex flex-wrap gap-2">
           <Badge tone="brand">SLMC {me?.slmc_number || "—"}</Badge>
           <Badge tone={me?.verification_status === "approved" ? "success" : "warning"}>
             {me?.verification_status || "unverified"}
           </Badge>
         </div>
-      </section>
+      </PageHero>
+      <div className="flex w-full max-w-xl flex-col gap-6">
 
       <Card>
         <h2 className="text-h4 text-ink">Practice profile</h2>
@@ -338,6 +352,7 @@ export default function ProfilePage() {
       <Button variant="ghost" fullWidth leading={<LogOut className="size-4" />} onClick={() => void logout()}>
         Sign out
       </Button>
+      </div>
     </div>
   );
 }

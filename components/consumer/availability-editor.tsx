@@ -20,6 +20,8 @@ import {
   type ScheduleSettings,
   type TimeWindow,
 } from "@/lib/consumer/features/practice";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 export function AvailabilityEditor({
   initialHours,
@@ -157,13 +159,7 @@ export function AvailabilityEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-h2 text-ink">Working hours</h1>
-        <p className="mt-1 max-w-prose text-body-lg text-muted">
-          Asia/Colombo. Slot length, buffer and daily cap save with the week. Leave dates are
-          additive — they do not replace previous leave.
-        </p>
-      </header>
+      <PageHero {...HEROES.availability} />
 
       <Card variant="glass" className="grid gap-4 sm:grid-cols-3">
         <Select

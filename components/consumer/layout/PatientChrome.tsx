@@ -69,12 +69,12 @@ export function PatientHeader() {
           href="/profile"
           aria-label="Profile"
           aria-current={isActivePath(pathname, "/profile") ? "page" : undefined}
-          className="flex min-h-11 items-center gap-2 rounded-pill p-0.5 pr-1 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
+          className="flex min-h-10 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
         >
           <Avatar
             src={profilePhotoSrc(account?.photo_url)}
             name={account?.name}
-            size={40}
+            size={32}
             ring
             className="ring-brand/30"
           />

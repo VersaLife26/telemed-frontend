@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarClock, ListOrdered, Wallet } from "lucide-react";
+import { BadgeCheck, CalendarClock, ListOrdered, Stethoscope, Wallet } from "lucide-react";
 
 import { PracticeOverview } from "@/components/consumer/practice-overview";
 import { Alert } from "@/components/consumer/ui/Alert";
@@ -10,6 +10,8 @@ import { apiFetch } from "@/lib/consumer/api/client";
 import type { Doctor } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import type { PeakHours, PracticeSummary } from "@/lib/consumer/features/practice";
+import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 const SHORTCUTS = [
   { href: "/queue", label: "Queue", hint: "Today’s appointments", Icon: ListOrdered },
@@ -84,34 +86,47 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="overflow-hidden rounded-xl bg-[image:var(--gradient-hero)] p-6 md:p-8">
-        <p className="text-eyebrow text-brand">Good day</p>
-        <h1 className="mt-1 text-h2 text-ink">{me.display_name || "Doctor"}</h1>
-        <p className="mt-2 text-body text-blue-800">
-          {me.specialty || "Specialty"} · SLMC {me.slmc_number || "—"}
-        </p>
-      </section>
-
-      <div className="stagger grid gap-4 sm:grid-cols-3">
-        {SHORTCUTS.map(({ href, label, hint, Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center gap-4 rounded-lg border border-border-subtle bg-surface p-5 shadow-sm transition-[transform,box-shadow] duration-[200ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md"
-          >
-            <span
-              aria-hidden="true"
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-tint text-brand"
-            >
-              <Icon className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-h5 text-ink">{label}</span>
-              <span className="mt-0.5 block text-body-sm text-muted">{hint}</span>
-            </span>
-          </Link>
-        ))}
-      </div>
+      <PageHero
+        {...HEROES.dashboard}
+        title={me.display_name || "Doctor"}
+        chips={
+          <>
+            <HeroChip
+              icon={<Stethoscope className="size-5" />}
+              value={me.specialty || "Specialty"}
+              label="Specialty"
+            />
+            <HeroChip
+              icon={<BadgeCheck className="size-5" />}
+              value={`SLMC ${me.slmc_number || "—"}`}
+              label="Registration"
+              className="ml-10"
+            />
+          </>
+        }
+        overlap={
+          <div className="stagger grid gap-4 sm:grid-cols-3">
+            {SHORTCUTS.map(({ href, label, hint, Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-4 rounded-lg border border-border-subtle bg-surface p-5 shadow-md transition-[transform,box-shadow] duration-[200ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-lg"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-tint text-brand"
+                >
+                  <Icon className="size-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-h5 text-ink">{label}</span>
+                  <span className="mt-0.5 block text-body-sm text-muted">{hint}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        }
+      />
 
       {analyticsError ? (
         <Alert tone="warning" title="Analytics unavailable">

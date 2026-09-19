@@ -26,6 +26,8 @@ import {
   formatVisitDate,
   isUpcomingAppointment,
 } from "@/lib/consumer/features/patient-appointment";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 async function pendingByAppointment(
   appointments: Appointment[],
@@ -157,7 +159,12 @@ export default function AppointmentsPage() {
   }, [load]);
 
   if (loading) {
-    return <AppointmentsSkeleton />;
+    return (
+      <div className="flex flex-col gap-10">
+        <PageHero {...HEROES.appointments} />
+        <AppointmentsSkeleton />
+      </div>
+    );
   }
 
   if (error && appointments.length === 0 && /sign in|unauthorized|unauthorised|401/i.test(error)) {
@@ -177,12 +184,7 @@ export default function AppointmentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-h2 text-ink">Appointments</h1>
-        <p className="mt-1 text-body-lg text-muted">
-          Pay, join, or read a visit summary from here.
-        </p>
-      </header>
+      <PageHero {...HEROES.appointments} />
 
       {error ? (
         <Alert tone="danger" title="Couldn’t load visits">

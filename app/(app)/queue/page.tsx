@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, FileText, Pill, Video } from "lucide-react";
+import { CalendarDays, FileText, ListOrdered, Pill, Video } from "lucide-react";
 
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
@@ -14,6 +14,8 @@ import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { afterEndPath, callPath } from "@/lib/consumer/features/consult";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
+import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 async function pendingByAppointment(
   token: string,
@@ -64,14 +66,28 @@ export default async function QueuePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card variant="glass" className="flex flex-col items-start gap-3">
-        <h2 className="text-h5 text-ink">Finished early?</h2>
-        <p className="max-w-prose text-body-sm text-muted">
-          After you end a call you can ask only the next patient whether they can join now. Later
-          slots stay where they are.
-        </p>
-        <ReadyForNextButton />
-      </Card>
+      <PageHero
+        {...HEROES.queue}
+        chips={
+          error ? undefined : (
+            <HeroChip
+              icon={<ListOrdered className="size-5" />}
+              value={appointments.length}
+              label={appointments.length === 1 ? "Confirmed consult" : "Confirmed consults"}
+            />
+          )
+        }
+        overlap={
+          <Card className="flex flex-col items-start gap-3 shadow-lg">
+            <h2 className="text-h5 text-ink">Finished early?</h2>
+            <p className="max-w-prose text-body-sm text-muted">
+              After you end a call you can ask only the next patient whether they can join now.
+              Later slots stay where they are.
+            </p>
+            <ReadyForNextButton />
+          </Card>
+        }
+      />
 
       {error ? (
         <Alert tone="danger" title="Couldn’t load the queue">

@@ -15,6 +15,8 @@ import {
 } from "@/lib/consumer/features/practice";
 import { periodLabel } from "@/lib/consumer/features/earnings";
 import { formatMoney } from "@/lib/consumer/money";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 export function EarningsClient() {
   const [earnings, setEarnings] = useState<DoctorEarnings | null>(null);
@@ -45,19 +47,27 @@ export function EarningsClient() {
   const payouts = earnings?.payouts ?? [];
 
   if (loading) {
-    return <FormSkeleton />;
+    return (
+      <div className="flex flex-col gap-10">
+        <PageHero {...HEROES.earnings} />
+        <div className="mx-auto w-full max-w-3xl">
+          <FormSkeleton />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-h2 text-ink">Earnings</h1>
-        <p className="mt-1 text-body-lg text-muted">
-          {earnings?.from && earnings?.to
+    <div className="flex flex-col gap-10">
+      <PageHero
+        {...HEROES.earnings}
+        lede={
+          earnings?.from && earnings?.to
             ? `${periodLabel(earnings.from, earnings.to)}${earnings.timezone ? ` · ${earnings.timezone}` : ""}`
-            : "Settled consults from your practice ledger."}
-        </p>
-      </header>
+            : "Settled consults from your practice ledger."
+        }
+      />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
@@ -126,6 +136,7 @@ export function EarningsClient() {
           </ul>
         )}
       </section>
+      </div>
     </div>
   );
 }

@@ -20,6 +20,8 @@ import {
   type VaultDocType,
 } from "@/lib/consumer/features/vault";
 import { cx } from "@/lib/consumer/cx";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 export function VaultClient() {
   const [docs, setDocs] = useState<VaultDocument[]>([]);
@@ -100,13 +102,9 @@ export function VaultClient() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-h2 text-ink">Health vault</h1>
-        <p className="mt-1 text-body-lg text-muted">
-          Upload reports and scans. Downloads use a short-lived link.
-        </p>
-      </header>
+    <div className="flex flex-col gap-10">
+      <PageHero {...HEROES.vault} />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
@@ -262,6 +260,7 @@ export function VaultClient() {
           </>
         }
       />
+      </div>
     </div>
   );
 }

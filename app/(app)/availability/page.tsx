@@ -6,6 +6,8 @@ import { apiFetch } from "@/lib/consumer/api/client";
 import type { WorkingHour } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import type { ScheduleSettings } from "@/lib/consumer/features/practice";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 export default async function AvailabilityPage() {
   const token = await getAccessToken();
@@ -37,9 +39,11 @@ export default async function AvailabilityPage() {
 
   if (error) {
     return (
-      <div className="flex max-w-xl flex-col gap-4">
-        <h1 className="text-h2 text-ink">Working hours</h1>
-        <Alert tone="danger">{error}</Alert>
+      <div className="flex flex-col gap-6">
+        <PageHero {...HEROES.availability} />
+        <Alert tone="danger" className="max-w-xl">
+          {error}
+        </Alert>
       </div>
     );
   }

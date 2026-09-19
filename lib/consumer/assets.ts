@@ -36,6 +36,22 @@ export const stock = {
   doctorHero: unsplash("photo-1550831107-1553da8c8464", 720),
   /** Waiting room ambience. */
   waitingRoom: unsplash("photo-1622253692010-333f2da6031d", 720),
+  /** Page hero photography, one per page -- see lib/consumer/heroes.ts. */
+  hero: {
+    home: unsplash("photo-1631217868264-e5b90bb7e133", 720),
+    homeCta: unsplash("photo-1622253692010-333f2da6031d", 560),
+    doctors: unsplash("photo-1612349317150-e413f6a5b16d", 720),
+    booking: unsplash("photo-1594824476967-48c8b964273f", 720),
+    appointments: unsplash("photo-1576091160399-112ba8d25d1d", 720),
+    vault: unsplash("photo-1666214280557-f1b5022eb634", 720),
+    profile: unsplash("photo-1506126613408-eca07ce68773", 720),
+    dashboard: unsplash("photo-1622902046580-2b47f47f5471", 720),
+    calendar: unsplash("photo-1638202993928-7267aad84c31", 720),
+    queue: unsplash("photo-1576765608535-5f04d1e3f289", 720),
+    availability: unsplash("photo-1571772996211-2f02c9727629", 720),
+    earnings: unsplash("photo-1651008376811-b90baee60c1f", 720),
+    doctorProfile: unsplash("photo-1584515933487-779824d29309", 720),
+  },
   /** Fallbacks for directory tiles whose doctor has no uploaded photo. */
   portraits: [
     unsplash("photo-1584982751601-97dcc096659c", 400),

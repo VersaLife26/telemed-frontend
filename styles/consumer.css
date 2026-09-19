@@ -125,6 +125,10 @@
   --stagger-step:  60ms;
 
   --content-max-width: 1200px;
+
+  /* Height of the fixed top bar. Page heroes run underneath it, so they and
+     the shell both offset by this rather than by a guessed padding. */
+  --nav-h: 56px;
 }
 
 /*
@@ -404,6 +408,73 @@
     }
   }
 
+  /* Slim top bar: transparent over the page hero, frosted once content
+     scrolls under it. */
+  .top-bar {
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
+  }
+
+  .top-bar[data-scrolled] {
+    background: var(--glass-bg-light);
+    -webkit-backdrop-filter: var(--glass-blur-md);
+    backdrop-filter: var(--glass-blur-md);
+    border-bottom-color: oklch(99% 0.002 258 / 0.6);
+    box-shadow: 0 4px 20px oklch(24% 0.05 258 / 0.06);
+  }
+
+  /* Page hero band. Full-bleed out of the shell's max-width main, and pulled
+     up under the fixed top bar. The shell clips x-overflow, so 100vw's
+     scrollbar width never turns into a horizontal scroll. */
+  .page-hero {
+    position: relative;
+    isolation: isolate;
+    margin-inline: calc(50% - 50vw);
+    margin-top: calc(-1 * (var(--nav-h) + 2rem));
+    background: var(--gradient-hero);
+    overflow: hidden;
+  }
+
+  .page-hero::before {
+    content: "";
+    position: absolute;
+    top: -160px;
+    right: -120px;
+    width: 520px;
+    height: 520px;
+    z-index: -1;
+    border-radius: 50%;
+    background: var(--blue-300);
+    opacity: 0.4;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+
+  /* Faint hexagon lattice from the kit's CTA bands. */
+  .hero-pattern {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='98' viewBox='0 0 56 98'%3E%3Cpath d='M28 66 0 50V17L28 1l28 16v33L28 66Zm0 32V66' fill='none' stroke='%23ffffff' stroke-width='1.2'/%3E%3C/svg%3E");
+    background-size: 56px 98px;
+    -webkit-mask-image: linear-gradient(100deg, transparent 20%, #000 70%);
+    mask-image: linear-gradient(100deg, transparent 20%, #000 70%);
+  }
+
+  .hero-in {
+    animation: rise var(--duration-slow) var(--ease-out) both;
+  }
+
+  .hero-photo-in {
+    animation: hero-photo-in 480ms var(--ease-out) both;
+  }
+
   .skeleton-pulse {
     animation: skeleton-pulse 1.5s ease-in-out infinite;
   }
@@ -511,6 +582,11 @@
   50%      { opacity: 0.45; }
 }
 
+@keyframes hero-photo-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
@@ -519,7 +595,9 @@
 /* Reduced motion means gentler, not absent: opacity still carries meaning. */
 @media (prefers-reduced-motion: reduce) {
   .skeleton-pulse,
-  .stagger > * {
+  .stagger > *,
+  .hero-in,
+  .hero-photo-in {
     animation: none;
   }
 
@@ -540,6 +618,7 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
+  .top-bar[data-scrolled],
   .chrome-blur,
   .glass-panel,
   .glass-panel-strong {
@@ -569,6 +648,7 @@
 }
 
 @supports not (backdrop-filter: blur(1px)) {
+  .top-bar[data-scrolled],
   .glass-panel,
   .glass-panel-strong {
     background: var(--surface);

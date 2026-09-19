@@ -29,13 +29,13 @@ export function DoctorCard({ doctor, className }: { doctor: Doctor; className?: 
         className,
       )}
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-tint">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[image:var(--gradient-hero)]">
         <Image
           src={photo}
           alt=""
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-cover transition-transform duration-[320ms] ease-out can-hover:group-hover:scale-[1.03]"
+          className="object-cover object-top transition-transform duration-[320ms] ease-out can-hover:group-hover:scale-[1.03]"
           unoptimized
         />
         <span
@@ -46,11 +46,18 @@ export function DoctorCard({ doctor, className }: { doctor: Doctor; className?: 
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-1 p-4">
-        <p className="truncate text-h5 text-ink">{name}</p>
-        <p className="truncate text-body-sm text-faint">{specialtyLabel(doctor.specialty)}</p>
+      {/* The specialty rides the photo's bottom edge, as in the kit's doctor
+          cards, so the face and the field read as one label. */}
+      <div className="relative z-10 -mt-3.5 flex justify-center px-4">
+        <span className="max-w-full truncate rounded-pill bg-brand px-3.5 py-1.5 text-caption text-on-brand shadow-brand">
+          {specialtyLabel(doctor.specialty)}
+        </span>
+      </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+      <div className="flex flex-1 flex-col items-center gap-1 px-4 pb-4 pt-3 text-center">
+        <p className="w-full truncate text-h5 text-ink">{name}</p>
+
+        <div className="mt-auto flex w-full items-center justify-between gap-2 border-t border-border-subtle pt-3">
           <span className="text-label text-brand tabular-time">
             {formatMoney(doctor.fee_cents, doctor.currency)}
           </span>

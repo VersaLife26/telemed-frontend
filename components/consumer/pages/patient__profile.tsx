@@ -22,6 +22,8 @@ import {
   profileUpdateError,
   type ProfileDraft,
 } from "@/lib/consumer/features/profile";
+import { PageHero } from "@/components/consumer/ui/PageHero";
+import { HEROES } from "@/lib/consumer/heroes";
 
 const emptyDraft: ProfileDraft = { name: "", phone: "", address: "", dateOfBirth: "" };
 
@@ -138,7 +140,14 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return <ProfileSkeleton />;
+    return (
+      <div className="flex flex-col gap-10">
+        <PageHero {...HEROES.profile} />
+        <div className="mx-auto w-full max-w-xl">
+          <ProfileSkeleton />
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -156,11 +165,9 @@ export default function ProfilePage() {
   const hasStoredPhoto = Boolean(user.photo_url) || Boolean(previewUrl);
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-      <header>
-        <h1 className="text-h2 text-ink">Profile</h1>
-        <p className="mt-1 text-body-lg text-muted">How this account appears on visits.</p>
-      </header>
+    <div className="flex flex-col gap-10">
+      <PageHero {...HEROES.profile} />
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
 
       {/* Identity sits on the gradient, the editable record sits on a card.
           Two planes, because they are two different kinds of thing. */}
@@ -263,6 +270,7 @@ export default function ProfilePage() {
       >
         Sign out
       </Button>
+      </div>
     </div>
   );
 }
