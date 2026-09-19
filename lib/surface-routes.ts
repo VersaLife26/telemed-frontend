@@ -61,6 +61,7 @@ const ROUTES: Record<Surface, readonly string[]> = {
   doctor: [
     "/",
     "/dashboard",
+    "/calendar",
     "/queue",
     "/availability",
     "/earnings",
