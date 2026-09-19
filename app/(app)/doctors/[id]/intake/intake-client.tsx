@@ -86,13 +86,17 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
       <section className="overflow-hidden rounded-xl border border-blue-100 bg-[image:var(--gradient-hero)] shadow-md">
         <div className="grid lg:grid-cols-[0.85fr_1.15fr]">
           <div className="relative hidden min-h-[440px] lg:block">
+            <div
+              aria-hidden="true"
+              className="absolute bottom-0 left-1/2 size-[340px] -translate-x-1/2 translate-y-1/4 rounded-full bg-white/50 blur-2xl"
+            />
             <Image
               src={HEROES.booking.image}
               alt=""
               fill
               sizes="420px"
               unoptimized
-              className="object-cover object-top [mask-image:linear-gradient(to_right,#000_70%,transparent)]"
+              className="object-contain object-bottom pt-8"
             />
           </div>
 

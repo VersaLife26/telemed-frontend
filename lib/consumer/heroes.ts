@@ -1,4 +1,4 @@
-import { stock } from "@/lib/consumer/assets";
+import { assets } from "@/lib/consumer/assets";
 
 export type HeroQuote = { text: string; author: string };
 
@@ -24,7 +24,7 @@ export const HEROES = {
       text: "The good physician treats the disease; the great physician treats the patient who has the disease.",
       author: "William Osler",
     },
-    image: stock.hero.home,
+    image: assets.hero.home,
   },
   doctors: {
     eyebrow: "Find a doctor",
@@ -34,7 +34,7 @@ export const HEROES = {
       text: "Wherever the art of medicine is loved, there is also a love of humanity.",
       author: "Hippocrates",
     },
-    image: stock.hero.doctors,
+    image: assets.hero.doctors,
   },
   doctorDetail: {
     eyebrow: "Doctor",
@@ -44,14 +44,14 @@ export const HEROES = {
       text: "To cure sometimes, to relieve often, to comfort always.",
       author: "Edward Trudeau",
     },
-    image: stock.hero.doctors,
+    image: assets.hero.doctors,
   },
   booking: {
     eyebrow: "Almost there",
     title: "Confirm your visit",
     lede: "Tell the doctor a little about how you feel, then continue to payment.",
     quote: { text: "The greatest wealth is health.", author: "Virgil" },
-    image: stock.hero.booking,
+    image: assets.hero.booking,
   },
   appointments: {
     eyebrow: "Your visits",
@@ -61,7 +61,7 @@ export const HEROES = {
       text: "Take care of your body. It’s the only place you have to live.",
       author: "Jim Rohn",
     },
-    image: stock.hero.appointments,
+    image: assets.hero.appointments,
   },
   vault: {
     eyebrow: "Your records",
@@ -71,7 +71,7 @@ export const HEROES = {
       text: "An ounce of prevention is worth a pound of cure.",
       author: "Benjamin Franklin",
     },
-    image: stock.hero.vault,
+    image: assets.hero.vault,
   },
   profile: {
     eyebrow: "Your account",
@@ -81,7 +81,7 @@ export const HEROES = {
       text: "Health is a state of complete harmony of the body, mind and spirit.",
       author: "B.K.S. Iyengar",
     },
-    image: stock.hero.profile,
+    image: assets.hero.profile,
   },
   dashboard: {
     eyebrow: "Good day",
@@ -91,7 +91,7 @@ export const HEROES = {
       text: "Medicine is a science of uncertainty and an art of probability.",
       author: "William Osler",
     },
-    image: stock.hero.dashboard,
+    image: assets.hero.dashboard,
   },
   calendar: {
     eyebrow: "Your schedule",
@@ -101,7 +101,7 @@ export const HEROES = {
       text: "Time and health are two precious assets that we don’t recognize and appreciate until they have been depleted.",
       author: "Denis Waitley",
     },
-    image: stock.hero.calendar,
+    image: assets.hero.calendar,
   },
   queue: {
     eyebrow: "Today",
@@ -111,7 +111,7 @@ export const HEROES = {
       text: "Listen to your patient; he is telling you the diagnosis.",
       author: "William Osler",
     },
-    image: stock.hero.queue,
+    image: assets.hero.queue,
   },
   availability: {
     eyebrow: "Your hours",
@@ -121,7 +121,7 @@ export const HEROES = {
       text: "Rest when you’re weary. Refresh and renew yourself, your body, your mind, your spirit.",
       author: "Ralph Marston",
     },
-    image: stock.hero.availability,
+    image: assets.hero.availability,
   },
   earnings: {
     eyebrow: "Your practice",
@@ -131,7 +131,7 @@ export const HEROES = {
       text: "It is health that is real wealth and not pieces of gold and silver.",
       author: "Mahatma Gandhi",
     },
-    image: stock.hero.earnings,
+    image: assets.hero.earnings,
   },
   doctorProfile: {
     eyebrow: "Your practice",
@@ -141,6 +141,6 @@ export const HEROES = {
       text: "The best way to find yourself is to lose yourself in the service of others.",
       author: "Mahatma Gandhi",
     },
-    image: stock.hero.doctorProfile,
+    image: assets.hero.doctorProfile,
   },
 } satisfies Record<string, HeroCopy>;

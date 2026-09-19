@@ -21,6 +21,7 @@ export function PageHero({
   quote,
   image,
   imageAlt = "",
+  framed = false,
   chips,
   children,
   overlap,
@@ -31,6 +32,12 @@ export function PageHero({
   quote: HeroQuote;
   image: string;
   imageAlt?: string;
+  /**
+   * For a photo with its own background (a doctor's uploaded portrait): show
+   * it in a rounded frame. The default expects a transparent cutout, which
+   * stands on the band's bottom edge with the gradient showing around it.
+   */
+  framed?: boolean;
   chips?: ReactNode;
   children?: ReactNode;
   overlap?: ReactNode;
@@ -39,16 +46,23 @@ export function PageHero({
     <>
       <section className="page-hero">
         <div aria-hidden="true" className="hero-pattern" />
-        <div
-          className={cx(
-            "mx-auto grid w-full max-w-6xl items-center gap-10 px-4 pt-[calc(var(--nav-h)+2.5rem)] md:px-8 lg:grid-cols-[1.1fr_0.9fr]",
-            overlap ? "pb-24" : "pb-12",
-          )}
-        >
-          <div className="hero-in min-w-0">
+        <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 pt-[calc(var(--nav-h)+2.5rem)] md:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+          <div className={cx("hero-in min-w-0 self-center", overlap ? "pb-24" : "pb-12")}>
             <div className="flex items-center gap-4">
-              <div className="relative size-20 shrink-0 overflow-hidden rounded-lg shadow-md lg:hidden">
-                <Image src={image} alt="" fill className="object-cover" unoptimized />
+              <div
+                className={cx(
+                  "relative size-20 shrink-0 overflow-hidden lg:hidden",
+                  framed ? "rounded-lg shadow-md" : "rounded-full bg-white/60 ring-4 ring-white/50",
+                )}
+              >
+                <Image
+                  src={image}
+                  alt=""
+                  fill
+                  sizes="80px"
+                  className={framed ? "object-cover" : "object-cover object-top"}
+                  unoptimized
+                />
               </div>
               <div className="min-w-0">
                 {eyebrow ? <p className="text-eyebrow text-brand">{eyebrow}</p> : null}
@@ -75,22 +89,59 @@ export function PageHero({
             {chips ? <div className="mt-7 flex flex-wrap gap-3 lg:hidden">{chips}</div> : null}
           </div>
 
-          <div className="hero-photo-in relative hidden justify-self-end lg:block">
-            <div className="relative aspect-[4/5] h-[360px] overflow-hidden rounded-xl shadow-lg ring-4 ring-white/50">
+          {framed ? (
+            <div
+              className={cx(
+                "hero-photo-in relative hidden self-center justify-self-end lg:block",
+                overlap ? "pb-24" : "pb-12",
+              )}
+            >
+              <div className="relative aspect-[4/5] h-[340px] overflow-hidden rounded-xl shadow-lg ring-4 ring-white/50">
+                <Image
+                  src={image}
+                  alt={imageAlt}
+                  fill
+                  sizes="280px"
+                  className="object-cover"
+                  unoptimized
+                  priority
+                />
+              </div>
+              {chips ? (
+                <div className="absolute -left-16 bottom-16 flex flex-col items-start gap-3">
+                  {chips}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="hero-photo-in relative hidden h-[420px] lg:block">
+              {/* A soft disc of light behind the figure, as in the kit: it
+                  lifts the cutout off the gradient without drawing a box. */}
+              <div
+                aria-hidden="true"
+                className="absolute bottom-0 left-1/2 size-[380px] -translate-x-1/2 translate-y-1/4 rounded-full bg-white/45 blur-2xl"
+              />
               <Image
                 src={image}
                 alt={imageAlt}
                 fill
-                sizes="300px"
-                className="object-cover"
+                sizes="420px"
+                className="object-contain object-bottom drop-shadow-[0_20px_30px_oklch(24%_0.05_258/0.18)]"
                 unoptimized
                 priority
               />
+              {chips ? (
+                <div
+                  className={cx(
+                    "absolute -left-10 flex flex-col items-start gap-3",
+                    overlap ? "bottom-28" : "bottom-16",
+                  )}
+                >
+                  {chips}
+                </div>
+              ) : null}
             </div>
-            {chips ? (
-              <div className="absolute -left-16 bottom-8 flex flex-col items-start gap-3">{chips}</div>
-            ) : null}
-          </div>
+          )}
         </div>
       </section>
 
@@ -114,7 +165,7 @@ export function HeroChip({
   return (
     <div
       className={cx(
-        "glass-panel flex items-center gap-3 rounded-pill bg-[var(--glass-bg-light)] py-2 pl-2 pr-5",
+        "glass-panel flex items-center gap-3 rounded-pill bg-white/85 py-2 pl-2 pr-5",
         className,
       )}
     >

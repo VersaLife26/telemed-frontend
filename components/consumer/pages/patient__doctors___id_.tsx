@@ -77,6 +77,7 @@ export default async function DoctorDetailPage({ params }: { params: Promise<{ i
         lede={doctor.bio ?? undefined}
         image={photo}
         imageAlt={name}
+        framed
         chips={
           <>
             <HeroChip

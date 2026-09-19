@@ -22,7 +22,7 @@ import { EmptyVisitTicket, VisitTicket } from "@/components/consumer/ui/VisitTic
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
-import { stock } from "@/lib/consumer/assets";
+import { assets } from "@/lib/consumer/assets";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { HEROES } from "@/lib/consumer/heroes";
 import {
@@ -296,12 +296,12 @@ export default async function HomePage() {
           </div>
           <div className="relative hidden h-64 md:block">
             <Image
-              src={stock.hero.homeCta}
+              src={assets.hero.homeCta}
               alt=""
               fill
               sizes="260px"
               unoptimized
-              className="object-cover [mask-image:linear-gradient(to_right,transparent,#000_30%)]"
+              className="object-contain object-bottom drop-shadow-xl"
             />
           </div>
         </div>
