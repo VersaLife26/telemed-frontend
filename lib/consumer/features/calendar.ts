@@ -180,7 +180,7 @@ export function toCalendarEvent(
     dayKey,
     event: {
       id: appointment.id,
-      title: appointment.specialty ? specialtyLabel(appointment.specialty) : "Consultation",
+      title: appointment.counterpart_name || appointment.patient_name || (appointment.specialty ? specialtyLabel(appointment.specialty) : "Consultation"),
       status: appointment.status,
       startMinute,
       endMinute: Math.min(endMinute, 1440),

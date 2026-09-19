@@ -63,6 +63,10 @@ export type Appointment = {
   amount_cents?: number;
   currency?: string;
   specialty?: string;
+  /** Only on the treating doctor's own view. */
+  patient_name?: string;
+  /** The other party: doctor's name for a patient, patient's name for a doctor. */
+  counterpart_name?: string;
 };
 
 export type RescheduleRequest = {
@@ -194,6 +198,7 @@ export type JoinResult = {
    */
   ice_servers?: ICEServer[];
   scheduled_at?: string;
+  counterpart_name?: string;
 };
 
 export type WaitingRoomStatus = {
@@ -273,7 +278,29 @@ export type VaultDocument = {
   content_type?: string;
   size_bytes?: number;
   scan_status?: string;
+  folder_id?: string;
   created_at?: string;
+};
+
+export type VaultFolder = {
+  id: string;
+  owner_user_id: string;
+  parent_id?: string;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** One level of a vault: its child folders and the breadcrumb chain to it. */
+export type VaultFolderListing = {
+  folders: VaultFolder[];
+  path: VaultFolder[];
+};
+
+/** A vault the calling doctor can currently open. */
+export type VaultPatient = {
+  user_id: string;
+  name: string;
 };
 
 export type VaultDownload = {

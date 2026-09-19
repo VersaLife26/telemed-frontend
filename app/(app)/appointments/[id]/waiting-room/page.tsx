@@ -1,4 +1,4 @@
-import { WaitingRoomClient } from "@/components/consumer/waiting-room-client";
+import { redirect } from "next/navigation";
 
 export default async function WaitingRoomPage({
   params,
@@ -6,5 +6,5 @@ export default async function WaitingRoomPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <WaitingRoomClient appointmentId={id} />;
+  redirect(`/appointments/${id}/call`);
 }

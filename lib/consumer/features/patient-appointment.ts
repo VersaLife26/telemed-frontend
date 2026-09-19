@@ -26,11 +26,8 @@ export function appointmentAction(id: string, status?: string): AppointmentActio
   if (s === "pending_payment" || s === "unpaid") {
     return { href: `/appointments/${id}/payment`, label: "Pay" };
   }
-  if (s === "waiting" || s === "active") {
+  if (s === "waiting" || s === "active" || s === "confirmed" || s === "scheduled") {
     return { href: `/appointments/${id}/call`, label: "Join" };
-  }
-  if (s === "confirmed" || s === "scheduled") {
-    return { href: `/appointments/${id}/waiting-room`, label: "Waiting room" };
   }
   if (s === "completed" || s === "ended") {
     return { href: `/appointments/${id}/summary`, label: "Summary" };

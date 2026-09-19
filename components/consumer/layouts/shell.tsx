@@ -9,6 +9,7 @@ import { SURFACE } from "@/lib/consumer/surface";
 
 const DOCTOR_NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/workspace", label: "Workspace" },
   { href: "/calendar", label: "Calendar" },
   { href: "/queue", label: "Queue" },
   { href: "/availability", label: "Availability" },
@@ -25,6 +26,10 @@ const DOCTOR_NAV = [
  */
 export default function ConsumerShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  if (SURFACE === "doctor" && pathname.startsWith("/workspace")) {
+    return <>{children}</>;
+  }
 
   if (SURFACE === "patient") {
     return (

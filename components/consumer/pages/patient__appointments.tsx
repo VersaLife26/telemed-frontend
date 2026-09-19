@@ -92,7 +92,7 @@ function AppointmentRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-body font-semibold text-ink">
-              {appointment.specialty || "Consultation"}
+              {appointment.counterpart_name || appointment.specialty || "Consultation"}
             </p>
             <StatusBadge status={appointment.status} />
           </div>

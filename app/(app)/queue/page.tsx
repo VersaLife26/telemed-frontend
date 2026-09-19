@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CalendarDays, FileText, ListOrdered, Pill, Video } from "lucide-react";
 
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
@@ -11,7 +10,7 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, RescheduleRequest } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
-import { afterEndPath, callPath } from "@/lib/consumer/features/consult";
+import { afterEndPath } from "@/lib/consumer/features/consult";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
@@ -122,7 +121,7 @@ export default async function QueuePage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-body font-semibold text-ink">
-                        {a.specialty || "Consultation"}
+                        {a.counterpart_name || a.patient_name || a.specialty || "Consultation"}
                       </p>
                       <StatusBadge status={a.status} />
                     </div>
@@ -135,7 +134,7 @@ export default async function QueuePage() {
                 <div className="flex shrink-0 flex-col items-stretch gap-3 lg:items-end">
                   <div className="flex flex-wrap gap-2">
                     <ButtonLink
-                      href={callPath(a.id)}
+                      href={`/workspace?call=${a.id}`}
                       size="sm"
                       leading={<Video className="size-4" />}
                     >

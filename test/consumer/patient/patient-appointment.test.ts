@@ -25,8 +25,11 @@ test("pending payment routes to checkout", () => {
   });
 });
 
-test("confirmed routes to the waiting room", () => {
-  assert.equal(appointmentAction("appt-1", "confirmed")?.label, "Waiting room");
+test("confirmed routes to the call lobby", () => {
+  assert.deepEqual(appointmentAction("appt-1", "confirmed"), {
+    href: "/appointments/appt-1/call",
+    label: "Join",
+  });
 });
 
 test("completed routes to the visit summary", () => {

@@ -1,5 +1,4 @@
-import { VideoCallClient } from "@/components/consumer/video-call-client";
-import { afterEndPath } from "@/lib/consumer/features/consult";
+import { redirect } from "next/navigation";
 
 export default async function DoctorCallPage({
   params,
@@ -7,11 +6,5 @@ export default async function DoctorCallPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return (
-    <VideoCallClient
-      appointmentId={id}
-      role="doctor"
-      afterEndHref={afterEndPath("doctor", id)}
-    />
-  );
+  redirect(`/workspace?call=${encodeURIComponent(id)}`);
 }

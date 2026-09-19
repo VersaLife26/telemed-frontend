@@ -62,6 +62,7 @@ const ROUTES: Record<Surface, readonly string[]> = {
     "/",
     "/dashboard",
     "/calendar",
+    "/workspace",
     "/queue",
     "/availability",
     "/earnings",

@@ -2,35 +2,39 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  MAX_UPLOAD_BYTES,
-  VAULT_TYPES,
-  formatBytes,
+  folderCrumbs,
+  previewKind,
   recordsListPath,
-  uploadError,
+  recordDownloadPath,
 } from "@/lib/consumer/features/vault";
 
-test("vault types are the three document kinds the UI offers", () => {
+test("previewKind maps content types", () => {
+  assert.equal(previewKind("application/pdf"), "pdf");
+  assert.equal(previewKind("image/png"), "image");
+  assert.equal(previewKind("video/mp4"), "video");
+  assert.equal(previewKind("audio/mpeg"), "audio");
+  assert.equal(previewKind("application/octet-stream"), "other");
+  assert.equal(previewKind(), "other");
+});
+
+test("folderCrumbs always starts at the vault root", () => {
+  assert.deepEqual(folderCrumbs([]), [{ id: null, name: "Vault" }]);
   assert.deepEqual(
-    VAULT_TYPES.map((t) => t.value),
-    ["report", "scan", "prescription"],
+    folderCrumbs([
+      { id: "a", owner_user_id: "u", name: "Labs" },
+      { id: "b", owner_user_id: "u", name: "2026" },
+    ]),
+    [
+      { id: null, name: "Vault" },
+      { id: "a", name: "Labs" },
+      { id: "b", name: "2026" },
+    ],
   );
 });
 
-test("uploads larger than 10 MB are refused", () => {
-  assert.equal(MAX_UPLOAD_BYTES, 10 * 1024 * 1024);
-  assert.equal(uploadError(MAX_UPLOAD_BYTES), null);
-  assert.equal(uploadError(MAX_UPLOAD_BYTES + 1), "File must be 10 MB or smaller.");
-});
-
-test("formatBytes stays empty for missing sizes", () => {
-  assert.equal(formatBytes(undefined), "");
-  assert.equal(formatBytes(0), "");
-  assert.equal(formatBytes(512), "512 B");
-  assert.equal(formatBytes(2048), "2 KB");
-  assert.equal(formatBytes(2 * 1024 * 1024), "2.0 MB");
-});
-
-test("recordsListPath filters by document_type when set", () => {
-  assert.equal(recordsListPath(""), "/records");
-  assert.equal(recordsListPath("scan"), "/records?document_type=scan");
+test("recordsListPath scopes a folder and an owner", () => {
+  assert.equal(recordsListPath(), "/records");
+  assert.equal(recordsListPath("scan", null, "user-1"), "/records?document_type=scan&folder_id=root&owner_user_id=user-1");
+  assert.equal(recordDownloadPath("doc-1", true), "/records/doc-1/download?disposition=attachment");
+  assert.equal(recordDownloadPath("doc-1"), "/records/doc-1/download");
 });

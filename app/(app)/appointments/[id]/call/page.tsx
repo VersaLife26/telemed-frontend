@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation";
+
 import { SURFACE } from "@/lib/consumer/surface";
-import DoctorPage from "@/components/consumer/pages/doctor__appointments___id___call";
 import PatientPage from "@/components/consumer/pages/patient__appointments___id___call";
 
 /**
@@ -11,6 +12,9 @@ import PatientPage from "@/components/consumer/pages/patient__appointments___id_
  * SURFACE is fixed at build time and the other imports are dead code.
  */
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  if (SURFACE === "doctor") return <DoctorPage params={params} />;
+  if (SURFACE === "doctor") {
+    const { id } = await params;
+    redirect(`/workspace?call=${encodeURIComponent(id)}`);
+  }
   return <PatientPage params={params} />;
 }
