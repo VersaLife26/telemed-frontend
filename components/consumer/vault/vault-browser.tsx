@@ -317,6 +317,12 @@ export function VaultBrowser({
 
   const text = dark ? "text-white" : "text-ink";
   const muted = dark ? "text-white/60" : "text-muted";
+  const ghost = dark
+    ? "min-h-9 min-w-9 text-white/80 can-hover:hover:bg-white/10 can-hover:hover:text-white"
+    : "min-h-9 min-w-9";
+  const field = dark
+    ? "border-white/15 bg-white/10 text-white placeholder:text-white/40 focus:shadow-none"
+    : undefined;
 
   return (
     <div className={cx("flex min-h-0 flex-1", compact ? "flex-col" : "flex-col lg:flex-row")}>
@@ -338,7 +344,7 @@ export function VaultBrowser({
                       setFolderId(null);
                     }}
                     className={cx(
-                      "w-full rounded-md px-3 py-2 text-left text-body-sm",
+                      "min-h-11 w-full rounded-md px-3 py-2 text-left text-body-sm",
                       selectedPatient === patient.user_id
                         ? "bg-brand text-on-brand"
                         : dark
@@ -374,7 +380,7 @@ export function VaultBrowser({
                 {index > 0 ? <span className={muted}>/</span> : null}
                 <button
                   type="button"
-                  className={cx("truncate", index === crumbs.length - 1 ? text : muted)}
+                  className={cx("min-h-9 truncate rounded-md px-1", index === crumbs.length - 1 ? text : muted, dark && "can-hover:hover:bg-white/10")}
                   onClick={() => setFolderId(crumb.id)}
                 >
                   {crumb.name}
@@ -386,6 +392,7 @@ export function VaultBrowser({
             <Button
               variant="ghost"
               size="sm"
+              className={ghost}
               aria-pressed={layout === "grid"}
               aria-label="Grid"
               onClick={() => setLayout("grid")}
@@ -394,6 +401,7 @@ export function VaultBrowser({
             <Button
               variant="ghost"
               size="sm"
+              className={ghost}
               aria-pressed={layout === "list"}
               aria-label="List"
               onClick={() => setLayout("list")}
@@ -408,12 +416,13 @@ export function VaultBrowser({
             placeholder="Search this folder"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="min-w-[12rem] flex-1"
+            className={cx("min-w-[12rem] flex-1", field)}
           />
           <Select
             aria-label="Document type filter"
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
+            className={field}
           >
             <option value="">All types</option>
             {VAULT_TYPES.map((type) => (
@@ -428,6 +437,7 @@ export function VaultBrowser({
                 aria-label="Upload as"
                 value={docType}
                 onChange={(event) => setDocType(event.target.value as VaultDocType)}
+                className={field}
               >
                 {VAULT_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -479,6 +489,7 @@ export function VaultBrowser({
             title="This folder is empty"
             body="Drop a file here or upload one to keep it with this visit."
             icon={<FolderIcon className="size-5" />}
+            tone={dark ? "dark" : "light"}
           />
         ) : layout === "grid" ? (
           <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4">
@@ -516,13 +527,14 @@ export function VaultBrowser({
             ))}
           </ul>
         ) : (
-          <ul className="divide-y divide-border-subtle">
+          <ul className={cx("divide-y", dark ? "divide-white/10" : "divide-border-subtle")}>
             {shownFolders.map((folder) => (
               <Row
                 key={folder.id}
                 name={folder.name}
                 meta="Folder"
                 icon={<FolderIcon className="size-5 text-amber-500" />}
+                dark={dark}
                 onOpen={() => setFolderId(folder.id)}
                 canMutate={canMutate}
                 onRename={() => setRenaming({ kind: "folder", id: folder.id, name: folder.name })}
@@ -538,6 +550,7 @@ export function VaultBrowser({
                   .filter(Boolean)
                   .join(" · ")}
                 icon={<TypeIcon type={doc.content_type} />}
+                dark={dark}
                 onOpen={() => openFile(doc)}
                 canMutate={canMutate}
                 onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.filename })}
@@ -563,7 +576,7 @@ export function VaultBrowser({
             dark={dark}
             onDownload={() => void download(preview)}
           />
-          <Button variant="ghost" size="sm" className="m-2 self-end" onClick={() => setPreview(null)}>
+          <Button variant="ghost" size="sm" className={cx("m-2 self-end", ghost)} onClick={() => setPreview(null)}>
             Close
           </Button>
         </div>
@@ -708,13 +721,13 @@ function VaultTile({
       </button>
       {canMutate ? (
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-          <IconBtn label="Rename" onClick={onRename}>
+          <IconBtn label="Rename" onClick={onRename} dark={dark}>
             <Pencil className="size-3.5" />
           </IconBtn>
-          <IconBtn label="Move" onClick={onMove}>
+          <IconBtn label="Move" onClick={onMove} dark={dark}>
             <FolderIcon className="size-3.5" />
           </IconBtn>
-          <IconBtn label="Delete" onClick={onDelete}>
+          <IconBtn label="Delete" onClick={onDelete} dark={dark}>
             <Trash2 className="size-3.5" />
           </IconBtn>
         </div>
@@ -727,6 +740,7 @@ function Row({
   name,
   meta,
   icon,
+  dark,
   onOpen,
   canMutate,
   onRename,
@@ -736,6 +750,7 @@ function Row({
   name: string;
   meta: string;
   icon: ReactNode;
+  dark: boolean;
   onOpen: () => void;
   canMutate: boolean;
   onRename: () => void;
@@ -743,23 +758,23 @@ function Row({
   onDelete: () => void;
 }) {
   return (
-    <li className="flex items-center gap-3 px-4 py-2">
+    <li className="flex min-h-11 items-center gap-3 px-4 py-2">
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         {icon}
         <span className="min-w-0">
-          <span className="block truncate text-label text-ink">{name}</span>
-          <span className="block truncate text-caption text-muted">{meta}</span>
+          <span className={cx("block truncate text-label", dark ? "text-white" : "text-ink")}>{name}</span>
+          <span className={cx("block truncate text-caption", dark ? "text-white/50" : "text-muted")}>{meta}</span>
         </span>
       </button>
       {canMutate ? (
         <span className="flex gap-1">
-          <IconBtn label="Rename" onClick={onRename}>
+          <IconBtn label="Rename" onClick={onRename} dark={dark}>
             <Pencil className="size-3.5" />
           </IconBtn>
-          <IconBtn label="Move" onClick={onMove}>
+          <IconBtn label="Move" onClick={onMove} dark={dark}>
             <FolderIcon className="size-3.5" />
           </IconBtn>
-          <IconBtn label="Delete" onClick={onDelete}>
+          <IconBtn label="Delete" onClick={onDelete} dark={dark}>
             <Trash2 className="size-3.5" />
           </IconBtn>
         </span>
@@ -771,10 +786,12 @@ function Row({
 function IconBtn({
   label,
   onClick,
+  dark,
   children,
 }: {
   label: string;
   onClick: () => void;
+  dark?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -782,7 +799,12 @@ function IconBtn({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-full text-faint can-hover:hover:bg-surface can-hover:hover:text-ink"
+      className={cx(
+        "flex size-9 items-center justify-center rounded-full",
+        dark
+          ? "text-white/55 can-hover:hover:bg-white/10 can-hover:hover:text-white"
+          : "text-faint can-hover:hover:bg-surface can-hover:hover:text-ink",
+      )}
     >
       {children}
     </button>

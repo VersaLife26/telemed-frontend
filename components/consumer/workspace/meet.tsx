@@ -14,7 +14,6 @@ import { colomboDayKey } from "@/lib/consumer/features/calendar";
 import { admitDisabled, canAdmit, consultJoinError, doctorLobbyCopy } from "@/lib/consumer/features/consult";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 import type { ConsultationControls } from "@/lib/consumer/features/use-consultation";
-import { cx } from "@/lib/consumer/cx";
 
 export function MeetApp({
   call,
@@ -56,23 +55,23 @@ function MeetQueue({ onJoin }: { onJoin: (id: string) => void }) {
       <h3 className="text-h4">Today’s queue</h3>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {appointments.length === 0 && !error ? (
-        <p className="text-body text-white/70">No confirmed visits today.</p>
+        <p className="text-body text-white/70">No confirmed visits today. When a patient is booked, they will appear here.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {appointments.map((appointment) => (
             <li
               key={appointment.id}
-              className="flex items-center justify-between gap-3 rounded-lg bg-white/10 px-3 py-2"
+              className="flex min-h-14 items-center justify-between gap-3 rounded-lg bg-white/10 px-3 py-2"
             >
-              <div>
-                <p className="text-label">
+              <div className="min-w-0">
+                <p className="truncate text-label">
                   {appointment.counterpart_name || appointment.patient_name || "Patient"}
                 </p>
                 <p className="text-caption text-white/60 tabular-time">
                   {formatVisitClock(appointment.start_at_local || appointment.start_at)}
                 </p>
               </div>
-              <Button size="sm" onClick={() => onJoin(appointment.id)}>
+              <Button size="sm" className="min-h-11 shrink-0" onClick={() => onJoin(appointment.id)}>
                 Join
               </Button>
             </li>
@@ -120,47 +119,47 @@ function MeetLive({ call }: { call: ConsultationControls }) {
           {call.counterpartName || "Live"}
         </Badge>
       </div>
-      <div className="glass-panel-dark absolute inset-x-0 bottom-0 mx-auto mb-4 flex w-fit items-center gap-2 rounded-pill px-3 py-2">
-        <Button
-          variant="glass"
-          size="sm"
+      <div className="ws-call-bar absolute inset-x-0 bottom-0">
+        <button
+          type="button"
+          className="ws-call-btn"
+          aria-label={call.muted ? "Unmute" : "Mute"}
           aria-pressed={call.muted}
-          leading={call.muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
           onClick={call.toggleMute}
         >
-          {call.muted ? "Unmute" : "Mute"}
-        </Button>
-        <Button
-          variant="glass"
-          size="sm"
+          {call.muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+        </button>
+        <button
+          type="button"
+          className="ws-call-btn"
+          aria-label={call.cameraOff ? "Turn camera on" : "Turn camera off"}
           aria-pressed={call.cameraOff}
-          leading={call.cameraOff ? <VideoOff className="size-4" /> : <Video className="size-4" />}
           onClick={call.toggleCamera}
         >
-          {call.cameraOff ? "Camera on" : "Camera off"}
-        </Button>
-        <Button
-          variant="glass"
-          size="sm"
+          {call.cameraOff ? <VideoOff className="size-5" /> : <Video className="size-5" />}
+        </button>
+        <button
+          type="button"
+          className="ws-call-btn"
+          aria-label={call.sharing ? "Stop sharing" : "Share screen"}
           aria-pressed={call.sharing}
-          leading={<MonitorUp className="size-4" />}
           onClick={() => void call.toggleScreenShare()}
         >
-          Share
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          busy={call.ending}
-          leading={<PhoneOff className="size-4" />}
+          <MonitorUp className="size-5" />
+        </button>
+        <button
+          type="button"
+          className="ws-call-btn ws-call-btn-end"
+          aria-label="End call"
+          disabled={call.ending}
           onClick={() =>
             void call.end().then(() => {
               router.replace("/workspace");
             })
           }
         >
-          End
-        </Button>
+          <PhoneOff className="size-5" />
+        </button>
       </div>
       {call.notice ? (
         <Alert tone="info" className="absolute left-4 right-4 top-16">
@@ -176,15 +175,16 @@ function MeetLive({ call }: { call: ConsultationControls }) {
   );
 }
 
-export function MiniCall({ call }: { call: ConsultationControls }) {
+export function MiniCall({
+  call,
+  onRestore,
+}: {
+  call: ConsultationControls;
+  onRestore: () => void;
+}) {
   return (
-    <div
-      className={cx(
-        "pointer-events-auto absolute bottom-24 right-6 overflow-hidden rounded-lg shadow-lg ring-1 ring-white/30",
-        "h-36 w-52",
-      )}
-    >
+    <button type="button" className="ws-mini-call" aria-label="Restore Meet" onClick={onRestore}>
       <video ref={call.remoteRef} autoPlay playsInline className="h-full w-full object-cover" />
-    </div>
+    </button>
   );
 }

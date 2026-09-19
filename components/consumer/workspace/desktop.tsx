@@ -44,7 +44,7 @@ function WorkspaceInner() {
   const router = useRouter();
   const callId = searchParams.get("call");
   const call = useConsultation(callId, "doctor");
-  const { windows, open, close } = useWindows();
+  const { windows, open, close, restore } = useWindows();
   const chat = useMemo(() => (callId ? createMemoryChat() : null), [callId]);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [viewers, setViewers] = useState<Record<string, VaultDocument>>({});
@@ -89,29 +89,40 @@ function WorkspaceInner() {
     if (callId) router.replace("/workspace");
   }
 
+  function exitWorkspace() {
+    if (callId && (call.live || call.waiting)) {
+      if (!window.confirm("Leave this call?")) return;
+      void call.end().then(() => router.push("/dashboard"));
+      return;
+    }
+    router.push("/dashboard");
+  }
+
   return (
     <div className="ws-desktop">
       <TopBar call={call} callId={callId} />
       <DesktopIcons />
-      {windows.map((win) => (
-        <WindowFrame
-          key={win.id}
-          win={win}
-          onClose={win.app === "meet" ? closeMeet : undefined}
-        >
-          {win.app === "meet" ? (
-            <MeetApp call={call} callId={callId} onJoin={joinCall} />
-          ) : null}
-          {win.app === "files" ? (
-            <FileStationApp lockedRoot={callId ? patientId : null} onOpenFile={openFile} />
-          ) : null}
-          {win.app === "calendar" ? <CalendarApp /> : null}
-          {win.app === "chat" ? <ChatApp transport={chat} /> : null}
-          {win.app === "viewer" ? <Viewer winId={win.props.id} docs={viewers} /> : null}
-        </WindowFrame>
-      ))}
-      {showMini ? <MiniCall call={call} /> : null}
-      <Dock />
+      <div className="ws-windows">
+        {windows.map((win) => (
+          <WindowFrame
+            key={win.id}
+            win={win}
+            onClose={win.app === "meet" ? closeMeet : undefined}
+          >
+            {win.app === "meet" ? (
+              <MeetApp call={call} callId={callId} onJoin={joinCall} />
+            ) : null}
+            {win.app === "files" ? (
+              <FileStationApp lockedRoot={callId ? patientId : null} onOpenFile={openFile} />
+            ) : null}
+            {win.app === "calendar" ? <CalendarApp /> : null}
+            {win.app === "chat" ? <ChatApp transport={chat} /> : null}
+            {win.app === "viewer" ? <Viewer winId={win.props.id} docs={viewers} /> : null}
+          </WindowFrame>
+        ))}
+      </div>
+      {showMini ? <MiniCall call={call} onRestore={() => restore("meet")} /> : null}
+      <Dock onExit={exitWorkspace} />
     </div>
   );
 }

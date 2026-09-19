@@ -30,6 +30,9 @@ export function FilePreview({
 }) {
   const kind = previewKind(doc.content_type);
   const [zoom, setZoom] = useState(1);
+  const ghost = dark
+    ? "text-white/80 can-hover:hover:bg-white/10 can-hover:hover:text-white"
+    : undefined;
 
   return (
     <div className={cx("flex min-h-0 flex-1 flex-col", className)}>
@@ -51,6 +54,7 @@ export function FilePreview({
               <Button
                 variant="ghost"
                 size="sm"
+                className={ghost}
                 aria-label="Zoom out"
                 onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
                 leading={<ZoomOut className="size-4" />}
@@ -58,6 +62,7 @@ export function FilePreview({
               <Button
                 variant="ghost"
                 size="sm"
+                className={ghost}
                 aria-label="Zoom in"
                 onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
                 leading={<ZoomIn className="size-4" />}
@@ -67,6 +72,7 @@ export function FilePreview({
           <Button
             variant="ghost"
             size="sm"
+            className={ghost}
             onClick={onDownload}
             leading={<Download className="size-4" />}
           >
@@ -76,6 +82,7 @@ export function FilePreview({
             <Button
               variant="ghost"
               size="sm"
+              className={ghost}
               leading={<ExternalLink className="size-4" />}
               onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
             >

@@ -14,13 +14,13 @@ const ICONS: { app: WorkspaceApp; label: string; color: string; Icon: typeof Vid
 export function DesktopIcons() {
   const { open } = useWindows();
   return (
-    <ul className="absolute left-6 top-16 flex flex-col gap-5">
+    <ul className="absolute left-6 top-16 z-[5] flex flex-col gap-5">
       {ICONS.map(({ app, label, color, Icon }) => (
         <li key={app}>
           <button
             type="button"
-            onDoubleClick={() => open(app)}
-            className="flex w-[4.5rem] flex-col items-center gap-1.5 text-white"
+            onClick={() => open(app)}
+            className="flex min-h-11 w-[4.5rem] cursor-pointer flex-col items-center gap-1.5 text-white transition-transform duration-[120ms] ease-out active:scale-[0.97]"
           >
             <span
               className="flex size-12 items-center justify-center rounded-2xl shadow-md"

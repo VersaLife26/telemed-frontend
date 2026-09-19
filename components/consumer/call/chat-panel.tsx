@@ -35,6 +35,7 @@ export function ChatPanel({
       <EmptyState
         title={emptyTitle}
         body={emptyBody}
+        tone={dark ? "dark" : "light"}
       />
     );
   }
@@ -85,6 +86,7 @@ export function ChatPanel({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Write a message"
+          aria-label="Message"
           className={cx(
             "min-h-11 min-w-0 flex-1 rounded-pill px-4 text-body outline-none",
             dark
@@ -92,7 +94,13 @@ export function ChatPanel({
               : "border border-border-default bg-surface text-ink",
           )}
         />
-        <Button type="submit" size="sm" leading={<Send className="size-4" />} disabled={!draft.trim()}>
+        <Button
+          type="submit"
+          size="sm"
+          className="min-h-11"
+          leading={<Send className="size-4" />}
+          disabled={!draft.trim()}
+        >
           Send
         </Button>
       </form>

@@ -40,16 +40,19 @@ export function CalendarApp() {
   const window = gridWindow(shown, workingHours);
 
   return (
-    <div className="h-full overflow-auto bg-white p-3">
-      <WeekGrid
-        dayKeys={dayKeys}
-        todayKey={todayKey}
-        eventsByDayKey={byDay}
-        hrefForEvent={() => null}
-        window={window}
-        workingHours={workingHours}
-        leaveByDayKey={{}}
-      />
+    <div className="flex h-full min-h-0 flex-col bg-ink-900">
+      <p className="shrink-0 px-4 py-2 text-label text-white/80">This week</p>
+      <div className="min-h-0 flex-1 overflow-auto bg-white p-3">
+        <WeekGrid
+          dayKeys={dayKeys}
+          todayKey={todayKey}
+          eventsByDayKey={byDay}
+          hrefForEvent={() => null}
+          window={window}
+          workingHours={workingHours}
+          leaveByDayKey={{}}
+        />
+      </div>
     </div>
   );
 }

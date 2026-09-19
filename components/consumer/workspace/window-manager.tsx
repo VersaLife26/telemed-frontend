@@ -1,5 +1,6 @@
 "use client";
 
+import { Copy, Minus, Square, X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -149,6 +150,10 @@ export function WindowFrame({
     ? { left: 0, top: 36, width: "100%", height: "calc(100% - 36px)", zIndex: win.z }
     : { left: win.rect.x, top: win.rect.y, width: win.rect.w, height: win.rect.h, zIndex: win.z };
 
+  function isControl(target: EventTarget | null) {
+    return target instanceof Element && Boolean(target.closest("[data-ws-controls]"));
+  }
+
   return (
     <section
       className="ws-window"
@@ -159,7 +164,7 @@ export function WindowFrame({
       <header
         className="ws-titlebar"
         onPointerDown={(event) => {
-          if (win.maximized) return;
+          if (win.maximized || isControl(event.target)) return;
           drag.current = { mx: event.clientX, my: event.clientY, ox: win.rect.x, oy: win.rect.y };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
@@ -173,14 +178,41 @@ export function WindowFrame({
         onPointerUp={() => {
           drag.current = null;
         }}
-        onDoubleClick={() => toggleMaximize(win.id)}
+        onDoubleClick={(event) => {
+          if (isControl(event.target)) return;
+          toggleMaximize(win.id);
+        }}
       >
-        <div className="ws-traffic">
-          <button type="button" aria-label="Close" className="ws-dot ws-dot-close" onClick={onClose ?? (() => close(win.id))} />
-          <button type="button" aria-label="Minimize" className="ws-dot ws-dot-min" onClick={() => minimize(win.id)} />
-          <button type="button" aria-label="Maximize" className="ws-dot ws-dot-max" onClick={() => toggleMaximize(win.id)} />
-        </div>
         <h2 className="ws-title">{win.title}</h2>
+        <div className="ws-controls" data-ws-controls>
+          <button
+            type="button"
+            aria-label="Minimize"
+            className="ws-ctrl"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => minimize(win.id)}
+          >
+            <Minus strokeWidth={2.25} />
+          </button>
+          <button
+            type="button"
+            aria-label={win.maximized ? "Restore" : "Maximize"}
+            className="ws-ctrl"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => toggleMaximize(win.id)}
+          >
+            {win.maximized ? <Copy strokeWidth={2.25} /> : <Square strokeWidth={2.25} />}
+          </button>
+          <button
+            type="button"
+            aria-label="Close"
+            className="ws-ctrl ws-ctrl-close"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onClose ?? (() => close(win.id))}
+          >
+            <X strokeWidth={2.25} />
+          </button>
+        </div>
       </header>
       <div className="ws-body">{children}</div>
       {!win.maximized ? (

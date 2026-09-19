@@ -37,7 +37,7 @@ export function Input({
         id={id}
         required={required}
         aria-invalid={error ? true : undefined}
-        className="min-h-11 w-full min-w-0 border-none bg-transparent text-body text-ink outline-none placeholder:text-faint"
+        className="min-h-11 w-full min-w-0 border-none bg-transparent text-body text-inherit outline-none placeholder:text-faint"
         {...props}
       />
     </span>
