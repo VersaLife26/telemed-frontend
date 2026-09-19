@@ -3,13 +3,13 @@ import test from "node:test";
 
 import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
 import {
+  afterPaymentPath,
   consultationTotal,
   isPaymentAuthorized,
   mockIntentBody,
   payhereIntentBody,
   paymentStatus,
   shouldGoToWaitingRoom,
-  waitingRoomPath,
 } from "@/lib/consumer/features/payment";
 
 const appointment: Appointment = { id: "appt-1", amount_cents: 250000, currency: "LKR" };
@@ -76,6 +76,6 @@ test("shouldGoToWaitingRoom after settlement or card authorization", () => {
   );
 });
 
-test("waitingRoomPath is keyed by appointment id", () => {
-  assert.equal(waitingRoomPath("appt-1"), "/appointments/appt-1/waiting-room");
+test("afterPaymentPath is the appointments list, not the call lobby", () => {
+  assert.equal(afterPaymentPath(), "/appointments");
 });

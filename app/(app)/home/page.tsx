@@ -27,12 +27,14 @@ import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { HEROES } from "@/lib/consumer/heroes";
 import {
   appointmentAction,
+  appointmentDoctorName,
   colomboHour,
   firstName,
   formatVisitClock,
   formatVisitDate,
   greetingForHour,
   pickNextAppointment,
+  uniqueDoctorIds,
 } from "@/lib/consumer/features/patient-appointment";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 
@@ -109,13 +111,39 @@ async function loadMe(token: string | undefined) {
   }
 }
 
+async function loadVisitDoctors(appointments: Appointment[]) {
+  const ids = uniqueDoctorIds(appointments);
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const doctor = await apiFetch<Doctor>(`/api/v1/doctors/${id}`);
+        return [id, doctor] as const;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const byId: Record<string, Doctor> = {};
+  const names: Record<string, string> = {};
+  for (const entry of entries) {
+    if (!entry) continue;
+    byId[entry[0]] = entry[1];
+    const display = entry[1].display_name?.trim();
+    if (display) names[entry[0]] = display;
+  }
+  return { byId, names };
+}
+
 export default async function HomePage() {
   const token = await getAccessToken();
   const [{ doctors, error: doctorsError }, { appointments, error: appointmentsError }, me] =
     await Promise.all([loadDoctors(), loadAppointments(token), loadMe(token)]);
 
   const next = pickNextAppointment(appointments);
-  const nextDoctor = next?.doctor_id ? doctors.find((d) => d.id === next.doctor_id) : undefined;
+  const { byId: visitDoctors, names: doctorNames } = await loadVisitDoctors(appointments);
+  const nextDoctor =
+    (next?.doctor_id ? visitDoctors[next.doctor_id] : undefined) ||
+    (next?.doctor_id ? doctors.find((d) => d.id === next.doctor_id) : undefined);
   const name = firstName(me?.name);
   const hello = greetingForHour(colomboHour());
   const later = appointments.filter((a) => a.id !== next?.id).slice(0, 4);
@@ -146,7 +174,7 @@ export default async function HomePage() {
               {next ? (
                 <VisitTicket
                   appointment={next}
-                  doctorName={nextDoctor?.display_name}
+                  doctorName={appointmentDoctorName(next, doctorNames)}
                   doctorPhoto={profilePhotoSrc(nextDoctor?.photo_url)}
                 />
               ) : (
@@ -253,7 +281,7 @@ export default async function HomePage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-body font-semibold text-ink">
-                      {a.specialty || "Consultation"}
+                      {appointmentDoctorName(a, doctorNames)}
                     </p>
                     <p className="mt-0.5 text-body-sm text-muted tabular-time">
                       {formatVisitDate(when)} · {formatVisitClock(when)}

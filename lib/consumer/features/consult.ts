@@ -97,6 +97,28 @@ export function isPastLateJoinCutoff(startAt?: string, now = Date.now(), endAt?:
   return now >= end;
 }
 
+/** Patients may enter the lobby this long before the booked start. */
+export const JOIN_WINDOW_BEFORE_MS = 15 * 60 * 1000;
+
+export function joinWindowStartMs(startAt?: string): number | null {
+  if (!startAt) return null;
+  const start = Date.parse(startAt);
+  if (!Number.isFinite(start)) return null;
+  return start - JOIN_WINDOW_BEFORE_MS;
+}
+
+export function isBeforeJoinWindow(startAt?: string, now = Date.now()): boolean {
+  const open = joinWindowStartMs(startAt);
+  if (open == null) return false;
+  return now < open;
+}
+
+export function isJoinWindow(startAt?: string, endAt?: string, now = Date.now()): boolean {
+  if (isBeforeJoinWindow(startAt, now)) return false;
+  if (isPastLateJoinCutoff(startAt, now, endAt)) return false;
+  return joinWindowStartMs(startAt) != null;
+}
+
 /**
  * Doctors do not mark no-show. The booked slot is the visit window whether
  * the patient is late, on time, or never joins.

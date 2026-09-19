@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
+  CalendarDays,
   FileText,
   MessageSquare,
   Mic,
@@ -16,18 +17,71 @@ import { ChatPanel } from "@/components/consumer/call/chat-panel";
 import { VaultBrowser } from "@/components/consumer/vault/vault-browser";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
-import { Button } from "@/components/consumer/ui/Button";
+import { Button, ButtonLink } from "@/components/consumer/ui/Button";
+import { Card } from "@/components/consumer/ui/Card";
 import { Tabs } from "@/components/consumer/ui/Tabs";
+import { browserApi } from "@/lib/consumer/api/client";
+import type { Appointment, Doctor } from "@/lib/consumer/api/types";
 import { createMemoryChat } from "@/lib/consumer/features/chat";
-import { afterEndPath } from "@/lib/consumer/features/consult";
+import {
+  afterEndPath,
+  isBeforeJoinWindow,
+  isJoinWindow,
+  isPastLateJoinCutoff,
+} from "@/lib/consumer/features/consult";
+import {
+  appointmentDoctorName,
+  formatVisitClock,
+  formatVisitDate,
+} from "@/lib/consumer/features/patient-appointment";
 import { useConsultation } from "@/lib/consumer/features/use-consultation";
-import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { formatWait } from "@/lib/consumer/money";
 import { cx } from "@/lib/consumer/cx";
 
 export function PatientCall({ appointmentId }: { appointmentId: string }) {
   const router = useRouter();
-  const call = useConsultation(appointmentId, "patient");
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [doctorName, setDoctorName] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const visit = await browserApi<Appointment>(`/appointments/${appointmentId}`);
+        if (cancelled) return;
+        setAppointment(visit);
+        if (visit.counterpart_name?.trim()) {
+          setDoctorName(visit.counterpart_name.trim());
+          return;
+        }
+        if (!visit.doctor_id) return;
+        const doctor = await browserApi<Doctor>(`/doctors/${visit.doctor_id}`).catch(() => null);
+        if (!cancelled && doctor?.display_name) setDoctorName(doctor.display_name);
+      } catch {
+        if (!cancelled) setAppointment(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [appointmentId]);
+
+  const startAt = appointment?.start_at_local || appointment?.start_at;
+  const endAt = appointment?.end_at_local || appointment?.end_at;
+  const open = isJoinWindow(startAt, endAt, now);
+  const tooSoon = isBeforeJoinWindow(startAt, now);
+  const tooLate = isPastLateJoinCutoff(startAt, now, endAt);
+  const name = appointmentDoctorName(appointment ?? { id: appointmentId }, {
+    [appointment?.doctor_id || ""]: doctorName,
+  });
+
+  const call = useConsultation(open ? appointmentId : null, "patient");
   const [panel, setPanel] = useState<"chat" | "files" | null>(null);
   const chat = useRef(createMemoryChat()).current;
   const afterEnd = afterEndPath("patient", appointmentId);
@@ -39,6 +93,20 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
   }, [afterEnd, call.status, router]);
 
   const inCall = call.live;
+
+  if (!appointment) {
+    return <p className="text-body text-muted">Loading visit…</p>;
+  }
+
+  if (tooSoon || tooLate) {
+    return (
+      <VisitHold
+        doctorName={name}
+        startAt={startAt}
+        tooLate={tooLate}
+      />
+    );
+  }
 
   return (
     <div className="relative flex min-h-[min(70vh,40rem)] flex-col gap-4 lg:flex-row">
@@ -54,12 +122,12 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
             <PipTile videoRef={call.localRef} />
             <div className="absolute left-4 top-4">
               <Badge tone="success" dot className="bg-white/90">
-                {call.counterpartName || "Live"}
+                {call.counterpartName || name || "Live"}
               </Badge>
             </div>
           </>
         ) : (
-          <Lobby call={call} />
+          <Lobby call={call} doctorName={call.counterpartName || name} startAt={startAt} />
         )}
 
         <div className="glass-panel-dark absolute inset-x-0 bottom-0 mx-auto mb-4 flex w-fit items-center gap-2 rounded-pill px-3 py-2">
@@ -103,17 +171,21 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
               >
                 Files
               </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                busy={call.ending}
+                leading={<PhoneOff className="size-4" />}
+                onClick={() => void call.end().then(() => router.push(afterEnd))}
+              >
+                End call
+              </Button>
             </>
-          ) : null}
-          <Button
-            variant="danger"
-            size="sm"
-            busy={call.ending}
-            leading={<PhoneOff className="size-4" />}
-            onClick={() => void call.end().then(() => router.push(afterEnd))}
-          >
-            End call
-          </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => router.push("/appointments")}>
+              Leave
+            </Button>
+          )}
         </div>
       </div>
 
@@ -141,18 +213,63 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
       ) : null}
 
       {call.notice ? <Alert tone="info" className="absolute bottom-20 left-4 right-4">{call.notice}</Alert> : null}
-      {call.error ? <Alert tone="danger" className="absolute bottom-20 left-4 right-4">{call.error}</Alert> : null}
-      {call.noRelay && !inCall ? (
-        <Alert tone="warning" title="No relay server configured" className="absolute left-4 right-4 top-4">
-          The call may not connect on mobile data.
+      {call.error ? (
+        <Alert tone="danger" className="absolute bottom-20 left-4 right-4">
+          {joinErrorMessage(call.error)}
         </Alert>
       ) : null}
     </div>
   );
 }
 
-function Lobby({ call }: { call: ReturnType<typeof useConsultation> }) {
-  const when = call.join?.scheduled_at;
+function VisitHold({
+  doctorName,
+  startAt,
+  tooLate,
+}: {
+  doctorName: string;
+  startAt?: string;
+  tooLate: boolean;
+}) {
+  return (
+    <Card className="mx-auto flex w-full max-w-lg flex-col gap-5 p-8 text-center">
+      <span
+        aria-hidden="true"
+        className="mx-auto flex size-12 items-center justify-center rounded-full bg-tint text-brand"
+      >
+        <CalendarDays className="size-6" />
+      </span>
+      <div>
+        <p className="text-eyebrow text-brand">{tooLate ? "Visit ended" : "You’re booked"}</p>
+        <h1 className="mt-2 text-h2 text-ink">{doctorName}</h1>
+        {startAt ? (
+          <p className="mt-2 text-body text-muted tabular-time">
+            {formatVisitDate(startAt)} · {formatVisitClock(startAt)}
+          </p>
+        ) : null}
+      </div>
+      <p className="text-body text-muted">
+        {tooLate
+          ? "This slot has ended. If you still need care, book another time."
+          : "The waiting room opens 15 minutes before your slot. You don’t need to sit here until then."}
+      </p>
+      <ButtonLink href="/appointments" fullWidth>
+        Back to appointments
+      </ButtonLink>
+    </Card>
+  );
+}
+
+function Lobby({
+  call,
+  doctorName,
+  startAt,
+}: {
+  call: ReturnType<typeof useConsultation>;
+  doctorName: string;
+  startAt?: string;
+}) {
+  const when = call.join?.scheduled_at || startAt;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 p-6 text-center">
       <video
@@ -166,21 +283,30 @@ function Lobby({ call }: { call: ReturnType<typeof useConsultation> }) {
         )}
       />
       <div className="text-white">
-        <p className="text-h3">{call.counterpartName || "Your doctor"}</p>
+        <p className="text-h3">{doctorName || "Your doctor"}</p>
         {when ? (
           <p className="mt-1 text-body text-white/70 tabular-time">
             {formatVisitDate(when)} · {formatVisitClock(when)}
           </p>
         ) : null}
-        <p className="mt-3 text-body text-white/80 tabular-time">
-          Position #{call.queue?.position ?? "—"} · {formatWait(call.queue?.estimated_wait_seconds)}
-        </p>
+        {call.queue?.position != null ? (
+          <p className="mt-3 text-body text-white/80 tabular-time">
+            Position #{call.queue.position} · {formatWait(call.queue.estimated_wait_seconds)}
+          </p>
+        ) : null}
         <p className="mt-2 text-body-sm text-white/60">
           {call.connecting ? "Connecting…" : "You’ll enter the call when the doctor admits you."}
         </p>
       </div>
     </div>
   );
+}
+
+function joinErrorMessage(error: string): string {
+  if (/not in a state that allows this action/i.test(error)) {
+    return "This visit isn’t open yet, or it has already ended. Join from Appointments when it is time.";
+  }
+  return error;
 }
 
 function PipTile({ videoRef }: { videoRef: RefObject<HTMLVideoElement | null> }) {

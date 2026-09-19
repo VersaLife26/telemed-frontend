@@ -11,13 +11,13 @@ import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
 import {
+  afterPaymentPath,
   consultationTotal,
   isPaymentAuthorized,
   mockIntentBody,
   payhereIntentBody,
   paymentStatus,
   shouldGoToWaitingRoom,
-  waitingRoomPath,
 } from "@/lib/consumer/features/payment";
 import { formatMoney, paymentSettled } from "@/lib/consumer/money";
 
@@ -67,9 +67,9 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
     };
   }, [appointmentId]);
 
-  const goWaiting = useCallback(() => {
-    router.push(waitingRoomPath(appointmentId));
-  }, [appointmentId, router]);
+  const goAppointments = useCallback(() => {
+    router.push(afterPaymentPath());
+  }, [router]);
 
   useEffect(() => {
     const id = payment?.id || intent?.payment?.id || order?.payment_id;
@@ -101,7 +101,7 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
       }
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [appointmentId, goWaiting, intent, order?.payment_id, payment, polling, searchParams]);
+  }, [appointmentId, intent, order?.payment_id, payment, polling, searchParams]);
 
   async function payPayHere() {
     setError(null);
@@ -116,7 +116,7 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
       setPayment(created.payment);
 
       if (paymentSettled(created.payment?.status, created.next_action)) {
-        goWaiting();
+        goAppointments();
         return;
       }
 
@@ -169,7 +169,7 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
       setIntent(created);
       setPayment(created.payment);
       if (paymentSettled(created.payment?.status, created.next_action)) {
-        goWaiting();
+        goAppointments();
         return;
       }
       setPolling(true);
@@ -212,7 +212,7 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
         </Alert>
       ) : settled ? (
         <Alert tone="success" title="Payment confirmed">
-          Your appointment is confirmed. You can go through to the waiting room.
+          Your appointment is confirmed. Join from Appointments when it is time.
         </Alert>
       ) : (
         <Card className="flex gap-3 p-5">
@@ -242,8 +242,8 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       {settled ? (
-        <Button size="lg" fullWidth onClick={goWaiting}>
-          Continue to waiting room
+        <Button size="lg" fullWidth onClick={goAppointments}>
+          View appointment
         </Button>
       ) : (
         <div className="flex flex-col gap-3">

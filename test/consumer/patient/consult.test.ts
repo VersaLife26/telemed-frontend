@@ -12,9 +12,12 @@ import {
   earlyJoinRespondPath,
   endConsultBody,
   endPath,
+  isBeforeJoinWindow,
+  isJoinWindow,
   isPastLateJoinCutoff,
   isWaiting,
   isWithinLateJoinGrace,
+  JOIN_WINDOW_BEFORE_MS,
   joinPath,
   LATE_JOIN_CUTOFF_MS,
   minutesLate,
@@ -94,4 +97,19 @@ test("the booked slot is the join window and no-show is not used", () => {
   assert.equal(isPastLateJoinCutoff(start, sixteenLate), true);
   assert.equal(canMarkNoShow("patient", "scheduled", start, fiveLate), false);
   assert.equal(canMarkNoShow("doctor", "scheduled", start, fiveLate), false);
+});
+
+test("the lobby opens 15 minutes before the booked start and closes at the slot end", () => {
+  const start = "2026-09-12T10:00:00.000Z";
+  const end = "2026-09-12T10:15:00.000Z";
+  const hourBefore = Date.parse(start) - 60 * 60 * 1000;
+  const fourteenBefore = Date.parse(start) - 14 * 60 * 1000;
+  const sixteenAfter = Date.parse(start) + 16 * 60 * 1000;
+
+  assert.equal(JOIN_WINDOW_BEFORE_MS, 15 * 60 * 1000);
+  assert.equal(isBeforeJoinWindow(start, hourBefore), true);
+  assert.equal(isJoinWindow(start, end, hourBefore), false);
+  assert.equal(isJoinWindow(start, end, fourteenBefore), true);
+  assert.equal(isJoinWindow(start, end, Date.parse(start)), true);
+  assert.equal(isJoinWindow(start, end, sixteenAfter), false);
 });

@@ -1,4 +1,5 @@
-import type { Appointment } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor } from "@/lib/consumer/api/types";
+import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 
 const COLOMBO = "Asia/Colombo";
 
@@ -153,4 +154,48 @@ export function firstName(name?: string | null): string | null {
   const trimmed = name?.trim();
   if (!trimmed) return null;
   return trimmed.split(/\s+/)[0] ?? null;
+}
+
+export function uniqueDoctorIds(appointments: Appointment[]): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const appointment of appointments) {
+    const id = appointment.doctor_id;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** Doctor's name for a patient-facing visit row. */
+export function appointmentDoctorName(
+  appointment: Appointment,
+  names: Record<string, string> = {},
+): string {
+  const named =
+    appointment.counterpart_name?.trim() ||
+    (appointment.doctor_id ? names[appointment.doctor_id]?.trim() : "") ||
+    "";
+  if (named) return named;
+  if (appointment.specialty?.trim()) return specialtyLabel(appointment.specialty);
+  return "Consultation";
+}
+
+export async function resolveDoctorNames(
+  appointments: Appointment[],
+  fetchDoctor: (id: string) => Promise<Pick<Doctor, "display_name">>,
+): Promise<Record<string, string>> {
+  const ids = uniqueDoctorIds(appointments.filter((a) => !a.counterpart_name?.trim()));
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const doctor = await fetchDoctor(id);
+        return [id, doctor.display_name?.trim() || ""] as const;
+      } catch {
+        return [id, ""] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries.filter(([, name]) => name));
 }

@@ -44,3 +44,8 @@ export function shouldGoToWaitingRoom(
 export function waitingRoomPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/waiting-room`;
 }
+
+/** After checkout the visit is booked; join from the list when it is time. */
+export function afterPaymentPath(): string {
+  return "/appointments";
+}

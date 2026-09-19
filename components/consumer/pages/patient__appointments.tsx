@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { Tabs } from "@/components/consumer/ui/Tabs";
 import { AppointmentsSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, EarlyJoinOffer, RescheduleRequest } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor, EarlyJoinOffer, RescheduleRequest } from "@/lib/consumer/api/types";
 import { earlyJoinPath } from "@/lib/consumer/features/consult";
 import {
   appointmentReschedulePath,
@@ -22,9 +22,11 @@ import {
 } from "@/lib/consumer/features/appointments";
 import {
   appointmentAction,
+  appointmentDoctorName,
   formatVisitClock,
   formatVisitDate,
   isUpcomingAppointment,
+  resolveDoctorNames,
 } from "@/lib/consumer/features/patient-appointment";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
@@ -67,11 +69,13 @@ async function earlyJoinByAppointment(
 
 function AppointmentRow({
   appointment,
+  doctorName,
   request,
   offer,
   onChanged,
 }: {
   appointment: Appointment;
+  doctorName: string;
   request: RescheduleRequest | null;
   offer: EarlyJoinOffer | null;
   onChanged: () => void;
@@ -91,9 +95,7 @@ function AppointmentRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-body font-semibold text-ink">
-              {appointment.counterpart_name || appointment.specialty || "Consultation"}
-            </p>
+            <p className="text-body font-semibold text-ink">{doctorName}</p>
             <StatusBadge status={appointment.status} />
           </div>
           <p className="mt-1 text-body-sm text-muted tabular-time">
@@ -126,6 +128,7 @@ type Pane = "upcoming" | "past";
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<Record<string, RescheduleRequest | null>>({});
   const [earlyJoin, setEarlyJoin] = useState<Record<string, EarlyJoinOffer | null>>({});
   const [error, setError] = useState<string | null>(null);
@@ -138,14 +141,17 @@ export default function AppointmentsPage() {
       const data = await browserApi<Appointment[]>(appointmentsListPath());
       const list = Array.isArray(data) ? data : [];
       setAppointments(list);
-      const [reschedule, offers] = await Promise.all([
+      const [reschedule, offers, names] = await Promise.all([
         pendingByAppointment(list),
         earlyJoinByAppointment(list),
+        resolveDoctorNames(list, (id) => browserApi<Doctor>(`/doctors/${id}`)),
       ]);
       setPending(reschedule);
       setEarlyJoin(offers);
+      setDoctorNames(names);
     } catch (e) {
       setAppointments([]);
+      setDoctorNames({});
       setPending({});
       setEarlyJoin({});
       setError(e instanceof Error ? e.message : "Could not load visits");
@@ -222,6 +228,7 @@ export default function AppointmentsPage() {
                 <AppointmentRow
                   key={a.id}
                   appointment={a}
+                  doctorName={appointmentDoctorName(a, doctorNames)}
                   request={pending[a.id] ?? null}
                   offer={earlyJoin[a.id] ?? null}
                   onChanged={() => void load()}

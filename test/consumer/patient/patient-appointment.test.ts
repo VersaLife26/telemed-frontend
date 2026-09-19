@@ -3,14 +3,17 @@ import test from "node:test";
 
 import {
   appointmentAction,
+  appointmentDoctorName,
   colomboHour,
   firstName,
   formatVisitClock,
   greetingForHour,
   isUpcomingAppointment,
   pickNextAppointment,
+  resolveDoctorNames,
   statusLabel,
   statusTone,
+  uniqueDoctorIds,
 } from "@/lib/consumer/features/patient-appointment";
 import type { Appointment } from "@/lib/consumer/api/types";
 
@@ -88,4 +91,46 @@ test("firstName takes the given name", () => {
 test("colomboHour is a 0-23 number", () => {
   const hour = colomboHour(new Date("2026-09-13T18:30:00Z"));
   assert.equal(hour, 0);
+});
+
+test("appointmentDoctorName prefers counterpart then directory then specialty", () => {
+  assert.equal(
+    appointmentDoctorName(appt({ counterpart_name: "Dr Silva", specialty: "cardiology" })),
+    "Dr Silva",
+  );
+  assert.equal(
+    appointmentDoctorName(appt({ doctor_id: "doc-1", specialty: "cardiology" }), {
+      "doc-1": "Dr Perera",
+    }),
+    "Dr Perera",
+  );
+  assert.equal(appointmentDoctorName(appt({ specialty: "cardiology" })), "Cardiology");
+});
+
+test("uniqueDoctorIds keeps first-seen order", () => {
+  assert.deepEqual(
+    uniqueDoctorIds([
+      appt({ doctor_id: "a" }),
+      appt({ doctor_id: "b" }),
+      appt({ doctor_id: "a" }),
+      appt({}),
+    ]),
+    ["a", "b"],
+  );
+});
+
+test("resolveDoctorNames fetches only visits missing counterpart_name", async () => {
+  const fetched: string[] = [];
+  const names = await resolveDoctorNames(
+    [
+      appt({ id: "1", doctor_id: "doc-1", counterpart_name: "Dr Silva" }),
+      appt({ id: "2", doctor_id: "doc-2" }),
+    ],
+    async (id) => {
+      fetched.push(id);
+      return { display_name: "Dr Perera" };
+    },
+  );
+  assert.deepEqual(fetched, ["doc-2"]);
+  assert.deepEqual(names, { "doc-2": "Dr Perera" });
 });
