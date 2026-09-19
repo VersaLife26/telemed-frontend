@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Activity, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 import { Button } from "@/components/admin/ui/button";
 import { Badge } from "@/components/admin/ui/badge";
@@ -61,14 +61,14 @@ export function ConsoleShell({
     <SessionGuard>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-pill focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
       >
         Skip to main content
       </a>
 
       <div className="flex min-h-dvh">
         {/* --- desktop sidebar ------------------------------------------- */}
-        <aside className="hidden w-72 shrink-0 border-r border-sidebar-border bg-sidebar lg:block">
+        <aside className="hidden w-72 shrink-0 border-r border-sidebar-border bg-sidebar shadow-sm lg:block">
           <div className="sticky top-0 flex h-dvh flex-col">
             <BrandMark />
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -82,7 +82,7 @@ export function ConsoleShell({
         {drawerOpen ? (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div
-              className="absolute inset-0 bg-black/60"
+              className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
               onClick={() => setDrawerOpen(false)}
               aria-hidden="true"
             />
@@ -92,7 +92,7 @@ export function ConsoleShell({
               aria-modal="true"
               aria-label="Navigation"
               tabIndex={-1}
-              className="absolute inset-y-0 left-0 flex w-72 flex-col bg-sidebar shadow-xl outline-none"
+              className="absolute inset-y-0 left-0 flex w-72 flex-col bg-sidebar shadow-lg outline-none"
             >
               <div className="flex items-center justify-between">
                 <BrandMark />
@@ -118,8 +118,8 @@ export function ConsoleShell({
         ) : null}
 
         {/* --- content ---------------------------------------------------- */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="page-wash flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/80 bg-background/70 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/55">
             <Button
               ref={menuButtonRef}
               variant="ghost"
@@ -168,10 +168,18 @@ function BrandMark() {
   return (
     <Link
       href="/"
-      className="flex items-center gap-2 px-5 py-4 text-sidebar-foreground"
+      className="flex items-center gap-2.5 px-5 py-5 text-sidebar-foreground"
     >
-      <Activity className="size-5 text-primary" aria-hidden="true" />
-      <span className="text-sm font-semibold tracking-tight">Telemed Admin</span>
+      <span
+        className="flex size-8 items-center justify-center rounded-lg bg-[image:var(--gradient-cta)] text-sm font-bold text-primary-foreground shadow-brand"
+        aria-hidden="true"
+      >
+        V
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="font-display text-sm font-bold tracking-tight">VersaLife Health</span>
+        <span className="text-[0.6875rem] font-medium text-muted-foreground">Admin console</span>
+      </span>
     </Link>
   );
 }

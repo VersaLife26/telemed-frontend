@@ -2,14 +2,22 @@
 @import "tw-animate-css";
 
 /*
- * Tailwind CSS 4 is configured in CSS, not in a tailwind.config.js. `@theme`
- * declares design tokens that become utilities (`bg-background`,
- * `text-muted-foreground`, `rounded-lg`); `@custom-variant` re-declares the
- * `dark:` variant against a class rather than the media query, because
- * next-themes toggles `class="dark"` on <html>.
+ * VersaLife Health — admin console design tokens.
+ *
+ * Same ProHealth / consumer visual system (royal blue, cool ink, Jakarta +
+ * Manrope, soft blue shadows, generous radius) mapped onto the shadcn token
+ * names admin components already use (`bg-primary`, `text-muted-foreground`,
+ * `bg-sidebar`, …). Do not merge this file with consumer.css: both declare
+ * conflicting @theme tokens and the surface picker copies one into
+ * app/globals.css at build time.
+ *
+ * Fonts are NOT imported here — next/font self-hosts them in
+ * components/admin/layouts/root.tsx and puts --font-jakarta / --font-manrope
+ * on <html>.
  */
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
 
 @theme inline {
   --color-background: var(--background);
@@ -51,177 +59,196 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-blue-50: var(--blue-50);
+  --color-blue-100: var(--blue-100);
+  --color-blue-200: var(--blue-200);
+  --color-blue-300: var(--blue-300);
+  --color-blue-500: var(--blue-500);
+  --color-blue-600: var(--blue-600);
+  --color-blue-700: var(--blue-700);
 
-  --font-sans: var(--font-sans);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px oklch(24% 0.05 258 / 0.06), 0 1px 1px oklch(24% 0.05 258 / 0.04);
+  --shadow-md: 0 8px 20px oklch(24% 0.05 258 / 0.08), 0 2px 6px oklch(24% 0.05 258 / 0.05);
+  --shadow-lg: 0 20px 40px oklch(24% 0.05 258 / 0.12), 0 6px 16px oklch(24% 0.05 258 / 0.06);
+  --shadow-brand: 0 12px 24px oklch(55% 0.19 258 / 0.28);
+
+  --font-sans: var(--family-body);
+  --font-display: var(--family-display);
   --font-mono: var(--font-mono);
 }
 
-/*
- * Light palette.
- *
- * Contrast was chosen against WCAG 2.1 AA (4.5:1 for body text, 3:1 for large
- * text and UI boundaries), not by eye. `--muted-foreground` in particular is
- * darker than the shadcn default, which lands at about 4.0:1 on white and
- * fails for the small type this console uses in table cells and captions.
- */
 :root {
-  --radius: 0.625rem;
+  /* Primary — royal blue (ProHealth / consumer) */
+  --blue-50: oklch(97.5% 0.012 258);
+  --blue-100: oklch(94% 0.03 258);
+  --blue-200: oklch(88% 0.06 258);
+  --blue-300: oklch(80% 0.09 258);
+  --blue-400: oklch(70% 0.13 258);
+  --blue-500: oklch(62% 0.17 258);
+  --blue-600: oklch(55% 0.19 258);
+  --blue-700: oklch(46% 0.18 258);
+  --blue-800: oklch(36% 0.15 258);
+  --blue-900: oklch(24% 0.10 258);
 
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, "Noto Sans", "Noto Sans Sinhala", "Noto Sans Tamil", sans-serif;
+  /* Neutral ink — cool near-black navy */
+  --ink-0: oklch(99% 0.002 258);
+  --ink-50: oklch(97.5% 0.004 258);
+  --ink-100: oklch(94% 0.006 258);
+  --ink-200: oklch(88% 0.008 258);
+  --ink-300: oklch(78% 0.01 258);
+  --ink-400: oklch(64% 0.014 258);
+  --ink-500: oklch(52% 0.018 258);
+  --ink-600: oklch(42% 0.03 258);
+  --ink-700: oklch(32% 0.045 258);
+  --ink-800: oklch(24% 0.05 258);
+  --ink-900: oklch(17% 0.045 258);
+
+  --teal-100: oklch(93% 0.05 178);
+  --teal-500: oklch(58% 0.10 178);
+  --teal-700: oklch(40% 0.09 178);
+
+  --amber-100: oklch(94% 0.06 80);
+  --amber-500: oklch(75% 0.15 80);
+  --amber-700: oklch(48% 0.12 60);
+  --red-100: oklch(94% 0.04 25);
+  --red-500: oklch(58% 0.19 25);
+  --red-700: oklch(42% 0.17 25);
+
+  --gradient-hero: linear-gradient(135deg, var(--blue-200) 0%, var(--blue-100) 45%, var(--blue-50) 100%);
+  --gradient-cta: linear-gradient(120deg, var(--blue-600) 0%, var(--blue-500) 100%);
+
+  --radius: 12px;
+
+  --family-display: var(--font-jakarta), "Segoe UI", system-ui, sans-serif;
+  --family-body: var(--font-manrope), "Segoe UI", system-ui, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
 
-  --background: oklch(0.995 0 0);
-  --foreground: oklch(0.21 0.02 255);
+  --background: var(--ink-0);
+  --foreground: var(--ink-900);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 255);
+  --card: #ffffff;
+  --card-foreground: var(--ink-900);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 255);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink-900);
 
-  /* Deep teal: clinical without being a hospital cliché, and 7.3:1 on white. */
-  --primary: oklch(0.46 0.09 205);
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: var(--blue-600);
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.96 0.005 250);
-  --secondary-foreground: oklch(0.28 0.02 255);
+  --secondary: var(--blue-50);
+  --secondary-foreground: var(--blue-700);
 
-  --muted: oklch(0.965 0.004 250);
-  --muted-foreground: oklch(0.46 0.02 255); /* 4.9:1 on --background */
+  --muted: var(--ink-50);
+  --muted-foreground: var(--ink-500);
 
-  --accent: oklch(0.945 0.015 205);
-  --accent-foreground: oklch(0.28 0.04 205);
+  --accent: var(--blue-100);
+  --accent-foreground: var(--blue-700);
 
-  --destructive: oklch(0.51 0.19 27);
-  --destructive-foreground: oklch(0.99 0 0);
+  --destructive: var(--red-700);
+  --destructive-foreground: #ffffff;
 
-  --success: oklch(0.46 0.12 152);
-  --success-foreground: oklch(0.99 0 0);
+  --success: var(--teal-700);
+  --success-foreground: #ffffff;
 
-  --warning: oklch(0.53 0.13 70);
-  --warning-foreground: oklch(0.99 0 0);
+  --warning: var(--amber-700);
+  --warning-foreground: #ffffff;
 
-  --info: oklch(0.48 0.13 255);
-  --info-foreground: oklch(0.99 0 0);
+  --info: var(--blue-700);
+  --info-foreground: #ffffff;
 
-  --border: oklch(0.9 0.005 250);
-  --input: oklch(0.87 0.006 250);
-  --ring: oklch(0.46 0.09 205);
+  --border: var(--ink-200);
+  --input: var(--ink-200);
+  --ring: var(--blue-600);
 
   /*
-   * Categorical chart series: four slots, assigned in this fixed order and
-   * never cycled. Four is not an arbitrary cut — no chart in this console
-   * shows more than two categorical series at once (revenue is gross vs
-   * commission; every other chart is single-series with identity on the axis,
-   * or uses the status colours below because its segments are states, not
-   * identities).
-   *
-   * These exact values were produced by the palette validator, not chosen by
-   * eye, and re-verified in both themes:
-   *
-   *   #009da4,#c67f4d,#8e71d6,#3e7232  --mode light --surface #ffffff --pairs all
-   *     lightness band PASS · chroma floor PASS · CVD separation PASS
-   *     (worst all-pairs deltaE 9.3 deutan) · normal-vision floor PASS (17.2)
-   *     · contrast vs surface PASS (all >= 3:1)
-   *
-   * Re-run after any change:
-   *   node scripts/validate_palette.js "<hex,...>" --mode light --surface "#ffffff" --pairs all
+   * Chart series stay categorical and CVD-safe. Hue family shifted toward
+   * brand blue; still four slots, never cycled.
    */
-  --chart-1: oklch(0.63 0.115 200);
+  --chart-1: oklch(0.55 0.19 258);
   --chart-2: oklch(0.66 0.11 55);
-  --chart-3: oklch(0.62 0.15 295);
-  --chart-4: oklch(0.5 0.11 140);
+  --chart-3: oklch(0.58 0.10 178);
+  --chart-4: oklch(0.62 0.15 295);
 
-  /* Grid and axis are recessive: they orient, they do not compete. */
-  --chart-grid: oklch(0.91 0.004 250);
-  --chart-axis: oklch(0.55 0.02 255);
+  --chart-grid: var(--ink-100);
+  --chart-axis: var(--ink-500);
 
-  --sidebar: oklch(0.985 0.002 250);
-  --sidebar-foreground: oklch(0.26 0.02 255);
-  --sidebar-accent: oklch(0.94 0.015 205);
-  --sidebar-accent-foreground: oklch(0.26 0.05 205);
-  --sidebar-border: oklch(0.9 0.005 250);
+  --sidebar: #ffffff;
+  --sidebar-foreground: var(--ink-800);
+  --sidebar-accent: var(--blue-50);
+  --sidebar-accent-foreground: var(--blue-700);
+  --sidebar-border: var(--ink-100);
+
+  --duration-fast: 160ms;
+  --duration-base: 220ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /*
- * Dark palette. Not an inversion: surfaces lift as they come forward, text
- * sits at ~0.93 rather than pure white to avoid halation on OLED, and the
- * primary lightens so it still clears 4.5:1 against the dark card.
+ * Dark palette on cool navy ink, not a teal inversion. Surfaces lift forward;
+ * primary lightens enough to clear 4.5:1 on dark cards.
  */
 .dark {
-  --background: oklch(0.17 0.012 255);
-  --foreground: oklch(0.93 0.005 250);
+  --background: var(--ink-900);
+  --foreground: oklch(0.93 0.01 258);
 
-  --card: oklch(0.21 0.014 255);
-  --card-foreground: oklch(0.93 0.005 250);
+  --card: var(--ink-800);
+  --card-foreground: oklch(0.93 0.01 258);
 
-  --popover: oklch(0.23 0.014 255);
-  --popover-foreground: oklch(0.93 0.005 250);
+  --popover: oklch(0.22 0.04 258);
+  --popover-foreground: oklch(0.93 0.01 258);
 
-  --primary: oklch(0.75 0.1 200);
-  --primary-foreground: oklch(0.17 0.02 255);
+  --primary: var(--blue-400);
+  --primary-foreground: var(--ink-900);
 
-  --secondary: oklch(0.27 0.015 255);
-  --secondary-foreground: oklch(0.93 0.005 250);
+  --secondary: oklch(0.28 0.04 258);
+  --secondary-foreground: oklch(0.93 0.01 258);
 
-  --muted: oklch(0.26 0.014 255);
-  --muted-foreground: oklch(0.72 0.015 250); /* 6.4:1 on --background */
+  --muted: oklch(0.26 0.035 258);
+  --muted-foreground: oklch(0.72 0.02 258);
 
-  --accent: oklch(0.3 0.03 200);
-  --accent-foreground: oklch(0.93 0.01 200);
+  --accent: oklch(0.3 0.06 258);
+  --accent-foreground: oklch(0.93 0.02 258);
 
   --destructive: oklch(0.68 0.17 25);
-  --destructive-foreground: oklch(0.16 0.02 255);
+  --destructive-foreground: var(--ink-900);
 
-  --success: oklch(0.72 0.14 152);
-  --success-foreground: oklch(0.16 0.02 255);
+  --success: oklch(0.72 0.12 178);
+  --success-foreground: var(--ink-900);
 
   --warning: oklch(0.78 0.13 75);
-  --warning-foreground: oklch(0.16 0.02 255);
+  --warning-foreground: var(--ink-900);
 
-  --info: oklch(0.72 0.11 250);
-  --info-foreground: oklch(0.16 0.02 255);
+  --info: var(--blue-400);
+  --info-foreground: var(--ink-900);
 
-  --border: oklch(0.31 0.014 255);
-  --input: oklch(0.35 0.016 255);
-  --ring: oklch(0.75 0.1 200);
+  --border: oklch(0.32 0.03 258);
+  --input: oklch(0.35 0.035 258);
+  --ring: var(--blue-400);
 
-  /*
-   * Dark is a separate selection from the same hue families, not a flip of the
-   * light steps: the validator's lightness band for a dark surface is
-   * L 0.48-0.67, which the light steps sit outside.
-   *
-   *   #00a6ae,#c57b45,#8b77c4,#4b7a40  --mode dark --surface #14191f --pairs all
-   *     lightness band PASS · chroma floor PASS · normal-vision floor PASS
-   *     (16.8) · contrast vs surface PASS
-   *     · CVD separation WARN: worst all-pairs deltaE 6.0 protan, between
-   *       slot 2 (#c57b45) and slot 4 (#4b7a40). That sits in the 6-8 floor
-   *       band, which is permitted only with secondary encoding. Both
-   *       conditions hold here: every multi-series chart carries a legend and
-   *       direct labels, every chart offers a table view, and slots 2 and 4
-   *       never appear in the same chart in this console.
-   */
-  --chart-1: oklch(0.65 0.13 200);
+  --chart-1: oklch(0.7 0.14 258);
   --chart-2: oklch(0.65 0.115 55);
-  --chart-3: oklch(0.62 0.115 295);
-  --chart-4: oklch(0.53 0.1 140);
+  --chart-3: oklch(0.68 0.1 178);
+  --chart-4: oklch(0.62 0.115 295);
 
-  --chart-grid: oklch(0.3 0.012 255);
-  --chart-axis: oklch(0.68 0.015 250);
+  --chart-grid: oklch(0.3 0.03 258);
+  --chart-axis: oklch(0.68 0.02 258);
 
-  --sidebar: oklch(0.2 0.013 255);
-  --sidebar-foreground: oklch(0.9 0.005 250);
-  --sidebar-accent: oklch(0.3 0.03 200);
-  --sidebar-accent-foreground: oklch(0.94 0.01 200);
-  --sidebar-border: oklch(0.29 0.014 255);
+  --sidebar: var(--ink-800);
+  --sidebar-foreground: oklch(0.9 0.01 258);
+  --sidebar-accent: oklch(0.3 0.06 258);
+  --sidebar-accent-foreground: oklch(0.94 0.02 258);
+  --sidebar-border: oklch(0.3 0.03 258);
+
+  --gradient-hero: linear-gradient(135deg, oklch(0.28 0.06 258) 0%, oklch(0.22 0.04 258) 55%, var(--ink-900) 100%);
+  --gradient-cta: linear-gradient(120deg, var(--blue-500) 0%, var(--blue-400) 100%);
 }
 
 @layer base {
@@ -240,24 +267,26 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: var(--font-sans);
+    font-family: var(--family-body);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  /*
-   * Focus is visible on every interactive element, always. This console is
-   * operated by keyboard through the verification checklist; a focus ring that
-   * only appears "sometimes" is the single fastest way to make that
-   * impossible.
-   */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--family-display);
+  }
+
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
 
-  /* Respect the OS setting rather than animating regardless. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -269,7 +298,6 @@
     }
   }
 
-  /* Windows high-contrast mode: keep boundaries visible. */
   @media (forced-colors: active) {
     * {
       border-color: CanvasText;
@@ -277,8 +305,46 @@
   }
 }
 
+@layer components {
+  /* Soft hero wash behind dashboard headers — keep off dense tables. */
+  .page-wash {
+    position: relative;
+    isolation: isolate;
+    background: var(--background);
+  }
+
+  .page-wash::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 320px;
+    z-index: -1;
+    background: var(--gradient-hero);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 100%);
+  }
+
+  .page-wash::after {
+    content: "";
+    position: absolute;
+    top: -120px;
+    right: -80px;
+    width: 380px;
+    height: 380px;
+    z-index: -1;
+    border-radius: 50%;
+    background: var(--blue-300);
+    opacity: 0.28;
+    filter: blur(100px);
+    pointer-events: none;
+  }
+
+  .dark .page-wash::after {
+    opacity: 0.18;
+  }
+}
+
 @layer utilities {
-  /* Visually hidden but still announced, for table captions and live regions. */
   .sr-only {
     position: absolute;
     width: 1px;

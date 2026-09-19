@@ -26,27 +26,29 @@ export function StatTile({
   tone?: "default" | "warning" | "success";
 }) {
   return (
-    <Card>
+    <Card className="transition-[box-shadow,transform] duration-[160ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md">
       <CardContent className="flex items-start gap-3 p-5">
         {Icon ? (
           <span
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-lg",
+              "flex size-10 shrink-0 items-center justify-center rounded-md",
               tone === "warning"
                 ? "bg-warning/15 text-warning"
                 : tone === "success"
                   ? "bg-success/15 text-success"
-                  : "bg-primary/10 text-primary",
+                  : "bg-secondary text-primary",
             )}
           >
             <Icon className="size-4" aria-hidden="true" />
           </span>
         ) : null}
         <div className="min-w-0 space-y-0.5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="truncate text-2xl font-semibold tabular-nums">{value}</p>
+          <p className="font-display truncate text-2xl font-bold tabular-nums tracking-tight">
+            {value}
+          </p>
           {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
         </div>
       </CardContent>

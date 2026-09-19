@@ -6,7 +6,7 @@ export function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-sm",
+        "rounded-lg border border-border bg-card text-card-foreground shadow-sm",
         className,
       )}
       {...props}
@@ -28,7 +28,10 @@ export function CardTitle({
   // and a heading that really is empty is a genuine defect worth catching.
   return (
     <h3
-      className={cn("text-base font-semibold leading-none tracking-tight", className)}
+      className={cn(
+        "font-display text-base font-semibold leading-none tracking-tight",
+        className,
+      )}
       {...props}
     >
       {children}

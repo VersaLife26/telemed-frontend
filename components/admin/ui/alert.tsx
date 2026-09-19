@@ -34,7 +34,7 @@ export function AlertTitle({
   ...props
 }: React.ComponentProps<"h5">) {
   return (
-    <h5 className={cn("mb-1 font-medium leading-none", className)} {...props}>
+    <h5 className={cn("mb-1 font-display font-semibold leading-none", className)} {...props}>
       {children}
     </h5>
   );

@@ -37,19 +37,27 @@ export function SidebarNav({
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "group flex items-start gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+              "group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition-[background-color,color,box-shadow] duration-[160ms] ease-out",
               active
-                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+                ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-sm ring-1 ring-blue-200/80"
+                : "text-sidebar-foreground can-hover:hover:bg-sidebar-accent/70",
             )}
           >
             <item.icon
-              className={cn("mt-0.5 size-4 shrink-0", active ? "" : "opacity-70")}
+              className={cn(
+                "mt-0.5 size-4 shrink-0 transition-opacity",
+                active ? "text-primary" : "opacity-70",
+              )}
               aria-hidden="true"
             />
             <span className="flex flex-col">
               <span>{item.label}</span>
-              <span className="text-xs font-normal text-muted-foreground">
+              <span
+                className={cn(
+                  "text-xs font-normal",
+                  active ? "text-sidebar-accent-foreground/75" : "text-muted-foreground",
+                )}
+              >
                 {item.description}
               </span>
             </span>

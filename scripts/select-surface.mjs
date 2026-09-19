@@ -2,11 +2,11 @@
 //
 // WHY A BUILD STEP AND NOT A CONDITIONAL IMPORT
 // The two surfaces run different Tailwind v4 design systems, and both declare
-// `@theme { --color-primary: ... }` with different values -- the consumer apps
-// mean #015591, the admin console means `var(--primary)` from a shadcn token
-// set. Importing both would let one silently win for every `bg-primary` on the
-// other surface. CSS cannot branch at runtime, so the choice is made here,
-// before the bundler ever sees it.
+// `@theme` tokens with different shapes -- the consumer apps use brand/ink
+// tokens, the admin console maps the same ProHealth palette onto shadcn names
+// (`--primary`, `--muted-foreground`, …). Importing both would let one
+// silently win for every `bg-primary` on the other surface. CSS cannot branch
+// at runtime, so the choice is made here, before the bundler ever sees it.
 //
 // This is why the frontend is built once PER SURFACE rather than once in total:
 // the JavaScript could have branched on SURFACE; the stylesheet cannot.

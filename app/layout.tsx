@@ -20,12 +20,12 @@ import "./globals.css";
  */
 const META: Record<Surface, Metadata> = {
   admin: {
-    title: { default: "Telemed Admin", template: "%s · Telemed Admin" },
+    title: { default: "VersaLife Health · Admin", template: "%s · VersaLife Health" },
     description: "Operations console for the telemedicine platform.",
     // This console must never appear in a search index, and it is not a mobile
     // web app anyone should be able to install from a phishing page.
     robots: { index: false, follow: false, nocache: true },
-    applicationName: "Telemed Admin",
+    applicationName: "VersaLife Health Admin",
   },
   doctor: {
     title: { default: "VersaLife Health · Doctor", template: "%s · VersaLife Health" },
@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   colorScheme: SURFACE === "admin" ? "light dark" : "light",
-  themeColor: SURFACE === "admin" ? undefined : "#ffffff",
+  themeColor: SURFACE === "admin" ? "#015591" : "#ffffff",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
