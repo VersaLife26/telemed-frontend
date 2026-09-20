@@ -1,8 +1,9 @@
-import { CalendarDays, FileText, ListOrdered, Pill, Video } from "lucide-react";
+import { CalendarDays, FileText, ListOrdered, Pill, User, Video } from "lucide-react";
 
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
 import { Alert } from "@/components/consumer/ui/Alert";
+import { Badge } from "@/components/consumer/ui/Badge";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
@@ -11,7 +12,9 @@ import { apiFetch } from "@/lib/consumer/api/client";
 import type { Appointment, RescheduleRequest } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { afterEndPath } from "@/lib/consumer/features/consult";
+import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
+import { formatMoney } from "@/lib/consumer/money";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
@@ -116,18 +119,42 @@ export default async function QueuePage() {
                     aria-hidden="true"
                     className="hidden size-11 shrink-0 items-center justify-center rounded-full bg-tint text-brand sm:flex"
                   >
-                    <CalendarDays className="size-5" />
+                    <User className="size-5" />
                   </span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-body font-semibold text-ink">
-                        {a.counterpart_name || a.patient_name || a.specialty || "Consultation"}
+                        {a.counterpart_name || a.patient_name || "Patient"}
                       </p>
                       <StatusBadge status={a.status} />
+                      {a.specialty ? (
+                        <Badge tone="brand">{specialtyLabel(a.specialty)}</Badge>
+                      ) : null}
                     </div>
-                    <p className="mt-1 text-body-sm text-muted tabular-time">
-                      {formatVisitDate(when)} · {formatVisitClock(when)}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-muted">
+                      <span className="tabular-time">
+                        {formatVisitDate(when)} · {formatVisitClock(when)}
+                      </span>
+                      {a.amount_cents != null && a.amount_cents > 0 ? (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span className="font-medium text-ink">
+                            {formatMoney(a.amount_cents, a.currency || "LKR")}
+                          </span>
+                        </>
+                      ) : null}
+                      <span aria-hidden="true">·</span>
+                      <span className="font-mono text-caption text-muted">
+                        Ref: {a.id.slice(0, 8)}
+                      </span>
+                    </div>
+
+                    {a.intake?.symptoms ? (
+                      <div className="mt-2.5 rounded-lg border border-line bg-surface-subtle p-3 text-body-sm">
+                        <span className="font-medium text-ink">Reason for visit: </span>
+                        <span className="text-muted">{a.intake.symptoms}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

@@ -67,6 +67,11 @@ export type Appointment = {
   patient_name?: string;
   /** The other party: doctor's name for a patient, patient's name for a doctor. */
   counterpart_name?: string;
+  intake?: {
+    symptoms?: string;
+    [key: string]: unknown;
+  } | null;
+  family_member_id?: string | null;
 };
 
 export type RescheduleRequest = {
