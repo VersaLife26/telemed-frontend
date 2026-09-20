@@ -17,7 +17,7 @@ import { isOpenSlot } from "@/lib/consumer/features/slots";
 import { HEROES } from "@/lib/consumer/heroes";
 import { formatMoney } from "@/lib/consumer/money";
 
-const SLOT_WINDOW_DAYS = 7;
+const SLOT_WINDOW_DAYS = 14;
 
 export default async function DoctorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
