@@ -97,3 +97,19 @@ export function amendReasonError(reason: string): string | null {
   if (reason.trim().length < 3) return "Amendment reason must be at least 3 characters.";
   return null;
 }
+
+export const AMEND_NO_CHANGE =
+  "Change at least one section or diagnosis before saving. A reason alone does not create a revision.";
+
+export function soapUnchanged(
+  a: SoapDraft,
+  b: SoapDraft,
+  dxA: ClinicalNoteDiagnosis[],
+  dxB: ClinicalNoteDiagnosis[],
+): boolean {
+  if (SOAP_SECTIONS.some((s) => a[s.key] !== b[s.key])) return false;
+  if (dxA.length !== dxB.length) return false;
+  return dxA.every(
+    (d, i) => d.code === dxB[i]?.code && Boolean(d.is_primary) === Boolean(dxB[i]?.is_primary),
+  );
+}

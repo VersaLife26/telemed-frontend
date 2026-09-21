@@ -18,6 +18,7 @@ import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button"
 import {
   SOAP_SECTIONS,
   addDiagnosis as appendDiagnosis,
+  AMEND_NO_CHANGE,
   amendPayload,
   amendReasonError,
   applyNote,
@@ -29,6 +30,7 @@ import {
   savePayload,
   setPrimary as markPrimary,
   shouldAutosave,
+  soapUnchanged,
   type SoapDraft,
   type SoapSectionKey,
 } from "@/lib/consumer/features/clinical-notes";
@@ -46,6 +48,8 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
   const [finalising, setFinalising] = useState(false);
   const [amending, setAmending] = useState(false);
   const [amendReason, setAmendReason] = useState("");
+  const [baseline, setBaseline] = useState<SoapDraft>(emptyDraft);
+  const [baselineDx, setBaselineDx] = useState<ClinicalNoteDiagnosis[]>([]);
 
   const versionRef = useRef(0);
   const draftRef = useRef(draft);
@@ -58,8 +62,12 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
   versionRef.current = version;
 
   const applyServer = useCallback((note: ClinicalNote) => {
-    setDraft(applyNote(note));
-    setDiagnoses(note.diagnoses || []);
+    const nextDraft = applyNote(note);
+    const nextDx = note.diagnoses || [];
+    setDraft(nextDraft);
+    setDiagnoses(nextDx);
+    setBaseline(nextDraft);
+    setBaselineDx(nextDx);
     setVersion(note.version);
     versionRef.current = note.version;
     setStatus(note.status || "draft");
@@ -198,6 +206,10 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
       setError(reasonErr);
       return;
     }
+    if (soapUnchanged(draft, baseline, diagnoses, baselineDx)) {
+      setError(AMEND_NO_CHANGE);
+      return;
+    }
     setAmending(true);
     setError(null);
     try {
@@ -209,7 +221,10 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
       setAmendReason("");
       setSaveState("saved");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not amend note");
+      const raw = e instanceof Error ? e.message : "Could not amend note";
+      setError(
+        /does not change|reason alone/i.test(raw) ? AMEND_NO_CHANGE : raw,
+      );
     } finally {
       setAmending(false);
     }
@@ -217,6 +232,7 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
 
   const locked = status === "finalised";
   const hasContent = hasSoapContent(draft, diagnoses);
+  const amendDirty = !soapUnchanged(draft, baseline, diagnoses, baselineDx);
 
   if (loading) {
     return <FormSkeleton />;
@@ -341,7 +357,7 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
           <div>
             <h2 className="text-h4 text-ink">Amend signed note</h2>
             <p className="mt-1 text-body-sm text-muted">
-              Changes write a revision. The original signed text stays in the trail.
+              Edit a section or diagnosis above, then save with a reason. The original signed text stays in the trail.
             </p>
           </div>
           <Input
@@ -351,7 +367,11 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
             value={amendReason}
             onChange={(e) => setAmendReason(e.target.value)}
           />
-          <Button busy={amending} onClick={() => void amend()}>
+          <Button
+            busy={amending}
+            disabled={amending || !amendDirty || Boolean(amendReasonError(amendReason))}
+            onClick={() => void amend()}
+          >
             Save amendment
           </Button>
         </Card>

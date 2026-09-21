@@ -17,6 +17,7 @@ import {
   savePayload,
   setPrimary,
   shouldAutosave,
+  soapUnchanged,
 } from "@/lib/consumer/features/clinical-notes";
 
 const dengue: Icd10Code = { code: "A90", description: "Dengue fever" };
@@ -103,4 +104,12 @@ test("amend requires a reason of at least 3 characters", () => {
   const payload = amendPayload(emptyDraft(), [], " typo ", 4);
   assert.equal(payload.amendment_reason, "typo");
   assert.equal(payload.version, 4);
+});
+
+test("an amendment is a no-op until SOAP or diagnoses actually change", () => {
+  const draft = { ...emptyDraft(), subjective: "fever" };
+  const dx = addDiagnosis([], dengue);
+  assert.equal(soapUnchanged(draft, { ...draft }, dx, [...dx]), true);
+  assert.equal(soapUnchanged({ ...draft, plan: "rest" }, draft, dx, dx), false);
+  assert.equal(soapUnchanged(draft, draft, addDiagnosis(dx, e11), dx), false);
 });
