@@ -62,6 +62,11 @@ export function recordDownloadPath(id: string, attachment = false): string {
   return attachment ? `/records/${id}/download?disposition=attachment` : `/records/${id}/download`;
 }
 
+/** Authenticated byte stream for in-app preview (same-origin via the BFF). */
+export function recordContentPath(id: string): string {
+  return `/records/${id}/content`;
+}
+
 export type PreviewKind = "pdf" | "image" | "video" | "audio" | "other";
 
 export function previewKind(contentType?: string): PreviewKind {

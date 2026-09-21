@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { FilePreview, presignedUrl } from "@/components/consumer/vault/file-preview";
+import { FilePreview, presignedUrl, previewObjectUrl } from "@/components/consumer/vault/file-preview";
 import type { VaultDocument } from "@/lib/consumer/api/types";
 
 export function FileViewerApp({ doc }: { doc: VaultDocument }) {
@@ -10,15 +10,22 @@ export function FileViewerApp({ doc }: { doc: VaultDocument }) {
 
   useEffect(() => {
     let cancelled = false;
-    presignedUrl(doc.id)
+    let objectUrl: string | undefined;
+    previewObjectUrl(doc.id)
       .then((next) => {
-        if (!cancelled) setUrl(next);
+        objectUrl = next;
+        if (cancelled) {
+          URL.revokeObjectURL(next);
+          return;
+        }
+        setUrl(next);
       })
       .catch(() => {
         if (!cancelled) setUrl(null);
       });
     return () => {
       cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [doc.id]);
 

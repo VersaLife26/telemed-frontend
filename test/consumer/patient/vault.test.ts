@@ -6,6 +6,7 @@ import {
   isCapturedRecordId,
   previewKind,
   recordsListPath,
+  recordContentPath,
   recordDownloadPath,
 } from "@/lib/consumer/features/vault";
 
@@ -38,6 +39,7 @@ test("recordsListPath scopes a folder and an owner", () => {
   assert.equal(recordsListPath("scan", null, "user-1"), "/records?document_type=scan&folder_id=root&owner_user_id=user-1");
   assert.equal(recordDownloadPath("doc-1", true), "/records/doc-1/download?disposition=attachment");
   assert.equal(recordDownloadPath("doc-1"), "/records/doc-1/download");
+  assert.equal(recordContentPath("doc-1"), "/records/doc-1/content");
 });
 
 test("isCapturedRecordId is the old /records/{id} collision", () => {

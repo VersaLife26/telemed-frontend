@@ -6,13 +6,29 @@ import { useState } from "react";
 import { Button } from "@/components/consumer/ui/Button";
 import type { VaultDocument, VaultDownload } from "@/lib/consumer/api/types";
 import { browserApi } from "@/lib/consumer/api/client";
-import { formatBytes, previewKind, recordDownloadPath } from "@/lib/consumer/features/vault";
+import { formatBytes, previewKind, recordContentPath, recordDownloadPath } from "@/lib/consumer/features/vault";
 import { cx } from "@/lib/consumer/cx";
 
 export async function presignedUrl(id: string, attachment = false): Promise<string> {
   const link = await browserApi<VaultDownload>(recordDownloadPath(id, attachment));
   if (!link.download_url) throw new Error("No download URL");
   return link.download_url;
+}
+
+/**
+ * Fetches the file through the same-origin BFF and returns a blob: URL.
+ *
+ * Presigned API URLs cannot be put in an <iframe>: the gateway sends
+ * X-Frame-Options: DENY and frame-ancestors 'none', so the browser shows
+ * "refused to connect" instead of the PDF.
+ */
+export async function previewObjectUrl(id: string): Promise<string> {
+  const res = await fetch(`/api/proxy${recordContentPath(id)}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Could not load the file preview.");
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 export function FilePreview({

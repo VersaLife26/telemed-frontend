@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { FilePreview, presignedUrl } from "@/components/consumer/vault/file-preview";
+import { FilePreview, presignedUrl, previewObjectUrl } from "@/components/consumer/vault/file-preview";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
@@ -175,15 +175,22 @@ export function VaultBrowser({
       return;
     }
     let cancelled = false;
-    presignedUrl(preview.id)
+    let objectUrl: string | undefined;
+    previewObjectUrl(preview.id)
       .then((url) => {
-        if (!cancelled) setPreviewUrl(url);
+        objectUrl = url;
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        setPreviewUrl(url);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Preview failed");
       });
     return () => {
       cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [preview]);
 
