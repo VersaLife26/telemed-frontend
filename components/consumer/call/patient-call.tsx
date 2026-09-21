@@ -216,7 +216,12 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
       {call.notice ? <Alert tone="info" className="absolute bottom-20 left-4 right-4">{call.notice}</Alert> : null}
       {call.error ? (
         <Alert tone="danger" className="absolute bottom-20 left-4 right-4">
-          {consultJoinError(call.error)}
+          <p>{consultJoinError(call.error)}</p>
+          {!call.hasLocalMedia ? (
+            <Button className="mt-3" size="sm" variant="secondary" onClick={() => void call.retryMedia()}>
+              Try again
+            </Button>
+          ) : null}
         </Alert>
       ) : null}
     </div>
@@ -298,6 +303,13 @@ function Lobby({
         <p className="mt-2 text-body-sm text-white/60">
           {call.connecting ? "Connecting…" : "You’ll enter the call when the doctor admits you."}
         </p>
+        {!call.hasLocalMedia && !call.connecting ? (
+          <div className="mt-4">
+            <Button size="lg" onClick={() => void call.retryMedia()}>
+              Enable camera and microphone
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

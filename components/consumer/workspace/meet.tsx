@@ -97,7 +97,16 @@ function MeetWaiting({ call }: { call: ConsultationControls }) {
           Admit
         </Button>
       ) : null}
-      {call.error ? <Alert tone="danger">{consultJoinError(call.error, "doctor")}</Alert> : null}
+      {call.error ? (
+        <Alert tone="danger">
+          <p>{consultJoinError(call.error, "doctor")}</p>
+          {!call.hasLocalMedia ? (
+            <Button className="mt-3" size="sm" variant="secondary" onClick={() => void call.retryMedia()}>
+              Enable camera and microphone
+            </Button>
+          ) : null}
+        </Alert>
+      ) : null}
     </div>
   );
 }

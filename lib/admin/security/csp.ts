@@ -91,6 +91,36 @@ export function contentSecurityPolicy({ nonce, dev = false }: CspOptions = {}): 
 }
 
 /**
+ * Permissions-Policy for this deployment.
+ *
+ * `camera=()` / `microphone=()` is a hard deny: the browser will not prompt,
+ * it just rejects getUserMedia. That is correct for admin. Patient and doctor
+ * calls must allow the same origin so the permission dialog can appear.
+ */
+export function permissionsPolicy(surface: string): string {
+  const consult = surface === "patient" || surface === "doctor";
+  const selfOrNone = consult ? "(self)" : "()";
+  return [
+    "accelerometer=()",
+    `autoplay=${selfOrNone}`,
+    `camera=${selfOrNone}`,
+    `display-capture=${selfOrNone}`,
+    "encrypted-media=()",
+    "geolocation=()",
+    "gyroscope=()",
+    "magnetometer=()",
+    `microphone=${selfOrNone}`,
+    "midi=()",
+    "payment=()",
+    "usb=()",
+  ].join(", ");
+}
+
+function deployedSurface(): string {
+  return process.env.TELEMED_SURFACE ?? process.env.NEXT_PUBLIC_TELEMED_SURFACE ?? "patient";
+}
+
+/**
  * Security headers that are identical on every response and carry no nonce.
  * `next.config.ts` applies these globally; the middleware does not repeat
  * them.
@@ -101,23 +131,7 @@ export const staticSecurityHeaders: ReadonlyArray<{ key: string; value: string }
   { key: "Referrer-Policy", value: "no-referrer" },
   {
     key: "Permissions-Policy",
-    // The admin console has no legitimate use for any of these. The patient
-    // and doctor apps need camera and microphone; this one never does, and
-    // saying so is free.
-    value: [
-      "accelerometer=()",
-      "autoplay=()",
-      "camera=()",
-      "display-capture=()",
-      "encrypted-media=()",
-      "geolocation=()",
-      "gyroscope=()",
-      "magnetometer=()",
-      "microphone=()",
-      "midi=()",
-      "payment=()",
-      "usb=()",
-    ].join(", "),
+    value: permissionsPolicy(deployedSurface()),
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },

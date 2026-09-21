@@ -47,6 +47,8 @@ export type ConsultationControls = {
   toggleScreenShare: () => Promise<void>;
   admit: () => Promise<void>;
   end: () => Promise<void>;
+  retryMedia: () => Promise<void>;
+  hasLocalMedia: boolean;
 };
 
 /**
@@ -79,18 +81,25 @@ export function useConsultation(
   const [sharing, setSharing] = useState(false);
   const [ending, setEnding] = useState(false);
   const [admitting, setAdmitting] = useState(false);
+  const [hasLocalMedia, setHasLocalMedia] = useState(false);
 
   const stopPreview = useCallback(() => {
     previewRef.current?.getTracks().forEach((track) => track.stop());
     previewRef.current = null;
+    setHasLocalMedia(false);
   }, []);
 
   const attachLocal = useCallback((stream: MediaStream | null) => {
     if (localRef.current) localRef.current.srcObject = stream;
+    setHasLocalMedia(!!stream);
   }, []);
 
   const startPreview = useCallback(async () => {
     if (previewRef.current || callRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setError("This browser cannot access the camera. Use Chrome or Safari over HTTPS.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       previewRef.current = stream;
@@ -101,6 +110,7 @@ export function useConsultation(
         track.enabled = !cameraOff;
       });
       attachLocal(stream);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? cameraMessage(e) : "Could not start the camera.");
     }
@@ -199,6 +209,7 @@ export function useConsultation(
       setNotice(null);
       setConnected(false);
       setConnecting(false);
+      setHasLocalMedia(false);
       return;
     }
     let cancelled = false;
@@ -327,6 +338,15 @@ export function useConsultation(
     }
   }, [join, stopPreview]);
 
+  const retryMedia = useCallback(async () => {
+    setError(null);
+    if (join && shouldConnectMedia(join.status, status) && !connected) {
+      await connectMedia(join);
+      return;
+    }
+    await startPreview();
+  }, [connectMedia, connected, join, startPreview, status]);
+
   const waiting = isWaiting(status, join?.status);
   const live = connected || status === "active";
   const noRelay =
@@ -358,6 +378,8 @@ export function useConsultation(
     toggleScreenShare,
     admit,
     end,
+    retryMedia,
+    hasLocalMedia,
   };
 }
 
@@ -369,7 +391,7 @@ function cameraMessage(e: Error): string {
   switch (e.name) {
     case "NotAllowedError":
     case "SecurityError":
-      return "Camera and microphone access was blocked. Allow it in your browser and reload.";
+      return "Camera and microphone need permission. Allow them when the browser asks, then try again.";
     case "NotFoundError":
       return "No camera or microphone was found on this device.";
     case "NotReadableError":
