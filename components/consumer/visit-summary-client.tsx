@@ -10,13 +10,14 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import { isNotFound } from "@/lib/consumer/api/envelope";
-import type { Appointment, ClinicalNote, Prescription, PrescriptionPdf } from "@/lib/consumer/api/types";
+import type { Appointment, ClinicalNote, Prescription } from "@/lib/consumer/api/types";
 import {
   clinicalNotePath,
   noteVisibleToPatient,
   prescriptionLookupPath,
   shouldStopPolling,
 } from "@/lib/consumer/features/visit-summary";
+import { downloadPrescriptionPdf } from "@/lib/consumer/features/prescription";
 
 export function VisitSummaryClient({ appointmentId }: { appointmentId: string }) {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
@@ -95,8 +96,12 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
 
   async function downloadRx() {
     if (!rx) return;
-    const pdf = await browserApi<PrescriptionPdf>(`/prescriptions/${rx.id}/pdf`);
-    if (pdf.pdf_url) window.open(pdf.pdf_url, "_blank", "noopener,noreferrer");
+    setError(null);
+    try {
+      await downloadPrescriptionPdf(rx.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not download the prescription PDF.");
+    }
   }
 
   if (loading) {

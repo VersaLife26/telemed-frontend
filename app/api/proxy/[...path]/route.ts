@@ -48,13 +48,13 @@ async function forward(req: Request, ctx: Ctx) {
       upstreamType.startsWith("application/octet-stream");
     if (isBinary) {
       const bytes = await upstream.arrayBuffer();
-      return new NextResponse(bytes, {
-        status: upstream.status,
-        headers: {
-          "Content-Type": upstreamType,
-          "Cache-Control": upstream.headers.get("Cache-Control") || "private, no-store",
-        },
-      });
+      const headers: Record<string, string> = {
+        "Content-Type": upstreamType,
+        "Cache-Control": upstream.headers.get("Cache-Control") || "private, no-store",
+      };
+      const disposition = upstream.headers.get("Content-Disposition");
+      if (disposition) headers["Content-Disposition"] = disposition;
+      return new NextResponse(bytes, { status: upstream.status, headers });
     }
     const text = await upstream.text();
     return new NextResponse(text, {

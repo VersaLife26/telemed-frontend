@@ -12,10 +12,11 @@ import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { browserApi } from "@/lib/consumer/api/client";
 import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
-import type { Doctor, FormularyDrug, Prescription, PrescriptionPdf } from "@/lib/consumer/api/types";
+import type { Doctor, FormularyDrug, Prescription } from "@/lib/consumer/api/types";
 import {
   blankItem,
   canSearchFormulary,
+  downloadPrescriptionPdf,
   fieldsFromDrug,
   fromIssued,
   issueError,
@@ -99,8 +100,12 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
   }
 
   async function openPdf(id: string) {
-    const pdf = await browserApi<PrescriptionPdf>(`/prescriptions/${id}/pdf`);
-    if (pdf.pdf_url) window.open(pdf.pdf_url, "_blank", "noopener,noreferrer");
+    setError(null);
+    try {
+      await downloadPrescriptionPdf(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not download the prescription PDF.");
+    }
   }
 
   async function issue() {

@@ -12,6 +12,7 @@ import {
   issuePayload,
   lookupPath,
   prescriptionPagePath,
+  prescriptionPdfPath,
 } from "@/lib/consumer/features/prescription";
 
 const doctor: Doctor = {
@@ -83,4 +84,5 @@ test("formulary search needs two characters and copies strength/form", () => {
 test("lookup and page paths are keyed by appointment", () => {
   assert.equal(lookupPath("appt-1"), "/prescriptions?appointment_id=appt-1");
   assert.equal(prescriptionPagePath("appt-1"), "/appointments/appt-1/prescription");
+  assert.equal(prescriptionPdfPath("rx-1"), "/prescriptions/rx-1/pdf");
 });

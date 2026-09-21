@@ -90,3 +90,37 @@ export function lookupPath(appointmentId: string): string {
 export function prescriptionPagePath(appointmentId: string): string {
   return `/appointments/${appointmentId}/prescription`;
 }
+
+export function prescriptionPdfPath(id: string): string {
+  return `/prescriptions/${id}/pdf`;
+}
+
+/** Fetches the PDF through the BFF so cookies attach; a presigned /files URL 404s at the gateway. */
+export async function downloadPrescriptionPdf(id: string): Promise<void> {
+  const path = `/api/proxy${prescriptionPdfPath(id)}`;
+  const send = () => fetch(path, { cache: "no-store" });
+  let res = await send();
+  if (res.status === 401) {
+    const refreshed = await fetch("/api/auth/refresh", { method: "POST", cache: "no-store" });
+    if (refreshed.ok) res = await send();
+  }
+  if (!res.ok) {
+    let message = "Could not download the prescription PDF.";
+    try {
+      const json = (await res.json()) as { message?: string; error?: { message?: string } };
+      message = json.message || json.error?.message || message;
+    } catch {
+      /* keep the default */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `prescription-${id}.pdf`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
