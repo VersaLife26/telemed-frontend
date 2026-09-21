@@ -4,8 +4,10 @@ import { Download, ExternalLink, FileQuestion, ZoomIn, ZoomOut } from "lucide-re
 import { useState } from "react";
 
 import { Button } from "@/components/consumer/ui/Button";
+import { PointerLayer } from "@/components/consumer/call/pointer-layer";
 import type { VaultDocument, VaultDownload } from "@/lib/consumer/api/types";
 import { browserApi } from "@/lib/consumer/api/client";
+import type { CallPointerBind } from "@/lib/consumer/features/pointer";
 import { formatBytes, previewKind, recordContentPath, recordDownloadPath } from "@/lib/consumer/features/vault";
 import { cx } from "@/lib/consumer/cx";
 
@@ -37,12 +39,14 @@ export function FilePreview({
   onDownload,
   className,
   dark = false,
+  pointer,
 }: {
   doc: VaultDocument;
   url: string | null;
   onDownload?: () => void;
   className?: string;
   dark?: boolean;
+  pointer?: CallPointerBind | null;
 }) {
   const kind = previewKind(doc.content_type);
   const [zoom, setZoom] = useState(1);
@@ -108,11 +112,15 @@ export function FilePreview({
         </div>
       </div>
 
-      <div className={cx("min-h-0 flex-1 overflow-auto", dark ? "bg-black/40" : "bg-ink-50")}>
+      <div className={cx("relative min-h-0 flex-1 overflow-auto", dark ? "bg-black/40" : "bg-ink-50")}>
         {!url ? (
           <p className={cx("p-6 text-body", dark ? "text-white/70" : "text-muted")}>Loading preview…</p>
         ) : kind === "pdf" ? (
-          <iframe title={doc.filename} src={url} className="h-full min-h-[24rem] w-full border-0" />
+          <iframe
+            title={doc.filename}
+            src={url}
+            className={cx("h-full min-h-[24rem] w-full border-0", pointer?.pointing && "pointer-events-none")}
+          />
         ) : kind === "image" ? (
           <div className="flex h-full items-center justify-center p-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -140,6 +148,18 @@ export function FilePreview({
             </Button>
           </div>
         )}
+        {pointer ? (
+          <PointerLayer
+            pointing={pointer.pointing}
+            local={pointer.localPointer}
+            remote={pointer.remotePointer}
+            surface="file"
+            fileId={doc.id}
+            incomingLabel={pointer.incomingLabel || "Pointing"}
+            onMove={pointer.movePointer}
+            onLeave={pointer.leavePointer}
+          />
+        ) : null}
       </div>
     </div>
   );

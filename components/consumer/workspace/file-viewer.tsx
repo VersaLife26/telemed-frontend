@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 
 import { FilePreview, presignedUrl, previewObjectUrl } from "@/components/consumer/vault/file-preview";
 import type { VaultDocument } from "@/lib/consumer/api/types";
+import type { CallPointerBind } from "@/lib/consumer/features/pointer";
 
-export function FileViewerApp({ doc }: { doc: VaultDocument }) {
+export function FileViewerApp({ doc, pointer }: { doc: VaultDocument; pointer?: CallPointerBind | null }) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function FileViewerApp({ doc }: { doc: VaultDocument }) {
       doc={doc}
       url={url}
       dark
+      pointer={pointer}
       onDownload={() => {
         void presignedUrl(doc.id, true).then((href) => {
           window.open(href, "_blank", "noopener,noreferrer");

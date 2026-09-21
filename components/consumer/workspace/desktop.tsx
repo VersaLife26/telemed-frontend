@@ -19,6 +19,7 @@ import {
 } from "@/components/consumer/workspace/window-manager";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, VaultDocument } from "@/lib/consumer/api/types";
+import type { CallPointerBind } from "@/lib/consumer/features/pointer";
 import { useConsultation } from "@/lib/consumer/features/use-consultation";
 
 export function WorkspaceDesktop() {
@@ -31,11 +32,19 @@ export function WorkspaceDesktop() {
   );
 }
 
-function Viewer({ winId, docs }: { winId?: string; docs: Record<string, VaultDocument> }) {
+function Viewer({
+  winId,
+  docs,
+  pointer,
+}: {
+  winId?: string;
+  docs: Record<string, VaultDocument>;
+  pointer?: CallPointerBind | null;
+}) {
   if (!winId) return null;
   const doc = docs[winId];
   if (!doc) return null;
-  return <FileViewerApp doc={doc} />;
+  return <FileViewerApp doc={doc} pointer={pointer} />;
 }
 
 function WorkspaceInner() {
@@ -96,6 +105,17 @@ function WorkspaceInner() {
     router.push("/dashboard");
   }
 
+  const pointer: CallPointerBind | null = callId
+    ? {
+        pointing: call.pointing,
+        localPointer: call.localPointer,
+        remotePointer: call.remotePointer,
+        incomingLabel: call.counterpartName || "Pointing",
+        movePointer: call.movePointer,
+        leavePointer: call.leavePointer,
+      }
+    : null;
+
   return (
     <div className="ws-desktop">
       <TopBar call={call} callId={callId} />
@@ -111,11 +131,15 @@ function WorkspaceInner() {
               <MeetApp call={call} callId={callId} onJoin={joinCall} />
             ) : null}
             {win.app === "files" ? (
-              <FileStationApp lockedRoot={callId ? patientId : null} onOpenFile={openFile} />
+              <FileStationApp
+                lockedRoot={callId ? patientId : null}
+                onOpenFile={openFile}
+                pointer={pointer}
+              />
             ) : null}
             {win.app === "calendar" ? <CalendarApp /> : null}
             {win.app === "chat" ? <ChatApp transport={callId ? call.chat : null} /> : null}
-            {win.app === "viewer" ? <Viewer winId={win.props.id} docs={viewers} /> : null}
+            {win.app === "viewer" ? <Viewer winId={win.props.id} docs={viewers} pointer={pointer} /> : null}
           </WindowFrame>
         ))}
       </div>

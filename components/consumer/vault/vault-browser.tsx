@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { FilePreview, presignedUrl, previewObjectUrl } from "@/components/consumer/vault/file-preview";
+import type { CallPointerBind } from "@/lib/consumer/features/pointer";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
@@ -55,6 +56,7 @@ export function VaultBrowser({
   lockedRoot,
   onOpenFile,
   dark = false,
+  pointer,
 }: {
   ownerUserId?: string;
   mode: VaultMode;
@@ -62,6 +64,7 @@ export function VaultBrowser({
   lockedRoot?: string | null;
   onOpenFile?: (doc: VaultDocument) => void;
   dark?: boolean;
+  pointer?: CallPointerBind | null;
 }) {
   const owner = lockedRoot || ownerUserId;
   const canMutate = mode === "owner";
@@ -581,6 +584,7 @@ export function VaultBrowser({
             doc={preview}
             url={previewUrl}
             dark={dark}
+            pointer={pointer}
             onDownload={() => void download(preview)}
           />
           <Button variant="ghost" size="sm" className={cx("m-2 self-end", ghost)} onClick={() => setPreview(null)}>

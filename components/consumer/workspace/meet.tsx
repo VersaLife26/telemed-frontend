@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, MonitorUp, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, MonitorUp, MousePointer2, PhoneOff, Video, VideoOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
+import { IncomingSelfView, PointerLayer } from "@/components/consumer/call/pointer-layer";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment } from "@/lib/consumer/api/types";
 import { appointmentsListPath } from "@/lib/consumer/features/appointments";
@@ -116,6 +117,19 @@ function MeetLive({ call }: { call: ConsultationControls }) {
   return (
     <div className="relative h-full bg-black">
       <video ref={call.remoteRef} autoPlay playsInline className="h-full w-full object-cover" />
+      <IncomingSelfView
+        source={call.localRef}
+        show={Boolean(call.remotePointer?.active && call.remotePointer.surface === "video" && !call.pointing)}
+      />
+      <PointerLayer
+        pointing={call.pointing}
+        local={call.localPointer}
+        remote={call.remotePointer}
+        surface="video"
+        incomingLabel={call.counterpartName || "Pointing"}
+        onMove={call.movePointer}
+        onLeave={call.leavePointer}
+      />
       <video
         ref={call.localRef}
         autoPlay
@@ -150,6 +164,15 @@ function MeetLive({ call }: { call: ConsultationControls }) {
         <button
           type="button"
           className="ws-call-btn"
+          aria-label={call.pointing ? "Stop pointing" : "Point"}
+          aria-pressed={call.pointing}
+          onClick={call.togglePointing}
+        >
+          <MousePointer2 className="size-5" />
+        </button>
+        <button
+          type="button"
+          className="ws-call-btn"
           aria-label={call.sharing ? "Stop sharing" : "Share screen"}
           aria-pressed={call.sharing}
           onClick={() => void call.toggleScreenShare()}
@@ -170,7 +193,12 @@ function MeetLive({ call }: { call: ConsultationControls }) {
           <PhoneOff className="size-5" />
         </button>
       </div>
-      {call.notice ? (
+      {call.remotePointer?.active && call.remotePointer.surface === "file" ? (
+        <Alert tone="info" className="absolute left-4 right-4 top-16">
+          {call.counterpartName || "The other person"} is pointing on a file. Open the same document to follow the laser.
+        </Alert>
+      ) : null}
+      {call.notice && !(call.remotePointer?.active && call.remotePointer.surface === "file") ? (
         <Alert tone="info" className="absolute left-4 right-4 top-16">
           {call.notice}
         </Alert>

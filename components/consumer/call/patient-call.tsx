@@ -11,9 +11,11 @@ import {
   PhoneOff,
   Video,
   VideoOff,
+  MousePointer2,
 } from "lucide-react";
 
 import { ChatPanel } from "@/components/consumer/call/chat-panel";
+import { IncomingSelfView, PointerLayer } from "@/components/consumer/call/pointer-layer";
 import { VaultBrowser } from "@/components/consumer/vault/vault-browser";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
@@ -118,6 +120,19 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
               playsInline
               className="h-full w-full object-cover"
             />
+            <IncomingSelfView
+              source={call.localRef}
+              show={Boolean(call.remotePointer?.active && call.remotePointer.surface === "video" && !call.pointing)}
+            />
+            <PointerLayer
+              pointing={call.pointing}
+              local={call.localPointer}
+              remote={call.remotePointer}
+              surface="video"
+              incomingLabel={call.counterpartName || name || "Pointing"}
+              onMove={call.movePointer}
+              onLeave={call.leavePointer}
+            />
             <PipTile videoRef={call.localRef} />
             <div className="absolute left-4 top-4">
               <Badge tone="success" dot className="bg-white/90">
@@ -152,6 +167,16 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
           </Button>
           {inCall ? (
             <>
+              <Button
+                variant="glass"
+                size="sm"
+                aria-pressed={call.pointing}
+                aria-label={call.pointing ? "Stop pointing" : "Point"}
+                leading={<MousePointer2 className="size-4" />}
+                onClick={call.togglePointing}
+              >
+                {call.pointing ? "Pointing" : "Point"}
+              </Button>
               <Button
                 variant="glass"
                 size="sm"
@@ -205,12 +230,32 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
             {panel === "chat" ? (
               <ChatPanel transport={call.chat} />
             ) : (
-              <VaultBrowser mode="owner" compact />
+              <VaultBrowser
+                mode="owner"
+                compact
+                pointer={
+                  inCall
+                    ? {
+                        pointing: call.pointing,
+                        localPointer: call.localPointer,
+                        remotePointer: call.remotePointer,
+                        incomingLabel: call.counterpartName || name || "Pointing",
+                        movePointer: call.movePointer,
+                        leavePointer: call.leavePointer,
+                      }
+                    : null
+                }
+              />
             )}
           </div>
         </aside>
       ) : null}
 
+      {inCall && call.remotePointer?.active && call.remotePointer.surface === "file" && panel !== "files" ? (
+        <Alert tone="info" className="absolute bottom-20 left-4 right-4">
+          {call.counterpartName || "The doctor"} is pointing on a file. Open Files to follow the laser.
+        </Alert>
+      ) : null}
       {call.notice ? <Alert tone="info" className="absolute bottom-20 left-4 right-4">{call.notice}</Alert> : null}
       {call.error ? (
         <Alert tone="danger" className="absolute bottom-20 left-4 right-4">

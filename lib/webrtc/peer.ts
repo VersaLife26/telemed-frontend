@@ -18,6 +18,8 @@
  *   for the whole call even though it is idle for most of it.
  */
 
+import type { PointerState } from "@/lib/consumer/features/pointer";
+import { parsePointer } from "@/lib/consumer/features/pointer";
 import {
   FrameType,
   SignalingClient,
@@ -69,6 +71,7 @@ export type PeerHandlers = {
    */
   onError?: (code: string, message: string) => void;
   onChat?: (msg: { id: string; body: string }) => void;
+  onPointer?: (pointer: PointerState) => void;
   onLog?: (line: string) => void;
 };
 
@@ -186,6 +189,10 @@ export class PeerCall {
     return this.signaling.send({ type: FrameType.Chat, data: msg });
   }
 
+  sendPointer(pointer: PointerState): boolean {
+    return this.signaling.send({ type: FrameType.Pointer, data: pointer });
+  }
+
   // --- signalling ------------------------------------------------------
 
   private async onWelcome(w: Welcome): Promise<void> {
@@ -234,6 +241,11 @@ export class PeerCall {
       if (body) {
         this.handlers.onChat?.({ id: data?.id?.trim() || `${Date.now()}`, body });
       }
+      return;
+    }
+    if (env.type === FrameType.Pointer) {
+      const pointer = parsePointer(env.data);
+      if (pointer) this.handlers.onPointer?.(pointer);
       return;
     }
 

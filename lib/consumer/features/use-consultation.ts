@@ -26,6 +26,7 @@ import {
 } from "@/lib/consumer/features/chat";
 import type { CallState } from "@/lib/webrtc/peer";
 import { PeerCall, SIGNAL_ERROR } from "@/lib/webrtc/peer";
+import type { PointerState } from "@/lib/consumer/features/pointer";
 
 export type ConsultationRole = "patient" | "doctor";
 
@@ -56,6 +57,12 @@ export type ConsultationControls = {
   retryMedia: () => Promise<void>;
   hasLocalMedia: boolean;
   chat: ChatTransport;
+  pointing: boolean;
+  localPointer: PointerState | null;
+  remotePointer: PointerState | null;
+  togglePointing: () => void;
+  movePointer: (next: PointerState) => void;
+  leavePointer: () => void;
 };
 
 /**
@@ -90,6 +97,10 @@ export function useConsultation(
   const [ending, setEnding] = useState(false);
   const [admitting, setAdmitting] = useState(false);
   const [hasLocalMedia, setHasLocalMedia] = useState(false);
+  const [pointing, setPointing] = useState(false);
+  const [localPointer, setLocalPointer] = useState<PointerState | null>(null);
+  const [remotePointer, setRemotePointer] = useState<PointerState | null>(null);
+  const lastPointerSent = useRef(0);
   joinRef.current = join;
 
   const chat = useMemo(
@@ -182,6 +193,7 @@ export function useConsultation(
             }
           },
           onChat: (msg) => chat.receive(msg),
+          onPointer: (pointer) => setRemotePointer(pointer),
           onError: (code, message) => {
             if (code === SIGNAL_ERROR.roomFull) {
               setConnecting(false);
@@ -234,6 +246,9 @@ export function useConsultation(
       setConnected(false);
       setConnecting(false);
       setHasLocalMedia(false);
+      setPointing(false);
+      setLocalPointer(null);
+      setRemotePointer(null);
       chat.reset();
       return;
     }
@@ -376,6 +391,39 @@ export function useConsultation(
     await startPreview();
   }, [connectMedia, connected, join, startPreview, status]);
 
+  const leavePointer = useCallback(() => {
+    setLocalPointer((prev) => {
+      const off: PointerState = prev
+        ? { ...prev, active: false }
+        : { x: 0, y: 0, active: false, surface: "video" };
+      callRef.current?.sendPointer(off);
+      return off;
+    });
+  }, []);
+
+  const togglePointing = useCallback(() => {
+    setPointing((on) => {
+      if (on) {
+        setLocalPointer((prev) => {
+          const off: PointerState = prev
+            ? { ...prev, active: false }
+            : { x: 0, y: 0, active: false, surface: "video" };
+          callRef.current?.sendPointer(off);
+          return off;
+        });
+      }
+      return !on;
+    });
+  }, []);
+
+  const movePointer = useCallback((next: PointerState) => {
+    setLocalPointer(next);
+    const now = Date.now();
+    if (now - lastPointerSent.current < 40 && next.active) return;
+    lastPointerSent.current = now;
+    callRef.current?.sendPointer(next);
+  }, []);
+
   const waiting = isWaiting(status, join?.status);
   const live = connected || status === "active";
   const noRelay =
@@ -410,6 +458,12 @@ export function useConsultation(
     retryMedia,
     hasLocalMedia,
     chat,
+    pointing,
+    localPointer,
+    remotePointer,
+    togglePointing,
+    movePointer,
+    leavePointer,
   };
 }
 
