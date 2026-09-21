@@ -181,7 +181,7 @@ export default async function QueuePage() {
                       variant="secondary"
                       leading={<Pill className="size-4" />}
                     >
-                      Rx
+                      Prescription
                     </ButtonLink>
                   </div>
                   <RescheduleRequestForm
