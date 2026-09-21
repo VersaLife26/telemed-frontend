@@ -111,6 +111,43 @@ export function prescriptionPdfPath(id: string): string {
   return `/prescriptions/${id}/pdf`;
 }
 
+/** PDF files always start with the five-byte header `%PDF-`. */
+export function looksLikePdf(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 5 &&
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  );
+}
+
+/**
+ * Turns a non-PDF `/prescriptions/{id}/pdf` body into a doctor-facing error.
+ * A stale VPS that still returns `{data:{pdf_url}}` has no `message` field,
+ * which is why the UI used to show only the generic fallback.
+ */
+export function messageFromPdfDownloadFailure(status: number, contentType: string, bodyText: string): string {
+  try {
+    const json = JSON.parse(bodyText) as {
+      message?: string;
+      code?: string;
+      error?: { message?: string };
+      data?: { pdf_url?: string };
+    };
+    if (json.data?.pdf_url) {
+      return "The prescription file is not being served yet. Please try Download again in a few minutes.";
+    }
+    const fromApi = json.message || json.error?.message;
+    if (fromApi) return fromApi;
+  } catch {
+    /* not JSON */
+  }
+  const type = contentType || "unknown type";
+  return `Could not download the prescription PDF. (${status} ${type})`;
+}
+
 /** Fetches the PDF through the BFF so cookies attach; a presigned /files URL 404s at the gateway. */
 export async function downloadPrescriptionPdf(id: string): Promise<void> {
   const path = `/api/proxy${prescriptionPdfPath(id)}`;
@@ -121,27 +158,21 @@ export async function downloadPrescriptionPdf(id: string): Promise<void> {
     if (refreshed.ok) res = await send();
   }
   const contentType = res.headers.get("content-type") || "";
-  if (!res.ok || !contentType.toLowerCase().startsWith("application/pdf")) {
-    // A 200 with a non-PDF content type (e.g. a stale backend still
-    // answering with the old {pdf_url} JSON envelope) is just as much a
-    // failure as a non-2xx status: downloading it anyway saves a file named
-    // "*.pdf" that no PDF reader can open, with no indication of why.
-    let message = "Could not download the prescription PDF.";
-    try {
-      const json = (await res.json()) as { message?: string; error?: { message?: string } };
-      message = json.message || json.error?.message || message;
-    } catch {
-      /* keep the default */
-    }
-    throw new Error(message);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  // Trust the file header, not Content-Type: a correct PDF with
+  // application/octet-stream (or a charset suffix) must still download, and a
+  // 200 JSON envelope must never be saved as ".pdf".
+  if (res.ok && looksLikePdf(bytes)) {
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `prescription-${id}.pdf`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return;
   }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `prescription-${id}.pdf`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  throw new Error(messageFromPdfDownloadFailure(res.status, contentType, new TextDecoder().decode(bytes)));
 }

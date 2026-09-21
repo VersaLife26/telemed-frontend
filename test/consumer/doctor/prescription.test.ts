@@ -12,6 +12,8 @@ import {
   issueError,
   issuePayload,
   lookupPath,
+  looksLikePdf,
+  messageFromPdfDownloadFailure,
   prescriptionPagePath,
   prescriptionPdfPath,
 } from "@/lib/consumer/features/prescription";
@@ -125,4 +127,27 @@ test("lookup and page paths are keyed by appointment", () => {
   assert.equal(lookupPath("appt-1"), "/prescriptions?appointment_id=appt-1");
   assert.equal(prescriptionPagePath("appt-1"), "/appointments/appt-1/prescription");
   assert.equal(prescriptionPdfPath("rx-1"), "/prescriptions/rx-1/pdf");
+});
+
+test("looksLikePdf requires the %PDF- header, not the Content-Type", () => {
+  const encoder = new TextEncoder();
+  assert.equal(looksLikePdf(encoder.encode("%PDF-1.4\n%")), true);
+  assert.equal(looksLikePdf(encoder.encode('{"data":{"pdf_url":"https://example"}}')), false);
+  assert.equal(looksLikePdf(encoder.encode("%PD")), false);
+});
+
+test("messageFromPdfDownloadFailure explains a stale pdf_url envelope", () => {
+  const msg = messageFromPdfDownloadFailure(
+    200,
+    "application/json",
+    JSON.stringify({ data: { pdf_url: "https://api.example/api/v1/files/x", expires_in_seconds: 86400 } }),
+  );
+  assert.ok(msg.includes("not being served yet"), msg);
+});
+
+test("messageFromPdfDownloadFailure prefers the API's own message", () => {
+  assert.equal(
+    messageFromPdfDownloadFailure(404, "application/json", JSON.stringify({ code: "NOT_FOUND", message: "resource not found" })),
+    "resource not found",
+  );
 });
