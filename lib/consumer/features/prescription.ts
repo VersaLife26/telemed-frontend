@@ -52,6 +52,22 @@ export function canSearchFormulary(query: string): boolean {
   return query.trim().length >= 2;
 }
 
+/**
+ * Renders the doctor's real degree(s) and university onto the prescription
+ * credentials block, newline-separated so pdf.go can print each on its own
+ * line ("University: ..." reading like a printed prescription pad, not a
+ * comma-separated dump). Falls back to bio only for the rare profile with no
+ * structured qualifications at all -- every doctor approved through the
+ * normal application flow has at least one entry (see application.go).
+ */
+export function doctorCredentialsText(doctor: Doctor | null): string {
+  const quals = doctor?.qualifications || [];
+  if (!quals.length) return doctor?.bio || "";
+  const degrees = quals.map((q) => q.degree).filter(Boolean).join(", ");
+  const universities = Array.from(new Set(quals.map((q) => q.institution).filter(Boolean))).join(", ");
+  return [degrees, universities && `University: ${universities}`].filter(Boolean).join("\n");
+}
+
 export function issuePayload(opts: {
   appointmentId: string;
   doctor: Doctor | null;
@@ -64,7 +80,7 @@ export function issuePayload(opts: {
     appointment_id: opts.appointmentId,
     doctor_name: opts.doctor?.display_name || "Doctor",
     doctor_slmc: (opts.doctor?.slmc_number || "").toUpperCase(),
-    doctor_qualifications: opts.doctor?.bio || "",
+    doctor_qualifications: doctorCredentialsText(opts.doctor),
     clinic_name: "VersaLife Telemedicine",
     patient_name: opts.patientName.trim(),
     patient_age: Number.parseInt(opts.patientAge, 10) || 0,
@@ -104,7 +120,12 @@ export async function downloadPrescriptionPdf(id: string): Promise<void> {
     const refreshed = await fetch("/api/auth/refresh", { method: "POST", cache: "no-store" });
     if (refreshed.ok) res = await send();
   }
-  if (!res.ok) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!res.ok || !contentType.toLowerCase().startsWith("application/pdf")) {
+    // A 200 with a non-PDF content type (e.g. a stale backend still
+    // answering with the old {pdf_url} JSON envelope) is just as much a
+    // failure as a non-2xx status: downloading it anyway saves a file named
+    // "*.pdf" that no PDF reader can open, with no indication of why.
     let message = "Could not download the prescription PDF.";
     try {
       const json = (await res.json()) as { message?: string; error?: { message?: string } };

@@ -6,6 +6,7 @@ import {
   blankItem,
   canSearchFormulary,
   completeLines,
+  doctorCredentialsText,
   fieldsFromDrug,
   fromIssued,
   issueError,
@@ -79,6 +80,45 @@ test("formulary search needs two characters and copies strength/form", () => {
     form: "tablet",
     is_generic: true,
   });
+});
+
+test("doctorCredentialsText prints the real degree and university, not the bio", () => {
+  const withQuals: Doctor = {
+    ...doctor,
+    bio: "Loves hiking.",
+    qualifications: [
+      { degree: "MBBS", institution: "University of Colombo", year: 2010 },
+      { degree: "MD (Family Medicine)", institution: "University of Colombo", year: 2015 },
+    ],
+  };
+  const text = doctorCredentialsText(withQuals);
+  assert.ok(text.includes("MBBS"), "expected the degree to appear");
+  assert.ok(text.includes("MD (Family Medicine)"), "expected the second degree to appear");
+  assert.ok(text.includes("University: University of Colombo"), "expected a labeled university line");
+  assert.ok(!text.includes("Loves hiking"), "must not fall back to bio when qualifications exist");
+});
+
+test("doctorCredentialsText falls back to bio when there are no structured qualifications", () => {
+  assert.equal(doctorCredentialsText(doctor), "MD");
+  assert.equal(doctorCredentialsText(null), "");
+});
+
+test("issuePayload sends the doctor's real credentials, not their bio", () => {
+  const withQuals: Doctor = {
+    ...doctor,
+    bio: "Loves hiking.",
+    qualifications: [{ degree: "MBBS", institution: "University of Colombo", year: 2010 }],
+  };
+  const body = issuePayload({
+    appointmentId: "appt-1",
+    doctor: withQuals,
+    patientName: "Ana",
+    patientAge: "34",
+    items: [{ ...blankItem("a"), drug_name: "Para", dosage: "500mg", frequency: "TDS", duration_days: 5, quantity: 10 }],
+  });
+  assert.ok(body.doctor_qualifications.includes("MBBS"));
+  assert.ok(body.doctor_qualifications.includes("University of Colombo"));
+  assert.ok(!body.doctor_qualifications.includes("hiking"));
 });
 
 test("lookup and page paths are keyed by appointment", () => {
