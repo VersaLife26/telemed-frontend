@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Consultation, JoinResult, WaitingRoomStatus } from "@/lib/consumer/api/types";
@@ -18,6 +18,12 @@ import {
   signalUrlFor,
   waitingRoomPollPath,
 } from "@/lib/consumer/features/consult";
+import {
+  consultationMessagesPath,
+  createLiveChat,
+  type ChatTransport,
+  type ServerChatMessage,
+} from "@/lib/consumer/features/chat";
 import type { CallState } from "@/lib/webrtc/peer";
 import { PeerCall, SIGNAL_ERROR } from "@/lib/webrtc/peer";
 
@@ -49,6 +55,7 @@ export type ConsultationControls = {
   end: () => Promise<void>;
   retryMedia: () => Promise<void>;
   hasLocalMedia: boolean;
+  chat: ChatTransport;
 };
 
 /**
@@ -68,6 +75,7 @@ export function useConsultation(
   const previewRef = useRef<MediaStream | null>(null);
   const leavingRef = useRef(false);
   const lastQualityReport = useRef(0);
+  const joinRef = useRef<JoinResult | null>(null);
 
   const [join, setJoin] = useState<JoinResult | null>(null);
   const [queue, setQueue] = useState<WaitingRoomStatus | null>(null);
@@ -82,6 +90,21 @@ export function useConsultation(
   const [ending, setEnding] = useState(false);
   const [admitting, setAdmitting] = useState(false);
   const [hasLocalMedia, setHasLocalMedia] = useState(false);
+  joinRef.current = join;
+
+  const chat = useMemo(
+    () =>
+      createLiveChat((msg) => {
+        callRef.current?.sendChat(msg);
+        const cid = joinRef.current?.consultation_id;
+        if (!cid) return;
+        void browserApi(consultationMessagesPath(cid), {
+          method: "POST",
+          body: { content: msg.body, metadata: { client_id: msg.id } },
+        }).catch(() => {});
+      }),
+    [appointmentId],
+  );
 
   const stopPreview = useCallback(() => {
     previewRef.current?.getTracks().forEach((track) => track.stop());
@@ -158,6 +181,7 @@ export function useConsultation(
               setNotice("This call was opened in another window.");
             }
           },
+          onChat: (msg) => chat.receive(msg),
           onError: (code, message) => {
             if (code === SIGNAL_ERROR.roomFull) {
               setConnecting(false);
@@ -197,7 +221,7 @@ export function useConsultation(
         setError(e instanceof Error ? cameraMessage(e) : "Could not start the call.");
       }
     },
-    [attachLocal, cameraOff, muted, stopPreview],
+    [attachLocal, cameraOff, chat, muted, stopPreview],
   );
 
   useEffect(() => {
@@ -210,6 +234,7 @@ export function useConsultation(
       setConnected(false);
       setConnecting(false);
       setHasLocalMedia(false);
+      chat.reset();
       return;
     }
     let cancelled = false;
@@ -231,7 +256,7 @@ export function useConsultation(
       callRef.current?.hangUp("left the page");
       callRef.current = null;
     };
-  }, [appointmentId, stopPreview]);
+  }, [appointmentId, chat, stopPreview]);
 
   useEffect(() => {
     if (!join || connected || connecting) return;
@@ -257,6 +282,10 @@ export function useConsultation(
         if (consult.status === "active" && join && !connected && !connecting) {
           void connectMedia(join);
         }
+        const rows = await browserApi<ServerChatMessage[]>(
+          `${consultationMessagesPath(join!.consultation_id)}?limit=100`,
+        );
+        if (!cancelled && Array.isArray(rows)) chat.mergeFromServer(rows, role);
       } catch {
         /* keep polling */
       }
@@ -267,7 +296,7 @@ export function useConsultation(
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [connectMedia, connected, connecting, join, role]);
+  }, [chat, connectMedia, connected, connecting, join, role]);
 
   const admit = useCallback(async () => {
     if (!join?.consultation_id || !appointmentId) return;
@@ -380,6 +409,7 @@ export function useConsultation(
     end,
     retryMedia,
     hasLocalMedia,
+    chat,
   };
 }
 

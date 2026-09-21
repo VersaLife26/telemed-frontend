@@ -22,7 +22,6 @@ import { Card } from "@/components/consumer/ui/Card";
 import { Tabs } from "@/components/consumer/ui/Tabs";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, Doctor } from "@/lib/consumer/api/types";
-import { createMemoryChat } from "@/lib/consumer/features/chat";
 import {
   afterEndPath,
   consultJoinError,
@@ -84,7 +83,6 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
 
   const call = useConsultation(open ? appointmentId : null, "patient");
   const [panel, setPanel] = useState<"chat" | "files" | null>(null);
-  const chat = useRef(createMemoryChat()).current;
   const afterEnd = afterEndPath("patient", appointmentId);
 
   useEffect(() => {
@@ -205,7 +203,7 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
           </div>
           <div className="min-h-0 flex-1">
             {panel === "chat" ? (
-              <ChatPanel transport={chat} />
+              <ChatPanel transport={call.chat} />
             ) : (
               <VaultBrowser mode="owner" compact />
             )}

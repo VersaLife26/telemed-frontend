@@ -42,6 +42,7 @@ export const FrameType = {
   Bye: "bye",
   RecordingState: "recording-state",
   Quality: "quality",
+  Chat: "chat",
   Ping: "ping",
   Pong: "pong",
   Welcome: "welcome",

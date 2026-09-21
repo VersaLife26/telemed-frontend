@@ -68,6 +68,7 @@ export type PeerHandlers = {
    * precisely so the client can tell that apart from the server being down.
    */
   onError?: (code: string, message: string) => void;
+  onChat?: (msg: { id: string; body: string }) => void;
   onLog?: (line: string) => void;
 };
 
@@ -180,6 +181,11 @@ export class PeerCall {
     return this.remoteStream;
   }
 
+  /** Relays an in-call chat line to the other participant. */
+  sendChat(msg: { id: string; body: string }): boolean {
+    return this.signaling.send({ type: FrameType.Chat, data: msg });
+  }
+
   // --- signalling ------------------------------------------------------
 
   private async onWelcome(w: Welcome): Promise<void> {
@@ -222,6 +228,15 @@ export class PeerCall {
   }
 
   private async onFrame(env: Envelope): Promise<void> {
+    if (env.type === FrameType.Chat) {
+      const data = env.data as { id?: string; body?: string } | undefined;
+      const body = data?.body?.trim() ?? "";
+      if (body) {
+        this.handlers.onChat?.({ id: data?.id?.trim() || `${Date.now()}`, body });
+      }
+      return;
+    }
+
     const pc = this.pc;
     if (!pc) return;
 

@@ -11,7 +11,7 @@ import { cx } from "@/lib/consumer/cx";
 export function ChatPanel({
   transport,
   emptyTitle = "No messages yet",
-  emptyBody = "Messages stay on this device until the chat backend is connected.",
+  emptyBody = "Messages appear here for both of you on this call.",
   dark = false,
 }: {
   transport: ChatTransport | null;

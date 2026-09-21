@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { CalendarApp } from "@/components/consumer/workspace/calendar-app";
 import { ChatApp } from "@/components/consumer/workspace/chat-app";
@@ -19,7 +19,6 @@ import {
 } from "@/components/consumer/workspace/window-manager";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, VaultDocument } from "@/lib/consumer/api/types";
-import { createMemoryChat } from "@/lib/consumer/features/chat";
 import { useConsultation } from "@/lib/consumer/features/use-consultation";
 
 export function WorkspaceDesktop() {
@@ -45,7 +44,6 @@ function WorkspaceInner() {
   const callId = searchParams.get("call");
   const call = useConsultation(callId, "doctor");
   const { windows, open, close, restore } = useWindows();
-  const chat = useMemo(() => (callId ? createMemoryChat() : null), [callId]);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [viewers, setViewers] = useState<Record<string, VaultDocument>>({});
 
@@ -116,7 +114,7 @@ function WorkspaceInner() {
               <FileStationApp lockedRoot={callId ? patientId : null} onOpenFile={openFile} />
             ) : null}
             {win.app === "calendar" ? <CalendarApp /> : null}
-            {win.app === "chat" ? <ChatApp transport={chat} /> : null}
+            {win.app === "chat" ? <ChatApp transport={callId ? call.chat : null} /> : null}
             {win.app === "viewer" ? <Viewer winId={win.props.id} docs={viewers} /> : null}
           </WindowFrame>
         ))}
