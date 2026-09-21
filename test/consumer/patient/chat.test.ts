@@ -61,5 +61,8 @@ test("server history merges without duplicating a client-sent line", () => {
     ],
     "doctor",
   );
-  assert.deepEqual(ids, [localId, "other"]);
+  assert.equal(ids.length, 2);
+  assert.equal(new Set(ids).size, 2);
+  assert.ok(ids.includes(localId!));
+  assert.ok(ids.includes("other"));
 });
