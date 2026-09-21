@@ -374,6 +374,11 @@ export function useConsultation(
         method: "POST",
         body: endConsultBody(),
       });
+      if (appointmentId) {
+        await browserApi(`/appointments/${appointmentId}/complete`, {
+          method: "POST",
+        }).catch(() => {});
+      }
     } catch {
       /* still leave the UI */
     } finally {

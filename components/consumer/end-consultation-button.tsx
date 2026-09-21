@@ -43,6 +43,9 @@ export function EndConsultationButton({
         method: "POST",
         body: endConsultBody(),
       });
+      await browserApi(`/appointments/${appointmentId}/complete`, {
+        method: "POST",
+      }).catch(() => {});
       setEnded(true);
       router.refresh();
     } catch (e) {
