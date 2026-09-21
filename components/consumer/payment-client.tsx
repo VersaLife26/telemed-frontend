@@ -53,6 +53,11 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
         if (!cancelled) {
           setOrder(o);
           setAppointment(a);
+          if (o?.payment_id) {
+            const res = await browserApi<{ payment: Payment } | Payment>(`/payments/${o.payment_id}`).catch(() => null);
+            const p = res && "payment" in res ? res.payment : (res as Payment | null);
+            if (p) setPayment(p);
+          }
           setHydrating(false);
         }
       } catch (e) {
@@ -81,18 +86,24 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
     const timer = window.setInterval(async () => {
       try {
         if (id) {
-          const latest = await browserApi<Payment>(`/payments/${id}`);
-          setPayment(latest);
-          if (paymentSettled(latest.status)) {
-            setPolling(false);
+          const res = await browserApi<{ payment: Payment } | Payment>(`/payments/${id}`);
+          const latest = res && "payment" in res ? res.payment : (res as Payment);
+          if (latest) {
+            setPayment(latest);
+            if (paymentSettled(latest.status)) {
+              setPolling(false);
+            }
           }
         } else {
           const ord = await browserApi<OrderSummary>(`/payments/order/${appointmentId}`).catch(() => null);
           if (ord?.payment_id) {
-            const latest = await browserApi<Payment>(`/payments/${ord.payment_id}`);
-            setPayment(latest);
-            if (paymentSettled(latest.status)) {
-              setPolling(false);
+            const res = await browserApi<{ payment: Payment } | Payment>(`/payments/${ord.payment_id}`);
+            const latest = res && "payment" in res ? res.payment : (res as Payment);
+            if (latest) {
+              setPayment(latest);
+              if (paymentSettled(latest.status)) {
+                setPolling(false);
+              }
             }
           }
         }
