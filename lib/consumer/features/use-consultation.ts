@@ -54,6 +54,7 @@ export type ConsultationControls = {
   toggleScreenShare: () => Promise<void>;
   admit: () => Promise<void>;
   end: () => Promise<void>;
+  leave: () => void;
   retryMedia: () => Promise<void>;
   hasLocalMedia: boolean;
   chat: ChatTransport;
@@ -382,6 +383,16 @@ export function useConsultation(
     }
   }, [join, stopPreview]);
 
+  const leave = useCallback(() => {
+    leavingRef.current = true;
+    try {
+      stopPreview();
+      callRef.current?.hangUp("left by this participant");
+    } finally {
+      setConnected(false);
+    }
+  }, [stopPreview]);
+
   const retryMedia = useCallback(async () => {
     setError(null);
     if (join && shouldConnectMedia(join.status, status) && !connected) {
@@ -455,6 +466,7 @@ export function useConsultation(
     toggleScreenShare,
     admit,
     end,
+    leave,
     retryMedia,
     hasLocalMedia,
     chat,

@@ -198,11 +198,13 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
               <Button
                 variant="danger"
                 size="sm"
-                busy={call.ending}
                 leading={<PhoneOff className="size-4" />}
-                onClick={() => void call.end().then(() => router.push(afterEnd))}
+                onClick={() => {
+                  call.leave();
+                  router.push("/appointments");
+                }}
               >
-                End call
+                Leave call
               </Button>
             </>
           ) : (

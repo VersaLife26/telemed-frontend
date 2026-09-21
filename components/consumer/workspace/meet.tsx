@@ -84,19 +84,33 @@ function MeetQueue({ onJoin }: { onJoin: (id: string) => void }) {
 }
 
 function MeetWaiting({ call }: { call: ConsultationControls }) {
+  const router = useRouter();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center text-white">
       <p className="text-h3">{call.counterpartName || "Patient"}</p>
       <p className="text-body text-white/70">{doctorLobbyCopy(call.status)}</p>
       {canAdmit("doctor", call.status, call.join?.status) ? (
-        <Button
-          size="lg"
-          busy={call.admitting}
-          disabled={call.admitting || admitDisabled(call.status)}
-          onClick={() => void call.admit()}
-        >
-          Admit
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            size="lg"
+            busy={call.admitting}
+            disabled={call.admitting || admitDisabled(call.status)}
+            onClick={() => void call.admit()}
+          >
+            Admit
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            className="border-white/30 text-white can-hover:hover:bg-white/10"
+            onClick={() => {
+              call.leave();
+              router.replace("/workspace");
+            }}
+          >
+            Leave lobby
+          </Button>
+        </div>
       ) : null}
       {call.error ? (
         <Alert tone="danger">
@@ -142,6 +156,26 @@ function MeetLive({ call }: { call: ConsultationControls }) {
           {call.counterpartName || "Live"}
         </Badge>
       </div>
+      <div className="absolute right-4 top-4">
+        <Button
+          size="sm"
+          variant="danger"
+          busy={call.ending}
+          onClick={() => {
+            if (
+              window.confirm(
+                "End this consultation session? Once ended, neither you nor the patient can rejoin.",
+              )
+            ) {
+              void call.end().then(() => {
+                router.replace("/workspace");
+              });
+            }
+          }}
+        >
+          End consultation
+        </Button>
+      </div>
       <div className="ws-call-bar absolute inset-x-0 bottom-0">
         <button
           type="button"
@@ -182,13 +216,11 @@ function MeetLive({ call }: { call: ConsultationControls }) {
         <button
           type="button"
           className="ws-call-btn ws-call-btn-end"
-          aria-label="End call"
-          disabled={call.ending}
-          onClick={() =>
-            void call.end().then(() => {
-              router.replace("/workspace");
-            })
-          }
+          aria-label="Leave call"
+          onClick={() => {
+            call.leave();
+            router.replace("/workspace");
+          }}
         >
           <PhoneOff className="size-5" />
         </button>

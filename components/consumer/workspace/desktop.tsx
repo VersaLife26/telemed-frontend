@@ -90,7 +90,7 @@ function WorkspaceInner() {
   function closeMeet() {
     if (callId && (call.live || call.waiting)) {
       if (!window.confirm("Leave this call?")) return;
-      void call.end();
+      call.leave();
     }
     close("meet");
     if (callId) router.replace("/workspace");
@@ -99,7 +99,8 @@ function WorkspaceInner() {
   function exitWorkspace() {
     if (callId && (call.live || call.waiting)) {
       if (!window.confirm("Leave this call?")) return;
-      void call.end().then(() => router.push("/dashboard"));
+      call.leave();
+      router.push("/dashboard");
       return;
     }
     router.push("/dashboard");

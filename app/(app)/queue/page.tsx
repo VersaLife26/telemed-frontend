@@ -1,5 +1,6 @@
 import { CalendarDays, FileText, ListOrdered, Pill, User, Video } from "lucide-react";
 
+import { EndConsultationButton } from "@/components/consumer/end-consultation-button";
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
 import { Alert } from "@/components/consumer/ui/Alert";
@@ -183,6 +184,7 @@ export default async function QueuePage() {
                     >
                       Prescription
                     </ButtonLink>
+                    <EndConsultationButton appointmentId={a.id} />
                   </div>
                   <RescheduleRequestForm
                     appointmentId={a.id}
