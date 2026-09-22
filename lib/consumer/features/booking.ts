@@ -3,12 +3,44 @@ export function bookingError(slotId: string): string | null {
   return null;
 }
 
-export function bookingBody(slotId: string, doctorId: string, symptoms: string) {
+export function bookingBody(
+  slotId: string,
+  doctorId: string,
+  symptoms: string,
+  visit: { name: string; dob: string; relation?: string },
+) {
+  const intake: Record<string, string> = { symptoms };
+  if (visit.relation?.trim()) intake.visit_relation = visit.relation.trim();
   return {
     slot_id: slotId,
     doctor_id: doctorId,
-    intake: { symptoms },
+    visit_patient_name: visit.name.trim(),
+    visit_patient_dob: visit.dob.trim(),
+    intake,
   };
+}
+
+export function bookingVisitError(
+  subject: "self" | "other",
+  name: string,
+  dob: string,
+  accountDob?: string,
+): string | null {
+  if (!name.trim()) {
+    return subject === "other"
+      ? "Enter the name of the person this visit is for."
+      : "Your profile is missing a name. Update it under Profile before booking.";
+  }
+  const useDob = subject === "other" ? dob : accountDob || dob;
+  if (!useDob || !/^\d{4}-\d{2}-\d{2}$/.test(useDob)) {
+    return subject === "other"
+      ? "Enter their date of birth."
+      : "Add your date of birth under Profile before booking.";
+  }
+  if (useDob > new Date().toISOString().slice(0, 10)) {
+    return "Date of birth cannot be in the future.";
+  }
+  return null;
 }
 
 export function paymentPath(appointmentId: string): string {

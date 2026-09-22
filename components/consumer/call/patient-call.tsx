@@ -28,6 +28,7 @@ import {
   afterEndPath,
   consultJoinError,
   isBeforeJoinWindow,
+  isConsultTerminal,
   isJoinWindow,
   isPastLateJoinCutoff,
 } from "@/lib/consumer/features/consult";
@@ -83,12 +84,15 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
     [appointment?.doctor_id || ""]: doctorName,
   });
 
-  const call = useConsultation(open ? appointmentId : null, "patient");
+  const [sessionClosed, setSessionClosed] = useState(false);
+  const inJoinWindow = open && !sessionClosed;
+  const call = useConsultation(inJoinWindow ? appointmentId : null, "patient");
   const [panel, setPanel] = useState<"chat" | "files" | null>(null);
   const afterEnd = afterEndPath("patient", appointmentId);
 
   useEffect(() => {
-    if (call.status === "ended" || call.status === "abandoned") {
+    if (isConsultTerminal(call.status)) {
+      setSessionClosed(true);
       router.replace(afterEnd);
     }
   }, [afterEnd, call.status, router]);
@@ -110,8 +114,8 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
   }
 
   return (
-    <div className="relative flex min-h-[min(70vh,40rem)] flex-col gap-4 lg:flex-row">
-      <div className="relative min-h-[20rem] min-w-0 flex-1 overflow-hidden rounded-xl bg-ink-900 shadow-lg">
+    <div className="fixed inset-0 z-50 flex bg-ink-900">
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
         {inCall ? (
           <>
             <video
@@ -216,7 +220,7 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
       </div>
 
       {inCall && panel ? (
-        <aside className="flex h-[min(70vh,40rem)] w-full shrink-0 flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface lg:w-[22rem]">
+        <aside className="flex h-full w-full max-w-sm shrink-0 flex-col overflow-hidden border-l border-white/10 bg-surface lg:w-[22rem]">
           <div className="p-3">
             <Tabs
               label="Side panel"

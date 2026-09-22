@@ -14,6 +14,7 @@ import {
   qualityLabel,
   qualityPath,
   QUALITY_REPORT_INTERVAL_MS,
+  isConsultTerminal,
   shouldConnectMedia,
   signalUrlFor,
   waitingRoomPollPath,
@@ -130,6 +131,7 @@ export function useConsultation(
   }, []);
 
   const startPreview = useCallback(async () => {
+    if (isConsultTerminal(status)) return;
     if (previewRef.current || callRef.current) return;
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setError("This browser cannot access the camera. Use Chrome or Safari over HTTPS.");
@@ -149,7 +151,7 @@ export function useConsultation(
     } catch (e) {
       setError(e instanceof Error ? cameraMessage(e) : "Could not start the camera.");
     }
-  }, [attachLocal, cameraOff, muted]);
+  }, [attachLocal, cameraOff, muted, status]);
 
   const connectMedia = useCallback(
     async (info: JoinResult) => {
@@ -275,6 +277,7 @@ export function useConsultation(
   }, [appointmentId, chat, stopPreview]);
 
   useEffect(() => {
+    if (isConsultTerminal(status)) return;
     if (!join || connected || connecting) return;
     if (shouldConnectMedia(join.status, status)) {
       void connectMedia(join);
@@ -284,13 +287,24 @@ export function useConsultation(
   }, [join, status, connected, connecting, connectMedia, role, startPreview]);
 
   useEffect(() => {
-    if (!join?.consultation_id) return;
+    if (!join?.consultation_id || isConsultTerminal(status)) return;
     let cancelled = false;
     async function tick() {
       try {
         const consult = await browserApi<Consultation>(`/consultations/${join!.consultation_id}`);
         if (cancelled) return;
-        if (consult.status) setStatus(consult.status);
+        if (consult.status) {
+          setStatus(consult.status);
+          if (isConsultTerminal(consult.status)) {
+            leavingRef.current = true;
+            stopPreview();
+            callRef.current?.hangUp("consultation ended");
+            callRef.current = null;
+            setConnected(false);
+            setConnecting(false);
+            return;
+          }
+        }
         if (!connected && (role === "patient" || consult.status === "waiting")) {
           const room = await browserApi<WaitingRoomStatus>(waitingRoomPollPath(join!.consultation_id));
           if (!cancelled) setQueue(room);
@@ -312,7 +326,7 @@ export function useConsultation(
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [chat, connectMedia, connected, connecting, join, role]);
+  }, [chat, connectMedia, connected, connecting, join, role, status, stopPreview]);
 
   const admit = useCallback(async () => {
     if (!join?.consultation_id || !appointmentId) return;

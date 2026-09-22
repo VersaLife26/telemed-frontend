@@ -12,7 +12,8 @@ import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { browserApi } from "@/lib/consumer/api/client";
 import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
-import type { Doctor, FormularyDrug, Prescription } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor, FormularyDrug, Prescription } from "@/lib/consumer/api/types";
+import { prescriptionPatientFields } from "@/lib/consumer/features/visit-patient";
 import {
   blankItem,
   canSearchFormulary,
@@ -28,7 +29,8 @@ import {
 export function PrescriptionClient({ appointmentId }: { appointmentId: string }) {
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [patientName, setPatientName] = useState("");
-  const [patientAge, setPatientAge] = useState("0");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientLocked, setPatientLocked] = useState(false);
   const [items, setItems] = useState<ItemDraft[]>([blankItem()]);
   const [issued, setIssued] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +57,19 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
     let cancelled = false;
     (async () => {
       try {
-        const [me] = await Promise.all([browserApi<Doctor>("/doctors/me"), loadExisting()]);
-        if (!cancelled) setDoctor(me);
+        const [me, appt, existing] = await Promise.all([
+          browserApi<Doctor>("/doctors/me"),
+          browserApi<Appointment>(`/appointments/${appointmentId}`).catch(() => null),
+          loadExisting(),
+        ]);
+        if (cancelled) return;
+        setDoctor(me);
+        if (!existing) {
+          const fields = prescriptionPatientFields(appt);
+          if (fields.name) setPatientName(fields.name);
+          if (fields.age) setPatientAge(fields.age);
+          setPatientLocked(fields.locked);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not load prescription");
       } finally {
@@ -177,11 +190,12 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
         <Input
           id="patient-name"
           label="Patient name"
-          hint="Printed on the PDF."
+          hint={patientLocked ? "From booking — printed on the PDF." : "Printed on the PDF."}
           value={patientName}
           onChange={(e) => setPatientName(e.target.value)}
           placeholder="Kamala Silva"
-          disabled={Boolean(issued)}
+          readOnly={patientLocked}
+          disabled={Boolean(issued) || patientLocked}
         />
         <Input
           id="patient-age"
@@ -191,7 +205,8 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
           max={130}
           value={patientAge}
           onChange={(e) => setPatientAge(e.target.value)}
-          disabled={Boolean(issued)}
+          readOnly={patientLocked}
+          disabled={Boolean(issued) || patientLocked}
         />
       </Card>
 

@@ -2,6 +2,12 @@ export function shouldEnterCall(joinStatus?: string, consultStatus?: string): bo
   return joinStatus === "active" || consultStatus === "active";
 }
 
+/** Consultation has finished; media must not restart. */
+export function isConsultTerminal(status?: string): boolean {
+  const s = (status || "").toLowerCase();
+  return s === "ended" || s === "abandoned" || s === "failed" || s === "no_show";
+}
+
 export function callPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/call`;
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { SURFACE } from "@/lib/consumer/surface";
 import AdminPage from "@/components/admin/pages/admin__appointments";
+import DoctorPage from "@/components/consumer/pages/doctor__appointments";
 import PatientPage from "@/components/consumer/pages/patient__appointments";
 
 /**
@@ -17,5 +18,6 @@ export const metadata: Metadata =
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   if (SURFACE === "admin") return <AdminPage searchParams={searchParams} />;
+  if (SURFACE === "doctor") return <DoctorPage />;
   return <PatientPage />;
 }

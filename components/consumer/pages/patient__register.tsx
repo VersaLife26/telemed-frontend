@@ -22,18 +22,27 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"email" | "google" | null>(null);
 
   async function onRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+      setError("Enter your date of birth.");
+      return;
+    }
+    if (dateOfBirth > new Date().toISOString().slice(0, 10)) {
+      setError("Date of birth cannot be in the future.");
+      return;
+    }
     setLoading("email");
     try {
       const res = await fetch("/api/auth/email/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, date_of_birth: dateOfBirth }),
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(readError(json, "Could not create account"));
@@ -87,6 +96,15 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
+            />
+            <Input
+              id="register-dob"
+              label="Date of birth"
+              type="date"
+              required
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              className="tabular-time"
             />
             <Input
               id="register-email"

@@ -12,8 +12,14 @@ import { Input } from "@/components/consumer/ui/Input";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, Doctor } from "@/lib/consumer/api/types";
-import { bookingBody, bookingError, paymentPath } from "@/lib/consumer/features/booking";
+import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
+import {
+  bookingBody,
+  bookingError,
+  bookingVisitError,
+  paymentPath,
+} from "@/lib/consumer/features/booking";
+import { visitPatientFromUser, type VisitSubject } from "@/lib/consumer/features/visit-patient";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { HEROES } from "@/lib/consumer/heroes";
@@ -25,20 +31,32 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
   const start = params.get("start") || "";
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [symptoms, setSymptoms] = useState("");
+  const [subject, setSubject] = useState<VisitSubject>("self");
+  const [account, setAccount] = useState<TelemedUser | null>(null);
+  const [otherName, setOtherName] = useState("");
+  const [otherDob, setOtherDob] = useState("");
+  const [relation, setRelation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    browserApi<Doctor>(`/doctors/${doctorId}`)
-      .then((d) => {
-        if (!cancelled) setDoctor(d);
+    Promise.all([
+      browserApi<Doctor>(`/doctors/${doctorId}`),
+      browserApi<TelemedUser>("/users/me").catch(() => null),
+    ])
+      .then(([d, me]) => {
+        if (cancelled) return;
+        setDoctor(d);
+        setAccount(me);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [doctorId]);
+
+  const selfVisit = visitPatientFromUser(account);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,11 +66,22 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
       setError(missingSlot);
       return;
     }
+    const visitName = subject === "self" ? selfVisit.name : otherName;
+    const visitDob = subject === "self" ? selfVisit.dob : otherDob;
+    const visitErr = bookingVisitError(subject, visitName, visitDob, selfVisit.dob);
+    if (visitErr) {
+      setError(visitErr);
+      return;
+    }
     setLoading(true);
     try {
       const appt = await browserApi<Appointment>("/appointments", {
         method: "POST",
-        body: bookingBody(slotId, doctorId, symptoms),
+        body: bookingBody(slotId, doctorId, symptoms, {
+          name: visitName,
+          dob: visitDob,
+          relation: subject === "other" ? relation : undefined,
+        }),
       });
       router.push(paymentPath(appt.id));
     } catch (err) {
@@ -138,6 +167,74 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
                 className="tabular-time"
               />
             </div>
+
+            <fieldset className="flex flex-col gap-3">
+              <legend className="text-label text-ink">Who is this visit for?</legend>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={
+                    subject === "self"
+                      ? "rounded-md border border-brand bg-brand/10 px-4 py-2 text-body-sm font-semibold text-brand"
+                      : "rounded-md border border-border-subtle bg-surface px-4 py-2 text-body-sm text-muted"
+                  }
+                  onClick={() => setSubject("self")}
+                >
+                  This visit is for me
+                </button>
+                <button
+                  type="button"
+                  className={
+                    subject === "other"
+                      ? "rounded-md border border-brand bg-brand/10 px-4 py-2 text-body-sm font-semibold text-brand"
+                      : "rounded-md border border-border-subtle bg-surface px-4 py-2 text-body-sm text-muted"
+                  }
+                  onClick={() => setSubject("other")}
+                >
+                  For someone else
+                </button>
+              </div>
+            </fieldset>
+
+            {subject === "self" ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input id="visit-self-name" label="Your name" value={selfVisit.name || "—"} readOnly />
+                <Input
+                  id="visit-self-dob"
+                  label="Date of birth"
+                  value={selfVisit.dob || "Add under Profile"}
+                  readOnly
+                  className="tabular-time"
+                />
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="visit-other-name"
+                  label="Their full name"
+                  value={otherName}
+                  onChange={(e) => setOtherName(e.target.value)}
+                  required
+                />
+                <Input
+                  id="visit-other-dob"
+                  label="Their date of birth"
+                  type="date"
+                  value={otherDob}
+                  onChange={(e) => setOtherDob(e.target.value)}
+                  required
+                  className="tabular-time"
+                />
+                <Input
+                  id="visit-relation"
+                  label="Relationship (optional)"
+                  value={relation}
+                  onChange={(e) => setRelation(e.target.value)}
+                  placeholder="e.g. child, parent"
+                  className="sm:col-span-2"
+                />
+              </div>
+            )}
 
             <Textarea
               id="symptoms"

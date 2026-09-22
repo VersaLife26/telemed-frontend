@@ -22,3 +22,8 @@ test("the doctor surface publishes /workspace", () => {
   assert.equal(servedBy("patient", "/workspace"), false);
   assert.equal(servedBy("doctor", "/api/auth/refresh"), true);
 });
+
+test("the doctor surface publishes /appointments for visit history", () => {
+  assert.equal(servedBy("doctor", "/appointments"), true);
+  assert.equal(servedBy("doctor", "/appointments/appt-1/visit"), true);
+});

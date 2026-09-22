@@ -67,6 +67,10 @@ export type Appointment = {
   patient_name?: string;
   /** The other party: doctor's name for a patient, patient's name for a doctor. */
   counterpart_name?: string;
+  /** Person this visit is for, captured at booking (may differ from account holder). */
+  visit_patient_name?: string;
+  visit_patient_dob?: string;
+  visit_patient_age?: number;
   intake?: {
     symptoms?: string;
     [key: string]: unknown;
