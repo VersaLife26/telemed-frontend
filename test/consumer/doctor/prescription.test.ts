@@ -100,8 +100,8 @@ test("doctorCredentialsText prints the real degree and university, not the bio",
   assert.ok(!text.includes("Loves hiking"), "must not fall back to bio when qualifications exist");
 });
 
-test("doctorCredentialsText falls back to bio when there are no structured qualifications", () => {
-  assert.equal(doctorCredentialsText(doctor), "MD");
+test("doctorCredentialsText omits the bio when there are no structured qualifications", () => {
+  assert.equal(doctorCredentialsText(doctor), "");
   assert.equal(doctorCredentialsText(null), "");
 });
 

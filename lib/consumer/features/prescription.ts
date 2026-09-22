@@ -53,16 +53,13 @@ export function canSearchFormulary(query: string): boolean {
 }
 
 /**
- * Renders the doctor's real degree(s) and university onto the prescription
- * credentials block, newline-separated so pdf.go can print each on its own
- * line ("University: ..." reading like a printed prescription pad, not a
- * comma-separated dump). Falls back to bio only for the rare profile with no
- * structured qualifications at all -- every doctor approved through the
- * normal application flow has at least one entry (see application.go).
+ * Degree line plus a "University: ..." line for the prescription pad.
+ * The profile bio is deliberately not used: it is free text ("Practicing
+ * locations…") and was printing in the credentials block.
  */
 export function doctorCredentialsText(doctor: Doctor | null): string {
   const quals = doctor?.qualifications || [];
-  if (!quals.length) return doctor?.bio || "";
+  if (!quals.length) return "";
   const degrees = quals.map((q) => q.degree).filter(Boolean).join(", ");
   const universities = Array.from(new Set(quals.map((q) => q.institution).filter(Boolean))).join(", ");
   return [degrees, universities && `University: ${universities}`].filter(Boolean).join("\n");
