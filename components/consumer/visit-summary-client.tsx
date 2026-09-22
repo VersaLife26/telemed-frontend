@@ -172,12 +172,12 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
               ))}
             </ul>
             <Button fullWidth leading={<Download className="size-4" />} onClick={() => void downloadRx()}>
-              Download e-Rx PDF
+              Download prescription PDF
             </Button>
           </>
         ) : (
           <p className="text-body-sm text-muted">
-            No e-prescription yet. This updates when the doctor issues one.
+            No prescription yet. This updates when the doctor issues one.
           </p>
         )}
       </Card>

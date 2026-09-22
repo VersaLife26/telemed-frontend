@@ -149,7 +149,7 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-h2 text-ink">E-prescription</h1>
+          <h1 className="text-h2 text-ink">Prescription</h1>
           <div className="mt-2">
             {issued ? (
               <Badge tone="success">Issued {issued.issued_at || ""}</Badge>
@@ -311,7 +311,7 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
         </Button>
       ) : (
         <Button size="lg" fullWidth busy={issuing} onClick={() => void issue()}>
-          {issuing ? "Generating PDF…" : "Issue e-prescription"}
+          {issuing ? "Generating PDF…" : "Issue prescription"}
         </Button>
       )}
     </div>
