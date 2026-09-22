@@ -6,7 +6,7 @@ export function ageAtVisitDate(dob: string, visitStartIso: string): number {
   const visitDay = visitStartIso.slice(0, 10);
   const [vy, vm, vd] = visitDay.split("-").map(Number);
   const [dy, dm, dd] = dob.split("-").map(Number);
-  if (!vy || !dy) return 0;
+  if (vy == null || vm == null || vd == null || dy == null || dm == null || dd == null) return 0;
   let age = vy - dy;
   if (vm < dm || (vm === dm && vd < dd)) age--;
   return age >= 0 ? age : 0;

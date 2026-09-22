@@ -100,7 +100,7 @@ export default function DoctorAppointmentsPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-h5 text-ink truncate">{visitLabel(a)}</p>
-                    <StatusBadge status={a.status}>{statusLabel(a.status)}</StatusBadge>
+                    <StatusBadge status={a.status} />
                     {a.visit_patient_age != null && a.visit_patient_age > 0 ? (
                       <span className="text-caption text-muted">Age {a.visit_patient_age}</span>
                     ) : null}
