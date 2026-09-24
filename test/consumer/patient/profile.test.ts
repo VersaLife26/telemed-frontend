@@ -28,32 +28,38 @@ test("profileDraftFromUser copies the editable fields and hides role", () => {
     phone: "+94771234567",
     address: "Colombo",
     dateOfBirth: "1994-04-12",
+    sex: "",
+    allergies: "",
   });
   assert.equal("role" in draft, false);
 });
 
 test("profileUpdateError refuses a blank name and a future date of birth", () => {
-  assert.equal(profileUpdateError({ name: " ", phone: "", address: "", dateOfBirth: "" }), "Enter your name.");
+  assert.equal(profileUpdateError({ name: " ", phone: "", address: "", dateOfBirth: "", sex: "", allergies: "" }), "Enter your name.");
   assert.equal(
-    profileUpdateError({ name: "Pat", phone: "", address: "", dateOfBirth: "2999-01-01" }),
+    profileUpdateError({ name: "Pat", phone: "", address: "", dateOfBirth: "2999-01-01", sex: "", allergies: "" }),
     "Date of birth cannot be in the future.",
   );
-  assert.equal(profileUpdateError({ name: "Pat", phone: "077", address: "Kandy", dateOfBirth: "1990-01-01" }), null);
+  assert.equal(profileUpdateError({ name: "Pat", phone: "077", address: "Kandy", dateOfBirth: "1990-01-01", sex: "", allergies: "" }), null);
 });
 
-test("profileUpdateBody sends name, phone, address and date of birth with the observed version", () => {
+test("profileUpdateBody sends name, phone, address, date of birth, sex and allergies with the observed version", () => {
   assert.deepEqual(
     profileUpdateBody(user, {
       name: " Lasana ",
       phone: "0771234567",
       address: " Kandy ",
       dateOfBirth: "1994-04-12",
+      sex: "female",
+      allergies: " Penicillin ",
     }),
     {
       name: "Lasana",
       phone: "0771234567",
       address: "Kandy",
       date_of_birth: "1994-04-12",
+      sex: "female",
+      allergies: "Penicillin",
       language: "en",
       version: 4,
     },

@@ -44,6 +44,7 @@ export const FrameType = {
   Quality: "quality",
   Chat: "chat",
   Pointer: "pointer",
+  FileShared: "file_shared",
   Ping: "ping",
   Pong: "pong",
   Welcome: "welcome",

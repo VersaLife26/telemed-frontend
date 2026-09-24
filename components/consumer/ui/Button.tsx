@@ -20,7 +20,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   outline:
     "border border-border-default bg-surface text-ink shadow-sm can-hover:hover:border-border-strong",
   ghost: "text-muted can-hover:hover:bg-tint can-hover:hover:text-ink",
-  glass: "glass-panel text-ink can-hover:hover:bg-[var(--glass-bg-medium)]",
+  glass: "glass-regular text-ink can-hover:hover:bg-[var(--glass-thick-bg)]",
   danger: "bg-danger text-white shadow-sm can-hover:hover:brightness-110",
 };
 
@@ -29,8 +29,10 @@ const VARIANT: Record<ButtonVariant, string> = {
  * the control answers before the handler does. Hover is a 1px lift and lives
  * behind `can-hover:` -- on a touch screen it would stick after the tap.
  *
- * Only transform, box-shadow, colour and filter transition. `transition-all`
- * would animate layout properties too, off the compositor.
+ * Only scale/translate, box-shadow, colour and filter transition. Tailwind v4's
+ * scale-* and translate-* write the individual `scale`/`translate` properties,
+ * so a `transition-[transform]` list would leave the press unanimated.
+ * `transition-all` would animate layout properties too, off the compositor.
  */
 function buttonClass({
   variant = "primary",
@@ -45,8 +47,8 @@ function buttonClass({
 }) {
   return cx(
     "inline-flex cursor-pointer select-none items-center justify-center rounded-pill font-semibold leading-none",
-    "transition-[transform,box-shadow,background-color,border-color,color,filter] duration-[160ms] ease-out",
-    "can-hover:hover:-translate-y-px active:scale-[0.97]",
+    "transition-[scale,translate,box-shadow,background-color,border-color,color,filter] duration-[var(--dur-press)] ease-out",
+    "can-hover:hover:-translate-y-px active:scale-[0.97] active:translate-y-0",
     "disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none",
     "aria-disabled:pointer-events-none aria-disabled:opacity-50",
     SIZE[size],

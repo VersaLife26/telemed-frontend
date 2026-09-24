@@ -11,18 +11,34 @@ import { EmptyState } from "@/components/consumer/ui/EmptyState";
 import { Input } from "@/components/consumer/ui/Input";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { Textarea } from "@/components/consumer/ui/Textarea";
+import { SexField } from "@/components/consumer/sex-field";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor, Sex, TelemedUser } from "@/lib/consumer/api/types";
 import {
   bookingBody,
   bookingError,
   bookingVisitError,
   paymentPath,
+  weightError,
 } from "@/lib/consumer/features/booking";
-import { visitPatientFromUser, type VisitSubject } from "@/lib/consumer/features/visit-patient";
+import {
+  ageAtVisitDate,
+  visitPatientFromUser,
+  type VisitSubject,
+} from "@/lib/consumer/features/visit-patient";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { HEROES } from "@/lib/consumer/heroes";
+
+type VisitDraft = {
+  name: string;
+  dob: string;
+  sex: Sex | "";
+  weightKg: string;
+  allergies: string;
+};
+
+const emptyVisit: VisitDraft = { name: "", dob: "", sex: "", weightKg: "", allergies: "" };
 
 export function IntakeClient({ doctorId }: { doctorId: string }) {
   const router = useRouter();
@@ -33,8 +49,8 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
   const [symptoms, setSymptoms] = useState("");
   const [subject, setSubject] = useState<VisitSubject>("self");
   const [account, setAccount] = useState<TelemedUser | null>(null);
-  const [otherName, setOtherName] = useState("");
-  const [otherDob, setOtherDob] = useState("");
+  const [lastWeight, setLastWeight] = useState("");
+  const [visit, setVisit] = useState<VisitDraft>(emptyVisit);
   const [relation, setRelation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,11 +60,15 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
     Promise.all([
       browserApi<Doctor>(`/doctors/${doctorId}`),
       browserApi<TelemedUser>("/users/me").catch(() => null),
+      browserApi<{ weight_kg?: number | null }>("/appointments/last-visit-details").catch(() => null),
     ])
-      .then(([d, me]) => {
+      .then(([d, me, last]) => {
         if (cancelled) return;
+        const weight = last?.weight_kg ? String(last.weight_kg) : "";
         setDoctor(d);
         setAccount(me);
+        setLastWeight(weight);
+        setVisit({ ...visitPatientFromUser(me), weightKg: weight });
       })
       .catch(() => undefined);
     return () => {
@@ -56,7 +76,13 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
     };
   }, [doctorId]);
 
-  const selfVisit = visitPatientFromUser(account);
+  function chooseSubject(next: VisitSubject) {
+    if (next === subject) return;
+    setSubject(next);
+    setVisit(next === "self" ? { ...visitPatientFromUser(account), weightKg: lastWeight } : emptyVisit);
+  }
+
+  const age = visit.dob && start ? ageAtVisitDate(visit.dob, start) : null;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,9 +92,8 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
       setError(missingSlot);
       return;
     }
-    const visitName = subject === "self" ? selfVisit.name : otherName;
-    const visitDob = subject === "self" ? selfVisit.dob : otherDob;
-    const visitErr = bookingVisitError(subject, visitName, visitDob, selfVisit.dob);
+    const visitErr =
+      bookingVisitError(subject, visit.name, visit.dob) || weightError(visit.weightKg);
     if (visitErr) {
       setError(visitErr);
       return;
@@ -78,8 +103,7 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
       const appt = await browserApi<Appointment>("/appointments", {
         method: "POST",
         body: bookingBody(slotId, doctorId, symptoms, {
-          name: visitName,
-          dob: visitDob,
+          ...visit,
           relation: subject === "other" ? relation : undefined,
         }),
       });
@@ -178,7 +202,7 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
                       ? "rounded-md border border-brand bg-brand/10 px-4 py-2 text-body-sm font-semibold text-brand"
                       : "rounded-md border border-border-subtle bg-surface px-4 py-2 text-body-sm text-muted"
                   }
-                  onClick={() => setSubject("self")}
+                  onClick={() => chooseSubject("self")}
                 >
                   This visit is for me
                 </button>
@@ -189,52 +213,77 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
                       ? "rounded-md border border-brand bg-brand/10 px-4 py-2 text-body-sm font-semibold text-brand"
                       : "rounded-md border border-border-subtle bg-surface px-4 py-2 text-body-sm text-muted"
                   }
-                  onClick={() => setSubject("other")}
+                  onClick={() => chooseSubject("other")}
                 >
                   For someone else
                 </button>
               </div>
             </fieldset>
 
-            {subject === "self" ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input id="visit-self-name" label="Your name" value={selfVisit.name || "—"} readOnly />
-                <Input
-                  id="visit-self-dob"
-                  label="Date of birth"
-                  value={selfVisit.dob || "Add under Profile"}
-                  readOnly
-                  className="tabular-time"
-                />
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  id="visit-other-name"
-                  label="Their full name"
-                  value={otherName}
-                  onChange={(e) => setOtherName(e.target.value)}
-                  required
-                />
-                <Input
-                  id="visit-other-dob"
-                  label="Their date of birth"
-                  type="date"
-                  value={otherDob}
-                  onChange={(e) => setOtherDob(e.target.value)}
-                  required
-                  className="tabular-time"
-                />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                id="visit-name"
+                label={subject === "self" ? "Your name" : "Their full name"}
+                value={visit.name}
+                onChange={(e) => setVisit((v) => ({ ...v, name: e.target.value }))}
+                autoComplete={subject === "self" ? "name" : "off"}
+                required
+              />
+              <Input
+                id="visit-dob"
+                label="Date of birth"
+                type="date"
+                value={visit.dob}
+                onChange={(e) => setVisit((v) => ({ ...v, dob: e.target.value }))}
+                hint={age !== null && visit.dob ? `Age at visit: ${age}` : undefined}
+                required
+                className="tabular-time"
+              />
+              <SexField
+                id="visit-sex"
+                value={visit.sex}
+                onChange={(sex) => setVisit((v) => ({ ...v, sex }))}
+              />
+              <Input
+                id="visit-weight"
+                label="Weight (kg)"
+                type="number"
+                inputMode="decimal"
+                min={0.5}
+                max={400}
+                step={0.1}
+                value={visit.weightKg}
+                onChange={(e) => setVisit((v) => ({ ...v, weightKg: e.target.value }))}
+                hint={subject === "self" && lastWeight ? "From your last visit. Update if it changed." : "Optional"}
+                className="tabular-time"
+              />
+              <Textarea
+                id="visit-allergies"
+                label="Known allergies"
+                hint="Optional"
+                rows={2}
+                className="min-h-16"
+                value={visit.allergies}
+                onChange={(e) => setVisit((v) => ({ ...v, allergies: e.target.value }))}
+                placeholder="e.g. Penicillin"
+                fieldClassName="sm:col-span-2"
+              />
+              {subject === "other" ? (
                 <Input
                   id="visit-relation"
                   label="Relationship (optional)"
                   value={relation}
                   onChange={(e) => setRelation(e.target.value)}
                   placeholder="e.g. child, parent"
-                  className="sm:col-span-2"
+                  fieldClassName="sm:col-span-2"
                 />
-              </div>
-            )}
+              ) : null}
+            </div>
+            {subject === "self" ? (
+              <p className="-mt-2 text-body-sm text-faint">
+                Filled from your profile. Changes here apply to this visit only.
+              </p>
+            ) : null}
 
             <Textarea
               id="symptoms"

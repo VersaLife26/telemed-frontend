@@ -316,9 +316,13 @@ export function practiceProfileBody(doctor: Doctor, patch: {
   return body;
 }
 
-export function documentMetadataBody(documentType: string, filename: string) {
-  return {
-    document_type: documentType,
-    filename: filename.trim(),
-  };
+export const MAX_CREDENTIAL_DOCUMENT_BYTES = 5 * 1024 * 1024;
+
+const CREDENTIAL_DOCUMENT_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+
+export function credentialDocumentError(file: { type: string; size: number } | null): string | null {
+  if (!file) return "Choose a file to upload.";
+  if (!CREDENTIAL_DOCUMENT_TYPES.has(file.type)) return "Upload a PDF, JPEG, PNG or WebP file.";
+  if (file.size > MAX_CREDENTIAL_DOCUMENT_BYTES) return "Each document must be 5 MB or smaller.";
+  return null;
 }

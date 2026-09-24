@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
 import { MousePointer2 } from "lucide-react";
 
+import { StreamVideo } from "@/components/consumer/call/stream-video";
 import type { PointerState } from "@/lib/consumer/features/pointer";
 import { pointerFromEvent, pointerMatches } from "@/lib/consumer/features/pointer";
 import { cx } from "@/lib/consumer/cx";
@@ -33,8 +33,13 @@ export function PointerLayer({
 
   return (
     <div
-      className={cx("absolute inset-0 z-20", pointing ? "cursor-none" : "pointer-events-none", className)}
+      className={cx("absolute inset-0 z-20", pointing ? "cursor-crosshair touch-none" : "pointer-events-none", className)}
       onPointerMove={(event) => {
+        if (!pointing) return;
+        const next = pointerFromEvent(event, surface, fileId);
+        if (next) onMove(next);
+      }}
+      onPointerDown={(event) => {
         if (!pointing) return;
         const next = pointerFromEvent(event, surface, fileId);
         if (next) onMove(next);
@@ -95,25 +100,12 @@ function PointerDot({
 }
 
 /** While the far side points at your camera, show your self-view full-bleed so the laser lands on you. */
-export function IncomingSelfView({
-  source,
-  show,
-}: {
-  source: RefObject<HTMLVideoElement | null>;
-  show: boolean;
-}) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    if (!show || !ref.current) return;
-    ref.current.srcObject = source.current?.srcObject ?? null;
-  }, [show, source]);
+export function IncomingSelfView({ stream, show }: { stream: MediaStream | null; show: boolean }) {
   if (!show) return null;
   return (
-    <video
-      ref={ref}
-      autoPlay
+    <StreamVideo
+      stream={stream}
       muted
-      playsInline
       className="pointer-events-none absolute inset-0 z-[9] h-full w-full object-cover"
     />
   );

@@ -45,9 +45,9 @@ export function Field({
 /** Shared by Input, Select and Textarea so the three cannot drift. */
 export const fieldControlClass = cx(
   "w-full rounded-md border border-border-default bg-surface px-4 py-3 text-body text-ink",
-  "outline-none transition-[border-color,box-shadow] duration-[160ms] ease-out",
-  "placeholder:text-faint",
-  "focus:border-brand focus:shadow-[0_0_0_3px_var(--brand-tint)]",
+  "outline-none transition-[border-color,box-shadow,background-color] duration-150 ease-out",
+  "shadow-[0_0_0_0_var(--brand-tint)] placeholder:text-faint can-hover:hover:border-border-strong",
+  "focus:border-brand focus:shadow-[0_0_0_4px_var(--brand-tint)] can-hover:focus:border-brand",
   "disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-faint",
   "aria-[invalid=true]:border-danger",
 );

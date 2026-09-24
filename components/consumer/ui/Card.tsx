@@ -2,12 +2,16 @@ import type { ReactNode } from "react";
 
 import { cx } from "@/lib/consumer/cx";
 
-export type CardVariant = "default" | "glass" | "tint" | "bare";
+export type CardVariant = "default" | "solid" | "glass" | "glass-thin" | "glass-thick" | "glass-dark" | "tint" | "bare";
 
 const VARIANT: Record<CardVariant, string> = {
-  default: "border border-border-subtle bg-surface shadow-sm",
-  /* Only over the page wash, a photo or a tint — glass on flat white is invisible. */
-  glass: "glass-panel",
+  default: "border border-white/60 surface-frost",
+  solid: "border border-border-subtle bg-surface shadow-sm",
+  /* Only over the ambient field, a photo or a tint — glass on flat white is invisible. */
+  glass: "glass-regular",
+  "glass-thin": "glass-thin",
+  "glass-thick": "glass-thick",
+  "glass-dark": "glass-dark",
   tint: "border border-blue-200 bg-tint",
   bare: "bg-transparent",
 };
@@ -37,7 +41,7 @@ export function Card({
         "rounded-lg p-6",
         VARIANT[variant],
         interactive &&
-          "transition-[transform,box-shadow] duration-[200ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md",
+          "transition-[translate,scale,box-shadow] duration-[var(--dur-fast)] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md active:scale-[0.99]",
         className,
       )}
     >

@@ -4,7 +4,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cx("skeleton-pulse rounded-md bg-skeleton", className)}
+      className={cx("skeleton-shimmer rounded-md bg-skeleton", className)}
     />
   );
 }

@@ -1,13 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { Mic, MicOff, MonitorUp, MousePointer2, PhoneOff, Video, VideoOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
-import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
-import { IncomingSelfView, PointerLayer } from "@/components/consumer/call/pointer-layer";
+import { Modal } from "@/components/consumer/ui/Modal";
+import { CallStage } from "@/components/consumer/call/call-stage";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment } from "@/lib/consumer/api/types";
 import { appointmentsListPath } from "@/lib/consumer/features/appointments";
@@ -20,14 +18,18 @@ export function MeetApp({
   call,
   callId,
   onJoin,
+  onLeave,
+  onEnded,
 }: {
   call: ConsultationControls;
   callId: string | null;
   onJoin: (id: string) => void;
+  onLeave: () => void;
+  onEnded: () => void;
 }) {
   if (!callId) return <MeetQueue onJoin={onJoin} />;
-  if (call.live) return <MeetLive call={call} />;
-  return <MeetWaiting call={call} />;
+  if (call.live) return <MeetLive call={call} onLeave={onLeave} onEnded={onEnded} />;
+  return <MeetWaiting call={call} onLeave={onLeave} />;
 }
 
 function MeetQueue({ onJoin }: { onJoin: (id: string) => void }) {
@@ -83,8 +85,7 @@ function MeetQueue({ onJoin }: { onJoin: (id: string) => void }) {
   );
 }
 
-function MeetWaiting({ call }: { call: ConsultationControls }) {
-  const router = useRouter();
+function MeetWaiting({ call, onLeave }: { call: ConsultationControls; onLeave: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center text-white">
       <p className="text-h3">{call.counterpartName || "Patient"}</p>
@@ -103,10 +104,7 @@ function MeetWaiting({ call }: { call: ConsultationControls }) {
             size="lg"
             variant="outline"
             className="border-white/30 text-white can-hover:hover:bg-white/10"
-            onClick={() => {
-              call.leave();
-              router.replace("/workspace");
-            }}
+            onClick={onLeave}
           >
             Leave lobby
           </Button>
@@ -126,134 +124,65 @@ function MeetWaiting({ call }: { call: ConsultationControls }) {
   );
 }
 
-function MeetLive({ call }: { call: ConsultationControls }) {
-  const router = useRouter();
-  return (
-    <div className="relative h-full bg-black">
-      <video ref={call.remoteRef} autoPlay playsInline className="h-full w-full object-cover" />
-      <IncomingSelfView
-        source={call.localRef}
-        show={Boolean(call.remotePointer?.active && call.remotePointer.surface === "video" && !call.pointing)}
-      />
-      <PointerLayer
-        pointing={call.pointing}
-        local={call.localPointer}
-        remote={call.remotePointer}
-        surface="video"
-        incomingLabel={call.counterpartName || "Pointing"}
-        onMove={call.movePointer}
-        onLeave={call.leavePointer}
-      />
-      <video
-        ref={call.localRef}
-        autoPlay
-        muted
-        playsInline
-        className="absolute bottom-20 right-4 h-28 w-40 rounded-md object-cover ring-2 ring-white/70"
-      />
-      <div className="absolute left-4 top-4">
-        <Badge tone="success" dot className="bg-white/90">
-          {call.counterpartName || "Live"}
-        </Badge>
-      </div>
-      <div className="absolute right-4 top-4">
-        <Button
-          size="sm"
-          variant="danger"
-          busy={call.ending}
-          onClick={() => {
-            if (
-              window.confirm(
-                "End this consultation session? Once ended, neither you nor the patient can rejoin.",
-              )
-            ) {
-              void call.end().then(() => {
-                router.replace("/workspace");
-              });
-            }
-          }}
-        >
-          End consultation
-        </Button>
-      </div>
-      <div className="ws-call-bar absolute inset-x-0 bottom-0">
-        <button
-          type="button"
-          className="ws-call-btn"
-          aria-label={call.muted ? "Unmute" : "Mute"}
-          aria-pressed={call.muted}
-          onClick={call.toggleMute}
-        >
-          {call.muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
-        </button>
-        <button
-          type="button"
-          className="ws-call-btn"
-          aria-label={call.cameraOff ? "Turn camera on" : "Turn camera off"}
-          aria-pressed={call.cameraOff}
-          onClick={call.toggleCamera}
-        >
-          {call.cameraOff ? <VideoOff className="size-5" /> : <Video className="size-5" />}
-        </button>
-        <button
-          type="button"
-          className="ws-call-btn"
-          aria-label={call.pointing ? "Stop pointing" : "Point"}
-          aria-pressed={call.pointing}
-          onClick={call.togglePointing}
-        >
-          <MousePointer2 className="size-5" />
-        </button>
-        <button
-          type="button"
-          className="ws-call-btn"
-          aria-label={call.sharing ? "Stop sharing" : "Share screen"}
-          aria-pressed={call.sharing}
-          onClick={() => void call.toggleScreenShare()}
-        >
-          <MonitorUp className="size-5" />
-        </button>
-        <button
-          type="button"
-          className="ws-call-btn ws-call-btn-end"
-          aria-label="Leave call"
-          onClick={() => {
-            call.leave();
-            router.replace("/workspace");
-          }}
-        >
-          <PhoneOff className="size-5" />
-        </button>
-      </div>
-      {call.remotePointer?.active && call.remotePointer.surface === "file" ? (
-        <Alert tone="info" className="absolute left-4 right-4 top-16">
-          {call.counterpartName || "The other person"} is pointing on a file. Open the same document to follow the laser.
-        </Alert>
-      ) : null}
-      {call.notice && !(call.remotePointer?.active && call.remotePointer.surface === "file") ? (
-        <Alert tone="info" className="absolute left-4 right-4 top-16">
-          {call.notice}
-        </Alert>
-      ) : null}
-      {call.error ? (
-        <Alert tone="danger" className="absolute left-4 right-4 top-16">
-          {call.error}
-        </Alert>
-      ) : null}
-    </div>
-  );
-}
-
-export function MiniCall({
+function MeetLive({
   call,
-  onRestore,
+  onLeave,
+  onEnded,
 }: {
   call: ConsultationControls;
-  onRestore: () => void;
+  onLeave: () => void;
+  onEnded: () => void;
 }) {
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const counterpart = call.counterpartName || "Patient";
   return (
-    <button type="button" className="ws-mini-call" aria-label="Restore Meet" onClick={onRestore}>
-      <video ref={call.remoteRef} autoPlay playsInline className="h-full w-full object-cover" />
-    </button>
+    <>
+      <CallStage
+        call={call}
+        counterpart={counterpart}
+        onLeave={onLeave}
+        topRight={
+          <Button size="sm" variant="danger" busy={call.ending} onClick={() => setConfirmEnd(true)}>
+            End consultation
+          </Button>
+        }
+        alerts={
+          <>
+            {call.remotePointer?.active && call.remotePointer.surface === "file" ? (
+              <Alert tone="info">
+                {counterpart} is pointing on a file. Open the same document to follow the laser.
+              </Alert>
+            ) : null}
+            {call.notice && !(call.remotePointer?.active && call.remotePointer.surface === "file") ? (
+              <Alert tone="info">{call.notice}</Alert>
+            ) : null}
+            {call.error ? <Alert tone="danger">{call.error}</Alert> : null}
+          </>
+        }
+      />
+      <Modal
+        open={confirmEnd}
+        onClose={() => setConfirmEnd(false)}
+        title="End this consultation?"
+        description="Once ended, neither you nor the patient can rejoin. Your notes and prescription stay open so you can finish them."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmEnd(false)}>
+              Keep talking
+            </Button>
+            <Button
+              variant="danger"
+              busy={call.ending}
+              onClick={() => {
+                setConfirmEnd(false);
+                void call.end().then(onEnded);
+              }}
+            >
+              End consultation
+            </Button>
+          </>
+        }
+      />
+    </>
   );
 }

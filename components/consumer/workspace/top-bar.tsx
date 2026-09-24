@@ -8,6 +8,7 @@ import type { Appointment } from "@/lib/consumer/api/types";
 import { colomboDayKey } from "@/lib/consumer/features/calendar";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 import type { ConsultationControls } from "@/lib/consumer/features/use-consultation";
+import { APPS, LAUNCHER_APPS } from "@/components/consumer/workspace/apps";
 import { useWindows, type WorkspaceApp } from "@/components/consumer/workspace/window-manager";
 
 const CLOCK = new Intl.DateTimeFormat("en-GB", {
@@ -22,9 +23,11 @@ const CLOCK = new Intl.DateTimeFormat("en-GB", {
 export function TopBar({
   call,
   callId,
+  compact = false,
 }: {
   call: ConsultationControls;
   callId: string | null;
+  compact?: boolean;
 }) {
   const { windows, focusedId, open } = useWindows();
   const [now, setNow] = useState(() => new Date());
@@ -41,7 +44,7 @@ export function TopBar({
   return (
     <header className="ws-menubar">
       <div className="flex min-w-0 items-center gap-3">
-        <AppMenu onOpen={open} />
+        {compact ? null : <AppMenu onOpen={open} />}
         <p className="truncate text-[0.8125rem] font-medium text-white/90">
           {focused && !focused.minimized ? focused.title : "VersaLife"}
         </p>
@@ -62,7 +65,7 @@ export function TopBar({
             className="rounded-md px-2 py-1 text-[0.8125rem] text-white/90 tabular-time can-hover:hover:bg-white/10"
             onClick={() => setOpenClock((v) => !v)}
           >
-            {CLOCK.format(now)}
+            {compact ? SHORT_CLOCK.format(now) : CLOCK.format(now)}
           </button>
           {openClock ? <ClockPopover onClose={() => setOpenClock(false)} /> : null}
         </div>
@@ -70,6 +73,8 @@ export function TopBar({
     </header>
   );
 }
+
+const SHORT_CLOCK = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 function AppMenu({ onOpen }: { onOpen: (app: WorkspaceApp) => void }) {
   const [open, setOpen] = useState(false);
@@ -84,7 +89,7 @@ function AppMenu({ onOpen }: { onOpen: (app: WorkspaceApp) => void }) {
       </button>
       {open ? (
         <ul className="absolute left-0 top-full z-50 mt-1 min-w-[10rem] rounded-md bg-ink-900/95 p-1 text-white shadow-lg ring-1 ring-white/15">
-          {(["meet", "files", "calendar", "chat"] as const).map((app) => (
+          {LAUNCHER_APPS.map((app) => (
             <li key={app}>
               <button
                 type="button"
@@ -94,7 +99,7 @@ function AppMenu({ onOpen }: { onOpen: (app: WorkspaceApp) => void }) {
                   setOpen(false);
                 }}
               >
-                {app === "files" ? "File Station" : app}
+                {APPS[app].label}
               </button>
             </li>
           ))}

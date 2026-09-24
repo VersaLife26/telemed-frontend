@@ -13,6 +13,7 @@ import {
   joinPath,
   qualityLabel,
   qualityPath,
+  type QualityLabel,
   QUALITY_REPORT_INTERVAL_MS,
   isConsultTerminal,
   shouldConnectMedia,
@@ -48,8 +49,14 @@ export type ConsultationControls = {
   live: boolean;
   noRelay: boolean;
   counterpartName: string;
-  localRef: React.RefObject<HTMLVideoElement | null>;
-  remoteRef: React.RefObject<HTMLVideoElement | null>;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  /** Your own screen capture while sharing, for the local preview. */
+  screenStream: MediaStream | null;
+  /** The last file the other participant said they added to the vault. */
+  sharedFile: { name: string; at: number } | null;
+  announceFile: (name: string) => void;
+  quality: QualityLabel | null;
   toggleMute: () => void;
   toggleCamera: () => void;
   toggleScreenShare: () => Promise<void>;
@@ -78,8 +85,6 @@ export function useConsultation(
   appointmentId: string | null,
   role: ConsultationRole,
 ): ConsultationControls {
-  const localRef = useRef<HTMLVideoElement>(null);
-  const remoteRef = useRef<HTMLVideoElement>(null);
   const callRef = useRef<PeerCall | null>(null);
   const previewRef = useRef<MediaStream | null>(null);
   const leavingRef = useRef(false);
@@ -96,6 +101,11 @@ export function useConsultation(
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [quality, setQuality] = useState<QualityLabel | null>(null);
+  const [sharedFile, setSharedFile] = useState<{ name: string; at: number } | null>(null);
   const [ending, setEnding] = useState(false);
   const [admitting, setAdmitting] = useState(false);
   const [hasLocalMedia, setHasLocalMedia] = useState(false);
@@ -120,13 +130,15 @@ export function useConsultation(
   );
 
   const stopPreview = useCallback(() => {
-    previewRef.current?.getTracks().forEach((track) => track.stop());
+    const preview = previewRef.current;
+    preview?.getTracks().forEach((track) => track.stop());
     previewRef.current = null;
+    setLocalStream((current) => (current && current === preview ? null : current));
     setHasLocalMedia(false);
   }, []);
 
   const attachLocal = useCallback((stream: MediaStream | null) => {
-    if (localRef.current) localRef.current.srcObject = stream;
+    setLocalStream(stream);
     setHasLocalMedia(!!stream);
   }, []);
 
@@ -172,9 +184,12 @@ export function useConsultation(
         callRef.current?.hangUp("reconnecting");
 
         const call = new PeerCall(url, {
-          onRemoteStream: (stream) => {
-            if (remoteRef.current) remoteRef.current.srcObject = stream;
+          onRemoteStream: (stream) => setRemoteStream(stream),
+          onScreenShareEnded: () => {
+            setSharing(false);
+            setScreenStream(null);
           },
+          onFileShared: ({ name }) => setSharedFile({ name, at: Date.now() }),
           onStateChange: (state: CallState) => {
             setConnected(state === "connected");
             if (state === "connected") {
@@ -209,6 +224,7 @@ export function useConsultation(
             setNotice(message);
           },
           onQuality: (q) => {
+            setQuality(qualityLabel(q));
             const id = info.consultation_id;
             if (!id) return;
             const now = Date.now();
@@ -252,6 +268,11 @@ export function useConsultation(
       setPointing(false);
       setLocalPointer(null);
       setRemotePointer(null);
+      setLocalStream(null);
+      setRemoteStream(null);
+      setScreenStream(null);
+      setSharing(false);
+      setSharedFile(null);
       chat.reset();
       return;
     }
@@ -368,14 +389,27 @@ export function useConsultation(
   }, [cameraOff]);
 
   const toggleScreenShare = useCallback(async () => {
+    const call = callRef.current;
+    if (!call) return;
     const next = !sharing;
+    if (next && !navigator.mediaDevices?.getDisplayMedia) {
+      setNotice("This browser can't share its screen. Try Chrome, Edge or Firefox on a computer.");
+      return;
+    }
     try {
-      await callRef.current?.setScreenShare(next);
-      setSharing(next);
+      const stream = await call.setScreenShare(next);
+      setSharing(Boolean(stream));
+      setScreenStream(stream);
     } catch (e) {
+      // Dismissing the browser's picker is a choice, not an error.
+      if (e instanceof DOMException && e.name === "NotAllowedError") return;
       setNotice(e instanceof Error ? e.message : "Could not share the screen.");
     }
   }, [sharing]);
+
+  const announceFile = useCallback((name: string) => {
+    callRef.current?.sendFileShared(name);
+  }, []);
 
   const end = useCallback(async () => {
     if (!join?.consultation_id) return;
@@ -398,6 +432,8 @@ export function useConsultation(
     } finally {
       setEnding(false);
       setConnected(false);
+      setSharing(false);
+      setScreenStream(null);
       setStatus("ended");
     }
   }, [join, stopPreview]);
@@ -409,6 +445,8 @@ export function useConsultation(
       callRef.current?.hangUp("left by this participant");
     } finally {
       setConnected(false);
+      setSharing(false);
+      setScreenStream(null);
     }
   }, [stopPreview]);
 
@@ -454,6 +492,23 @@ export function useConsultation(
     callRef.current?.sendPointer(next);
   }, []);
 
+  useEffect(() => {
+    if (connected) return;
+    setPointing(false);
+    setLocalPointer(null);
+    setRemotePointer(null);
+    setQuality(null);
+  }, [connected]);
+
+  useEffect(() => {
+    if (!pointing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") togglePointing();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pointing, togglePointing]);
+
   const waiting = isWaiting(status, join?.status);
   const live = connected || status === "active";
   const noRelay =
@@ -478,8 +533,12 @@ export function useConsultation(
     live,
     noRelay,
     counterpartName: join?.counterpart_name || "",
-    localRef,
-    remoteRef,
+    localStream,
+    remoteStream,
+    screenStream,
+    sharedFile,
+    announceFile,
+    quality,
     toggleMute,
     toggleCamera,
     toggleScreenShare,

@@ -35,7 +35,13 @@ import {
   type SoapSectionKey,
 } from "@/lib/consumer/features/clinical-notes";
 
-export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }) {
+export function ClinicalNotesClient({
+  appointmentId,
+  embedded = false,
+}: {
+  appointmentId: string;
+  embedded?: boolean;
+}) {
   const [draft, setDraft] = useState<SoapDraft>(emptyDraft);
   const [diagnoses, setDiagnoses] = useState<ClinicalNoteDiagnosis[]>([]);
   const [version, setVersion] = useState(0);
@@ -239,11 +245,11 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <div className="@container mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-h2 text-ink">Clinical notes</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {embedded ? null : <h1 className="text-h2 text-ink">Clinical notes</h1>}
+          <div className={embedded ? "flex flex-wrap items-center gap-2" : "mt-2 flex flex-wrap items-center gap-2"}>
             <Badge tone={status === "finalised" ? "success" : "warning"}>
               {status === "finalised" ? "Signed" : "Draft"}
             </Badge>
@@ -256,16 +262,18 @@ export function ClinicalNotesClient({ appointmentId }: { appointmentId: string }
             ) : null}
           </div>
         </div>
-        <Link
-          href={`/appointments/${appointmentId}/prescription`}
-          className="inline-flex min-h-11 items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
-        >
-          Write prescription
-          <ArrowRight aria-hidden="true" className="size-4" />
-        </Link>
+        {embedded ? null : (
+          <Link
+            href={`/appointments/${appointmentId}/prescription`}
+            className="inline-flex min-h-11 items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+          >
+            Write prescription
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        )}
       </div>
 
-      <ReadyForNextButton appointmentId={appointmentId} />
+      {embedded ? null : <ReadyForNextButton appointmentId={appointmentId} />}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

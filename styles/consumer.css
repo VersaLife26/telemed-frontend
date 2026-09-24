@@ -121,8 +121,27 @@
 
   --duration-fast: 160ms;
   --duration-base: 220ms;
-  --duration-slow: 320ms;
-  --stagger-step:  60ms;
+  --duration-slow: 280ms;
+  --stagger-step:  40ms;
+
+  --dur-press: 140ms;
+  --dur-fast:  180ms;
+  --dur-base:  240ms;
+  --dur-slow:  280ms;
+
+  /* A critically-damped-ish spring (~4% overshoot) sampled into linear(), for
+     CSS-only controls like the Switch thumb. Pair with --dur-slow. */
+  --ease-spring: linear(0, 0.08, 0.255, 0.455, 0.639, 0.787, 0.896, 0.969, 1.011, 1.032, 1.038, 1.036, 1.03, 1.022, 1.015, 1.009, 1);
+
+  /* Glass materials. Thicker = more opaque, more blur, deeper shadow. The
+     inset pair is the lit top edge plus a faint rim, drawn with shadows so
+     the material never changes an element's box. */
+  --glass-thin-bg:    oklch(99% 0.004 258 / 0.52);
+  --glass-regular-bg: oklch(99% 0.004 258 / 0.64);
+  --glass-thick-bg:   oklch(99% 0.004 258 / 0.76);
+  --glass-dark-bg:    oklch(22% 0.035 258 / 0.58);
+  --glass-rim:        inset 0 1px 0 oklch(100% 0 0 / 0.75), inset 0 0 0 1px oklch(100% 0 0 / 0.32);
+  --glass-rim-dark:   inset 0 1px 0 oklch(100% 0 0 / 0.16), inset 0 0 0 1px oklch(100% 0 0 / 0.08);
 
   --content-max-width: 1200px;
 
@@ -230,13 +249,46 @@
     font-family: var(--family-body);
     background: var(--page);
     color: var(--ink);
+    letter-spacing: 0;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * The ambient field every glass surface refracts. Fixed, so it does not
+   * scroll away from the chrome that sits on it, and static: a moving
+   * background behind medical content reads as noise. body goes transparent
+   * so the negative-z layer paints between the canvas (html) and content.
+   */
+  body {
+    background: transparent;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(55% 45% at 8% 0%, oklch(90% 0.05 258 / 0.7), transparent 70%),
+      radial-gradient(45% 40% at 96% 12%, oklch(93% 0.045 178 / 0.6), transparent 70%),
+      radial-gradient(60% 50% at 78% 100%, oklch(92% 0.035 258 / 0.55), transparent 72%),
+      radial-gradient(40% 35% at 0% 85%, oklch(94% 0.03 178 / 0.45), transparent 70%),
+      var(--page);
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--family-display);
     margin: 0;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  h1, h2 {
+    line-height: 1.1;
+    letter-spacing: -0.02em;
   }
 
   a {
@@ -315,7 +367,6 @@
   .page-wash {
     position: relative;
     isolation: isolate;
-    background: var(--page);
   }
 
   .page-wash::before {
@@ -375,17 +426,23 @@
     transform: scale(0.96);
     filter: blur(4px);
     transition:
-      opacity var(--duration-base) var(--ease-out),
-      transform var(--duration-base) var(--ease-out),
-      filter var(--duration-base) var(--ease-out),
-      overlay var(--duration-base) allow-discrete,
-      display var(--duration-base) allow-discrete;
+      opacity 160ms var(--ease-out),
+      transform 160ms var(--ease-out),
+      filter 160ms var(--ease-out),
+      overlay 160ms allow-discrete,
+      display 160ms allow-discrete;
   }
 
   .vl-modal[open] {
     opacity: 1;
     transform: none;
     filter: none;
+    transition:
+      opacity 220ms var(--ease-out),
+      transform 220ms var(--ease-out),
+      filter 220ms var(--ease-out),
+      overlay 220ms allow-discrete,
+      display 220ms allow-discrete;
   }
 
   @starting-style {
@@ -397,18 +454,20 @@
   }
 
   .vl-modal::backdrop {
-    background: oklch(20% 0.03 258 / 0.45);
-    -webkit-backdrop-filter: var(--glass-blur-sm);
-    backdrop-filter: var(--glass-blur-sm);
+    background: oklch(20% 0.03 258 / 0.4);
     opacity: 0;
     transition:
-      opacity var(--duration-base) var(--ease-out),
-      overlay var(--duration-base) allow-discrete,
-      display var(--duration-base) allow-discrete;
+      opacity 160ms var(--ease-out),
+      overlay 160ms allow-discrete,
+      display 160ms allow-discrete;
   }
 
   .vl-modal[open]::backdrop {
     opacity: 1;
+    transition:
+      opacity 220ms var(--ease-out),
+      overlay 220ms allow-discrete,
+      display 220ms allow-discrete;
   }
 
   @starting-style {
@@ -417,23 +476,93 @@
     }
   }
 
-  /* Slim top bar: transparent over the page hero, frosted once content
-     scrolls under it. */
-  .top-bar {
-    background: transparent;
-    border-bottom: 1px solid transparent;
-    transition:
-      background-color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out),
-      box-shadow var(--duration-fast) var(--ease-out);
+  /*
+   * Below 640px the dialog is a bottom sheet: it rises from the edge it is
+   * dragged back to, with the drawer curve. Blur is dropped because the
+   * sheet is already moving -- blur on top of travel reads as smear. The
+   * drag itself is JS (Modal.tsx) and moves the inner panel, never this box,
+   * so the two transforms cannot fight.
+   */
+  @media (max-width: 639.98px) {
+    .vl-modal {
+      inset: auto 0 0 0;
+      margin: 0;
+      width: 100%;
+      max-width: none;
+      max-height: calc(100dvh - 1.5rem);
+      overflow: visible;
+      transform: translateY(100%);
+      filter: none;
+      transition:
+        opacity 200ms var(--ease-out),
+        transform 200ms var(--ease-drawer),
+        overlay 200ms allow-discrete,
+        display 200ms allow-discrete;
+    }
+
+    .vl-modal[open] {
+      transform: none;
+      transition:
+        opacity 280ms var(--ease-out),
+        transform 280ms var(--ease-drawer),
+        overlay 280ms allow-discrete,
+        display 280ms allow-discrete;
+    }
+
+    @starting-style {
+      .vl-modal[open] {
+        opacity: 0;
+        transform: translateY(100%);
+        filter: none;
+      }
+    }
   }
 
-  .top-bar[data-scrolled] {
-    background: var(--glass-bg-light);
-    -webkit-backdrop-filter: var(--glass-blur-md);
-    backdrop-filter: var(--glass-blur-md);
-    border-bottom-color: oklch(99% 0.002 258 / 0.6);
-    box-shadow: 0 4px 20px oklch(24% 0.05 258 / 0.06);
+  .vl-sheet-handle {
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .vl-sheet-handle:active {
+    cursor: grabbing;
+  }
+
+  /*
+   * Slim top bar: transparent over the page hero, glass once content scrolls
+   * under it. The material lives on ::before and extends past the bar, masked
+   * to nothing, so the bottom edge is a scroll-edge fade rather than a rule.
+   */
+  .top-bar {
+    isolation: isolate;
+  }
+
+  .top-bar::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 -18px 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--glass-regular-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+    opacity: 0;
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+
+  .top-bar[data-scrolled]::before {
+    opacity: 1;
+  }
+
+  /* Mobile tab bar. Same material as the top bar, thicker, since it carries
+     labels over arbitrary content. */
+  .tab-bar {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+    background: var(--glass-thick-bg);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    backdrop-filter: blur(32px) saturate(180%);
+    box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.7), 0 -8px 24px oklch(24% 0.05 258 / 0.06);
   }
 
   /* Page hero band. Full-bleed out of the shell's max-width main, and pulled
@@ -485,7 +614,21 @@
   }
 
   .skeleton-pulse {
-    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    animation: skeleton-pulse 1.1s ease-in-out infinite;
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, oklch(100% 0 0 / 0.6), transparent);
+    animation: skeleton-shimmer 1.1s var(--ease-in-out) infinite;
   }
 
   .visit-ticket-rail {
@@ -586,6 +729,51 @@
   .stagger > *:nth-child(n + 6) { animation-delay: calc(var(--stagger-step) * 5); }
 }
 
+/*
+ * Glass materials, thin -> thick. `@utility` rather than component classes so
+ * they take variants (`md:glass-regular`). Each one only works over something:
+ * the body's ambient field, a hero, a photo. Never stack two.
+ */
+@utility glass-thin {
+  background: var(--glass-thin-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  box-shadow: var(--glass-rim), 0 1px 2px oklch(24% 0.05 258 / 0.05), 0 2px 8px oklch(24% 0.05 258 / 0.04);
+}
+
+@utility glass-regular {
+  background: var(--glass-regular-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--glass-rim), 0 8px 24px oklch(24% 0.05 258 / 0.08), 0 2px 6px oklch(24% 0.05 258 / 0.05);
+}
+
+@utility glass-thick {
+  background: var(--glass-thick-bg);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
+  box-shadow: var(--glass-rim), 0 24px 48px oklch(24% 0.05 258 / 0.14), 0 6px 16px oklch(24% 0.05 258 / 0.06);
+}
+
+@utility glass-dark {
+  background: var(--glass-dark-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--glass-rim-dark), 0 12px 32px oklch(10% 0.03 258 / 0.3);
+  color: #fff;
+}
+
+/* Translucent without backdrop-filter: cheap enough for a long list of cards,
+   and the ambient field behind it is already soft, so blur would add nothing. */
+@utility surface-frost {
+  background: oklch(100% 0 0 / 0.78);
+  box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.9), 0 1px 2px oklch(24% 0.05 258 / 0.05), 0 1px 1px oklch(24% 0.05 258 / 0.03);
+}
+
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.45; }
@@ -616,6 +804,16 @@
     filter: none;
   }
 
+  /* Crossfade survives: the blanket rule below would otherwise cut it to 0. */
+  .vl-modal,
+  .vl-modal::backdrop {
+    transition-duration: 160ms !important;
+  }
+
+  .skeleton-shimmer::after {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {
@@ -627,16 +825,25 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .top-bar[data-scrolled],
+  .top-bar::before,
+  .tab-bar,
   .chrome-blur,
   .glass-panel,
-  .glass-panel-strong {
+  .glass-panel-strong,
+  .glass-thin,
+  .glass-regular,
+  .glass-thick {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
+    background: oklch(99% 0.002 258 / 0.97) !important;
+  }
+
+  .surface-frost {
     background: var(--surface) !important;
   }
 
-  .glass-panel-dark {
+  .glass-panel-dark,
+  .glass-dark {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background: var(--ink-900) !important;
@@ -644,33 +851,63 @@
 }
 
 @media (prefers-contrast: more) {
-  .glass-panel,
-  .glass-panel-strong {
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
+  body::before {
+    background: var(--page);
   }
 
-  .glass-panel-dark {
+  .top-bar::before,
+  .tab-bar,
+  .glass-panel,
+  .glass-panel-strong,
+  .glass-thin,
+  .glass-regular,
+  .glass-thick,
+  .surface-frost {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    box-shadow: none;
+  }
+
+  .top-bar::before {
+    border-width: 0 0 1px;
+    -webkit-mask-image: none;
+    mask-image: none;
+    inset: 0;
+  }
+
+  .tab-bar {
+    border-width: 1px 0 0;
+  }
+
+  .glass-panel-dark,
+  .glass-dark {
     background: var(--ink-900);
     border: 1px solid var(--ink-600);
   }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  .top-bar[data-scrolled],
+  .top-bar::before,
+  .tab-bar,
   .glass-panel,
-  .glass-panel-strong {
+  .glass-panel-strong,
+  .glass-thin,
+  .glass-regular,
+  .glass-thick {
     background: var(--surface);
   }
 
-  .glass-panel-dark {
+  .glass-panel-dark,
+  .glass-dark {
     background: var(--ink-900);
   }
 }
 
 .ws-desktop {
   position: relative;
-  min-height: 100dvh;
+  height: 100dvh;
   overflow: hidden;
   color: #fff;
   background:
@@ -683,11 +920,16 @@
   z-index: 40;
   display: flex;
   height: 36px;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  background: var(--ink-800);
-  border-bottom: 1px solid rgb(255 255 255 / 0.12);
+  padding-top: env(safe-area-inset-top);
+  box-sizing: content-box;
+  background: var(--glass-dark-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.08);
 }
 
 .ws-windows {
@@ -697,31 +939,54 @@
   pointer-events: none;
 }
 
+/* A window is a thick dark material: the wallpaper reads through at the
+   edges, content stays legible on a near-opaque body. */
 .ws-window {
   position: absolute;
   display: flex;
-  min-width: 360px;
-  min-height: 240px;
   flex-direction: column;
   overflow: hidden;
   pointer-events: auto;
-  border-radius: 10px;
-  background: var(--ink-900);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
+  border-radius: 12px;
+  background: oklch(20% 0.03 258 / 0.82);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 0 0 1px rgb(255 255 255 / 0.1),
+    0 24px 60px -12px rgb(0 0 0 / 0.5);
+  transition:
+    opacity 200ms var(--ease-out),
+    scale 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    scale: 0.96;
+  }
 }
 
 .ws-window[data-focused="true"] {
-  border-color: rgb(255 255 255 / 0.28);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 0 0 1px rgb(255 255 255 / 0.2),
+    0 32px 80px -12px rgb(0 0 0 / 0.6);
+}
+
+.ws-window[data-docked="true"] {
+  border-radius: 0;
 }
 
 .ws-titlebar {
   display: flex;
   height: 2.25rem;
+  flex-shrink: 0;
   cursor: grab;
   align-items: center;
-  background: var(--ink-800);
-  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  user-select: none;
+  touch-action: none;
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.06);
 }
 
 .ws-titlebar:active {
@@ -736,13 +1001,14 @@
   text-align: left;
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgb(255 255 255 / 0.85);
+  letter-spacing: 0.01em;
+  color: rgb(255 255 255 / 0.88);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ws-window[data-focused="false"] .ws-title {
-  color: rgb(255 255 255 / 0.55);
+  color: rgb(255 255 255 / 0.5);
 }
 
 .ws-controls {
@@ -765,11 +1031,11 @@
   transition:
     background-color 120ms var(--ease-out),
     color 120ms var(--ease-out),
-    transform 120ms var(--ease-out);
+    scale 120ms var(--ease-out);
 }
 
 .ws-ctrl:active {
-  transform: scale(0.97);
+  scale: 0.94;
 }
 
 .ws-ctrl svg {
@@ -788,34 +1054,88 @@
   }
 }
 
+/* Apps size themselves off the window, not the screen. */
 .ws-body {
+  position: relative;
   min-height: 0;
   flex: 1;
   overflow: hidden;
+  container-type: inline-size;
+}
+
+.ws-body-light {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+  background: var(--page);
+  color: var(--ink);
 }
 
 .ws-resize {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.ws-resize-n,
+.ws-resize-s { left: 10px; right: 10px; height: 8px; cursor: ns-resize; }
+.ws-resize-e,
+.ws-resize-w { top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
+.ws-resize-n { top: -4px; }
+.ws-resize-s { bottom: -4px; }
+.ws-resize-e { right: -4px; }
+.ws-resize-w { left: -4px; }
+.ws-resize-ne,
+.ws-resize-nw,
+.ws-resize-se,
+.ws-resize-sw { width: 16px; height: 16px; }
+.ws-resize-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+.ws-resize-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+.ws-resize-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.ws-resize-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+
+.ws-ghost {
+  position: absolute;
+  z-index: 9999;
+  pointer-events: none;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--brand) 18%, transparent);
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition:
+    left 180ms var(--ease-out),
+    top 180ms var(--ease-out),
+    width 180ms var(--ease-out),
+    height 180ms var(--ease-out),
+    opacity 180ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .ws-dock {
   position: absolute;
-  bottom: 16px;
+  bottom: max(12px, env(safe-area-inset-bottom));
   left: 50%;
   z-index: 30;
   display: flex;
+  max-width: calc(100vw - 24px);
   translate: -50% 0;
   align-items: flex-end;
   gap: 8px;
-  padding: 8px 12px 10px;
-  border-radius: 18px;
-  background: var(--ink-800);
-  border: 1px solid rgb(255 255 255 / 0.12);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 8px 12px 6px;
+  border-radius: 22px;
+  background: var(--glass-dark-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 0 0 1px rgb(255 255 255 / 0.1),
+    0 18px 40px -10px rgb(0 0 0 / 0.5);
 }
 
 .ws-dock-item {
@@ -834,7 +1154,7 @@
 }
 
 .ws-dock-item:active {
-  transform: scale(0.97);
+  transform: scale(0.94);
 }
 
 .ws-dock-dot {
@@ -844,10 +1164,16 @@
   border-radius: 999px;
   background: #fff;
   opacity: 0;
+  transition: width 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+.ws-dock-dot-active {
+  width: 12px;
 }
 
 .ws-dock-split {
   width: 1px;
+  flex-shrink: 0;
   align-self: stretch;
   margin: 6px 4px 14px;
   background: rgb(255 255 255 / 0.18);
@@ -857,6 +1183,7 @@
   display: flex;
   width: 3rem;
   height: 3rem;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   margin-bottom: 8px;
@@ -872,69 +1199,158 @@
 }
 
 .ws-dock-power:active {
-  transform: scale(0.97);
+  transform: scale(0.94);
 }
 
-.ws-mini-call {
-  position: absolute;
-  right: 1.5rem;
-  bottom: 6rem;
-  z-index: 20;
-  overflow: hidden;
-  width: 13rem;
-  height: 9rem;
-  border: 0;
-  padding: 0;
-  border-radius: 0.5rem;
-  box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
-  cursor: pointer;
-  outline: 1px solid rgb(255 255 255 / 0.28);
-  transition: transform 160ms var(--ease-out);
-}
+/* --- phone: one app at a time, Android-style recents ------------------- */
 
-.ws-mini-call:active {
-  transform: scale(0.97);
-}
-
-.ws-call-bar {
+.ws-phone {
+  position: fixed;
+  inset: 0;
   display: flex;
-  width: fit-content;
+  flex-direction: column;
+  overflow: hidden;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgb(8 15 28 / 0.4), rgb(8 15 28 / 0.55)),
+    url("/assets/workspace-wallpaper.jpg") center / cover no-repeat;
+}
+
+.ws-phone-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ws-phone-home {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 1.5rem 1.25rem;
+}
+
+.ws-phone-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: oklch(20% 0.03 258);
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.ws-phone-card-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ws-phone-card-recents {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.14),
+    0 30px 70px -10px rgb(0 0 0 / 0.6);
+}
+
+.ws-phone-card-label {
+  display: flex;
+  height: 0;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 auto 1rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-pill);
-  background: var(--ink-900);
-  border: 1px solid rgb(255 255 255 / 0.14);
+  overflow: visible;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
-.ws-call-btn {
+.ws-phone-card-recents .ws-phone-card-label {
+  height: 3.25rem;
+  flex-shrink: 0;
+  padding: 0 1rem;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.ws-phone-card-body {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.ws-recents-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  touch-action: none;
+  background: rgb(4 8 16 / 0.45);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: opacity 200ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.ws-gesture-bar {
+  position: relative;
+  z-index: 50;
   display: flex;
-  width: 2.75rem;
-  height: 2.75rem;
+  height: 48px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem env(safe-area-inset-bottom);
+  box-sizing: content-box;
+  touch-action: none;
+  background: var(--glass-dark-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.ws-gesture-handle {
+  width: 7rem;
+  height: 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.75);
+}
+
+.ws-gesture-btn {
+  display: flex;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   border: 0;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.1);
-  color: #fff;
-  cursor: pointer;
+  background: transparent;
+  color: rgb(255 255 255 / 0.85);
+  touch-action: manipulation;
   transition:
-    background-color 120ms var(--ease-out),
-    transform 120ms var(--ease-out);
+    background-color 140ms var(--ease-out),
+    scale 140ms var(--ease-out);
 }
 
-.ws-call-btn:active {
-  transform: scale(0.97);
+.ws-gesture-btn:active {
+  scale: 0.9;
+  background: rgb(255 255 255 / 0.12);
 }
 
-.ws-call-btn[aria-pressed="true"] {
-  background: rgb(255 255 255 / 0.22);
+.ws-gesture-btn:disabled {
+  opacity: 0.35;
 }
 
-.ws-call-btn-end {
-  margin-left: 0.25rem;
-  background: var(--red-700);
+/* In-call toasts rise out of the top edge they live against. */
+.call-toast {
+  transition:
+    opacity 220ms var(--ease-out),
+    translate 220ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 -8px;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
@@ -948,20 +1364,33 @@
   .ws-dock-power:hover {
     background: rgb(255 255 255 / 0.16);
   }
-  .ws-call-btn:hover {
-    background: rgb(255 255 255 / 0.18);
-  }
-  .ws-call-btn-end:hover {
-    background: var(--red-500);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ws-dock-item,
   .ws-dock-power,
   .ws-ctrl,
-  .ws-call-btn,
-  .ws-mini-call {
+  .ws-window,
+  .ws-ghost,
+  .ws-gesture-btn,
+  .call-toast {
     transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ws-menubar,
+  .ws-window,
+  .ws-dock,
+  .ws-gesture-bar,
+  .ws-recents-scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .ws-window,
+  .ws-dock,
+  .ws-menubar,
+  .ws-gesture-bar {
+    background: var(--ink-900);
   }
 }

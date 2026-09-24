@@ -51,14 +51,14 @@ export function Switch({
         <span
           aria-hidden="true"
           className={cx(
-            "flex h-7 w-12 items-center rounded-pill p-0.5 transition-colors duration-[160ms] ease-out",
+            "flex h-7 w-12 items-center rounded-pill p-0.5 transition-colors duration-[var(--dur-fast)] ease-out",
             "peer-focus-visible:outline peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand",
             checked ? "bg-brand" : "bg-ink-200",
           )}
         >
           <span
             className={cx(
-              "size-6 rounded-full bg-white shadow-sm transition-transform duration-[160ms] ease-out",
+              "size-6 rounded-full bg-white shadow-sm transition-[translate] duration-[var(--dur-slow)] ease-[var(--ease-spring)]",
               checked ? "translate-x-5" : "translate-x-0",
             )}
           />

@@ -1,10 +1,12 @@
-import type { TelemedUser } from "@/lib/consumer/api/types";
+import type { Sex, TelemedUser } from "@/lib/consumer/api/types";
 
 export type ProfileDraft = {
   name: string;
   phone: string;
   address: string;
   dateOfBirth: string;
+  sex: Sex | "";
+  allergies: string;
 };
 
 export const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -17,12 +19,15 @@ export function profileDraftFromUser(user: TelemedUser): ProfileDraft {
     phone: user.phone || "",
     address: user.address || "",
     dateOfBirth: user.date_of_birth || "",
+    sex: user.sex || "",
+    allergies: user.allergies || "",
   };
 }
 
 export function profileUpdateError(draft: ProfileDraft): string | null {
   if (!draft.name.trim()) return "Enter your name.";
   if (draft.address.length > 500) return "Address must be 500 characters or fewer.";
+  if (draft.allergies.length > 1000) return "Allergies must be 1000 characters or fewer.";
   if (draft.dateOfBirth) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.dateOfBirth)) {
       return "Date of birth must be a valid date.";
@@ -40,6 +45,8 @@ export function profileUpdateBody(user: TelemedUser, draft: ProfileDraft) {
     phone: draft.phone.trim(),
     address: draft.address.trim(),
     date_of_birth: draft.dateOfBirth.trim(),
+    sex: draft.sex,
+    allergies: draft.allergies.trim(),
     language: user.language || "en",
     version: user.version ?? 0,
   };

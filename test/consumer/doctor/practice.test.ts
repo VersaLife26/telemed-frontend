@@ -7,7 +7,7 @@ import {
   busiestLabel,
   consultLanguages,
   defaultWorkingHours,
-  documentMetadataBody,
+  credentialDocumentError,
   doctorFeeCents,
   fillWorkingHours,
   flattenWorkingHours,
@@ -157,11 +157,14 @@ test("consultLanguages keeps only en/si/ta/other", () => {
   assert.deepEqual(consultLanguages([]), ["en"]);
 });
 
-test("documentMetadataBody is type plus filename, never bytes", () => {
-  assert.deepEqual(documentMetadataBody("slmc_certificate", "  slmc.pdf  "), {
-    document_type: "slmc_certificate",
-    filename: "slmc.pdf",
-  });
+test("credentialDocumentError accepts PDFs and images up to 5 MB", () => {
+  assert.equal(credentialDocumentError(null), "Choose a file to upload.");
+  assert.equal(credentialDocumentError({ type: "application/pdf", size: 1024 }), null);
+  assert.equal(credentialDocumentError({ type: "image/heic", size: 1024 }), "Upload a PDF, JPEG, PNG or WebP file.");
+  assert.equal(
+    credentialDocumentError({ type: "image/png", size: 6 * 1024 * 1024 }),
+    "Each document must be 5 MB or smaller.",
+  );
 });
 
 test("summarizePracticeEarnings maps net/paid/unpaid", () => {

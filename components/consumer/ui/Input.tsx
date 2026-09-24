@@ -26,7 +26,7 @@ export function Input({
     <span
       className={cx(
         fieldControlClass,
-        "flex items-center gap-2.5 py-0 focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--brand-tint)]",
+        "flex items-center gap-2.5 py-0 focus-within:border-brand focus-within:shadow-[0_0_0_4px_var(--brand-tint)] can-hover:focus-within:border-brand",
         className,
       )}
     >

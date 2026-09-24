@@ -14,7 +14,9 @@ export type TabItem<T extends string> = { value: T; label: string };
  * and the text-colour boundary as one edge, which is something you cannot get
  * by transitioning each tab's own colour: that always shows two tabs
  * mid-crossfade. The clip transitions with ease-in-out because it is movement
- * across the screen rather than something entering it.
+ * across the screen rather than something entering it. Arrow-key changes jump
+ * instead: keyboard users repeat the action fast, and a trailing indicator
+ * reads as lag.
  */
 export function Tabs<T extends string>({
   items,
@@ -33,6 +35,7 @@ export function Tabs<T extends string>({
   const listRef = useRef<HTMLDivElement>(null);
   const buttonsRef = useRef(new Map<string, HTMLButtonElement>());
   const [clip, setClip] = useState<string>("inset(0 100% 0 0 round 999px)");
+  const [instant, setInstant] = useState(false);
 
   const measure = useCallback(() => {
     const list = listRef.current;
@@ -62,6 +65,7 @@ export function Tabs<T extends string>({
     const index = items.findIndex((item) => item.value === value);
     const next = items[(index + delta + items.length) % items.length];
     if (!next) return;
+    setInstant(true);
     onChange(next.value);
     buttonsRef.current.get(next.value)?.focus();
   }
@@ -85,8 +89,11 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={item.value === value}
           tabIndex={item.value === value ? 0 : -1}
-          onClick={() => onChange(item.value)}
-          className="relative z-10 min-h-9 cursor-pointer rounded-pill px-5 text-label text-muted transition-colors duration-[160ms] ease-out can-hover:hover:text-ink"
+          onClick={() => {
+            setInstant(false);
+            onChange(item.value);
+          }}
+          className="relative z-10 min-h-9 cursor-pointer rounded-pill px-5 text-label text-muted transition-colors duration-[var(--dur-fast)] ease-out can-hover:hover:text-ink"
         >
           {item.label}
         </button>
@@ -95,7 +102,10 @@ export function Tabs<T extends string>({
       <div
         aria-hidden="true"
         style={{ clipPath: clip }}
-        className="pointer-events-none absolute inset-0 z-20 flex gap-1 bg-brand p-1 text-on-brand [transition:clip-path_220ms_var(--ease-in-out)]"
+        className={cx(
+          "pointer-events-none absolute inset-0 z-20 flex gap-1 bg-brand p-1 text-on-brand",
+          !instant && "[transition:clip-path_var(--dur-base)_var(--ease-in-out)]",
+        )}
       >
         {items.map((item) => (
           <span

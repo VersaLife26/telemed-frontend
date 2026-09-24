@@ -70,9 +70,13 @@ export function issuePayload(opts: {
   doctor: Doctor | null;
   patientName: string;
   patientAge: string;
+  patientSex?: string;
+  patientWeightKg?: string;
+  patientAllergies?: string;
   items: ItemDraft[];
 }) {
   const lines = completeLines(opts.items);
+  const weight = Number.parseFloat(opts.patientWeightKg || "");
   return {
     appointment_id: opts.appointmentId,
     doctor_name: opts.doctor?.display_name || "Doctor",
@@ -82,6 +86,9 @@ export function issuePayload(opts: {
     patient_name: opts.patientName.trim(),
     patient_age: Number.parseInt(opts.patientAge, 10) || 0,
     patient_nic: "",
+    ...(opts.patientSex ? { patient_sex: opts.patientSex } : {}),
+    ...(Number.isFinite(weight) && weight > 0 ? { patient_weight_kg: weight } : {}),
+    ...(opts.patientAllergies?.trim() ? { patient_allergies: opts.patientAllergies.trim() } : {}),
     items: lines.map((it) => ({
       drug_name: it.drug_name.trim(),
       strength: it.strength || "",
@@ -95,6 +102,9 @@ export function issuePayload(opts: {
     })),
   };
 }
+
+export const signatureImagePath = "/api/proxy/doctors/me/signature";
+export const sealImagePath = "/api/proxy/doctors/me/seal";
 
 export function lookupPath(appointmentId: string): string {
   return `/prescriptions?appointment_id=${encodeURIComponent(appointmentId)}`;

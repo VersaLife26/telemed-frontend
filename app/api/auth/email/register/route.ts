@@ -14,6 +14,8 @@ export async function POST(req: Request) {
       password?: string;
       name?: string;
       date_of_birth?: string;
+      sex?: string;
+      allergies?: string;
     };
     if (!body.email?.trim() || !body.password) {
       return Response.json({ message: "Email and password are required" }, { status: 400 });
@@ -29,7 +31,10 @@ export async function POST(req: Request) {
       name: body.name?.trim() || undefined,
     };
 
-    if (!dob) {
+    const sex = ["female", "male", "other"].includes(body.sex || "") ? body.sex : "";
+    const allergies = body.allergies?.trim().slice(0, 1000) || "";
+
+    if (!dob && !sex && !allergies) {
       return await completeEmailRegister(payload);
     }
 
@@ -46,7 +51,9 @@ export async function POST(req: Request) {
           name: user.name || body.name?.trim() || "Patient",
           phone: user.phone || "",
           address: user.address || "",
-          date_of_birth: dob,
+          date_of_birth: dob || user.date_of_birth || "",
+          sex,
+          allergies,
           language: user.language || "en",
           version: user.version ?? 0,
         },

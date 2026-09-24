@@ -5,6 +5,8 @@ export type PageMeta = {
   total_pages: number;
 };
 
+export type Sex = "female" | "male" | "other";
+
 export type TelemedUser = {
   id: string;
   phone: string;
@@ -13,6 +15,8 @@ export type TelemedUser = {
   address?: string;
   date_of_birth?: string | null;
   photo_url?: string | null;
+  sex?: Sex | "" | null;
+  allergies?: string | null;
   language?: string;
   role?: string;
   status?: string;
@@ -71,6 +75,9 @@ export type Appointment = {
   visit_patient_name?: string;
   visit_patient_dob?: string;
   visit_patient_age?: number;
+  visit_patient_sex?: Sex | "" | null;
+  visit_patient_weight_kg?: number | null;
+  visit_patient_allergies?: string | null;
   intake?: {
     symptoms?: string;
     [key: string]: unknown;

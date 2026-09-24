@@ -1,20 +1,14 @@
 "use client";
 
-import { CalendarDays, FileText, FolderClosed, MessageSquare, Power, Video } from "lucide-react";
+import { Power } from "lucide-react";
 
-import { useWindows, type WorkspaceApp } from "@/components/consumer/workspace/window-manager";
+import { AppIcon, APPS, LAUNCHER_APPS, type WorkspaceApp } from "@/components/consumer/workspace/apps";
+import { useWindows } from "@/components/consumer/workspace/window-manager";
 import { cx } from "@/lib/consumer/cx";
 
-const APPS: { app: WorkspaceApp; label: string; color: string; Icon: typeof Video }[] = [
-  { app: "meet", label: "Meet", color: "#2563eb", Icon: Video },
-  { app: "files", label: "File Station", color: "#f59e0b", Icon: FolderClosed },
-  { app: "calendar", label: "Calendar", color: "#dc2626", Icon: CalendarDays },
-  { app: "chat", label: "Chat", color: "#0d9488", Icon: MessageSquare },
-];
-
 export function Dock({ onExit }: { onExit: () => void }) {
-  const { windows, open, restore, focus } = useWindows();
-  const viewers = windows.filter((w) => w.app === "viewer");
+  const { windows, open, restore, focus, focusedId } = useWindows();
+  const extra = windows.filter((w) => !APPS[w.app].launcher);
 
   function activate(id: string, app: WorkspaceApp) {
     const win = windows.find((w) => w.id === id);
@@ -28,9 +22,9 @@ export function Dock({ onExit }: { onExit: () => void }) {
 
   return (
     <nav aria-label="Dock" className="ws-dock">
-      {APPS.map(({ app, label, color, Icon }) => {
+      {LAUNCHER_APPS.map((app) => {
         const win = windows.find((w) => w.id === app);
-        const present = Boolean(win);
+        const label = APPS[app].label;
         return (
           <button
             key={app}
@@ -40,32 +34,23 @@ export function Dock({ onExit }: { onExit: () => void }) {
             className="ws-dock-item"
             onClick={() => activate(app, app)}
           >
-            <span
-              className="flex size-12 items-center justify-center rounded-2xl shadow-md"
-              style={{ background: color }}
-            >
-              <Icon className="size-6 text-white" strokeWidth={1.75} />
-            </span>
-            <span className={cx("ws-dock-dot", present && "opacity-100")} />
+            <AppIcon app={app} />
+            <span className={cx("ws-dock-dot", win && "opacity-100", focusedId === app && "ws-dock-dot-active")} />
           </button>
         );
       })}
-      {viewers.map((win) => (
+      {extra.length ? <span className="ws-dock-split" aria-hidden="true" /> : null}
+      {extra.map((win) => (
         <button
           key={win.id}
           type="button"
           title={win.title}
           aria-label={win.minimized ? `Restore ${win.title}` : win.title}
           className="ws-dock-item"
-          onClick={() => activate(win.id, "viewer")}
+          onClick={() => activate(win.id, win.app)}
         >
-          <span
-            className="flex size-12 items-center justify-center rounded-2xl shadow-md"
-            style={{ background: "#64748b" }}
-          >
-            <FileText className="size-6 text-white" strokeWidth={1.75} />
-          </span>
-          <span className="ws-dock-dot opacity-100" />
+          <AppIcon app={win.app} />
+          <span className={cx("ws-dock-dot opacity-100", focusedId === win.id && "ws-dock-dot-active")} />
         </button>
       ))}
       <span className="ws-dock-split" aria-hidden="true" />

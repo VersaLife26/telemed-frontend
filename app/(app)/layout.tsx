@@ -19,5 +19,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return <AdminConsoleLayout>{children}</AdminConsoleLayout>;
   }
   const { default: ConsumerShellLayout } = await import("@/components/consumer/layouts/shell");
-  return <ConsumerShellLayout>{children}</ConsumerShellLayout>;
+  const { CallProvider } = await import("@/components/consumer/call/call-provider");
+  return (
+    <CallProvider>
+      <ConsumerShellLayout>{children}</ConsumerShellLayout>
+    </CallProvider>
+  );
 }

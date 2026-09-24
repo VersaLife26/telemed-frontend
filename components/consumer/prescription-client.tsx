@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/consumer/ui/Card";
-import { ArrowLeft, Download, Plus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, PenLine, Plus } from "lucide-react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
 import { Button } from "@/components/consumer/ui/Button";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
+import { Modal } from "@/components/consumer/ui/Modal";
+import { Textarea } from "@/components/consumer/ui/Textarea";
+import { SexField } from "@/components/consumer/sex-field";
 import { browserApi } from "@/lib/consumer/api/client";
 import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
-import type { Appointment, Doctor, FormularyDrug, Prescription } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor, FormularyDrug, Prescription, Sex } from "@/lib/consumer/api/types";
 import { prescriptionPatientFields } from "@/lib/consumer/features/visit-patient";
 import {
   blankItem,
@@ -23,14 +26,51 @@ import {
   issueError,
   issuePayload,
   lookupPath,
+  sealImagePath,
+  signatureImagePath,
   type ItemDraft,
 } from "@/lib/consumer/features/prescription";
 
-export function PrescriptionClient({ appointmentId }: { appointmentId: string }) {
+function useCredentialImage(path: string) {
+  const [src, setSrc] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let url: string | null = null;
+    let cancelled = false;
+    fetch(path, { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok || !(res.headers.get("content-type") || "").startsWith("image/")) return null;
+        url = URL.createObjectURL(await res.blob());
+        return url;
+      })
+      .catch(() => null)
+      .then((next) => {
+        if (!cancelled) setSrc(next);
+      });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [path]);
+  return src;
+}
+
+export function PrescriptionClient({
+  appointmentId,
+  embedded = false,
+}: {
+  appointmentId: string;
+  embedded?: boolean;
+}) {
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [patientName, setPatientName] = useState("");
   const [patientAge, setPatientAge] = useState("");
+  const [patientSex, setPatientSex] = useState<Sex | "">("");
+  const [patientWeight, setPatientWeight] = useState("");
+  const [patientAllergies, setPatientAllergies] = useState("");
   const [patientLocked, setPatientLocked] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const signatureSrc = useCredentialImage(signatureImagePath);
+  const sealSrc = useCredentialImage(sealImagePath);
   const [items, setItems] = useState<ItemDraft[]>([blankItem()]);
   const [issued, setIssued] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +108,9 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
           const fields = prescriptionPatientFields(appt);
           if (fields.name) setPatientName(fields.name);
           if (fields.age) setPatientAge(fields.age);
+          setPatientSex(fields.sex);
+          setPatientWeight(fields.weightKg);
+          setPatientAllergies(fields.allergies);
           setPatientLocked(fields.locked);
         }
       } catch (e) {
@@ -121,18 +164,32 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
     }
   }
 
-  async function issue() {
+  function requestIssue() {
     setError(null);
     const validation = issueError(patientName, doctor, items);
     if (validation) {
       setError(validation);
       return;
     }
+    setConfirming(true);
+  }
+
+  async function issue() {
+    setConfirming(false);
     setIssuing(true);
     try {
       const created = await browserApi<Prescription>("/prescriptions", {
         method: "POST",
-        body: issuePayload({ appointmentId, doctor, patientName, patientAge, items }),
+        body: issuePayload({
+          appointmentId,
+          doctor,
+          patientName,
+          patientAge,
+          patientSex,
+          patientWeightKg: patientWeight,
+          patientAllergies,
+          items,
+        }),
       });
       setIssued(created);
       setItems(fromIssued(created.items));
@@ -158,12 +215,15 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
     return <FormSkeleton />;
   }
 
+  const locked = Boolean(issued) || patientLocked;
+  const credentialsMissing = signatureSrc === null || sealSrc === null;
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <div className="@container mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-h2 text-ink">Prescription</h1>
-          <div className="mt-2">
+          {embedded ? null : <h1 className="text-h2 text-ink">Prescription</h1>}
+          <div className={embedded ? undefined : "mt-2"}>
             {issued ? (
               <Badge tone="success">Issued {issued.issued_at || ""}</Badge>
             ) : (
@@ -171,43 +231,98 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
             )}
           </div>
         </div>
-        <Link
-          href={`/appointments/${appointmentId}/clinical-notes`}
-          className="inline-flex min-h-11 items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Clinical notes
-        </Link>
+        {embedded ? null : (
+          <Link
+            href={`/appointments/${appointmentId}/clinical-notes`}
+            className="inline-flex min-h-11 items-center gap-1 text-body-sm font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Clinical notes
+          </Link>
+        )}
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <Card className="flex flex-col gap-5">
-        <p className="text-body-sm text-muted">
-          Prescriber: <span className="font-semibold text-ink">{doctor?.display_name || "Doctor"}</span>{" "}
-          · SLMC {doctor?.slmc_number || "—"}
-        </p>
-        <Input
-          id="patient-name"
-          label="Patient name"
-          hint={patientLocked ? "From booking — printed on the PDF." : "Printed on the PDF."}
-          value={patientName}
-          onChange={(e) => setPatientName(e.target.value)}
-          placeholder="Kamala Silva"
-          readOnly={patientLocked}
-          disabled={Boolean(issued) || patientLocked}
-        />
-        <Input
-          id="patient-age"
-          label="Age"
-          type="number"
-          min={0}
-          max={130}
-          value={patientAge}
-          onChange={(e) => setPatientAge(e.target.value)}
-          readOnly={patientLocked}
-          disabled={Boolean(issued) || patientLocked}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-body-sm text-muted">
+            Prescriber: <span className="font-semibold text-ink">{doctor?.display_name || "Doctor"}</span>{" "}
+            · SLMC {doctor?.slmc_number || "—"}
+          </p>
+          {patientLocked && !issued ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              leading={<PenLine className="size-4" />}
+              onClick={() => setPatientLocked(false)}
+            >
+              Edit patient details
+            </Button>
+          ) : null}
+        </div>
+        {patientAllergies ? (
+          <div
+            role="note"
+            className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-tint px-3 py-2 text-body-sm text-ink"
+          >
+            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
+            <span>
+              <span className="font-semibold">Allergies:</span> {patientAllergies}
+            </span>
+          </div>
+        ) : null}
+        <div className="grid gap-4 @md:grid-cols-2">
+          <Input
+            id="patient-name"
+            label="Patient name"
+            hint={patientLocked ? "From booking. Printed on the PDF." : "Printed on the PDF."}
+            value={patientName}
+            onChange={(e) => setPatientName(e.target.value)}
+            placeholder="Kamala Silva"
+            readOnly={patientLocked}
+            disabled={locked}
+            fieldClassName="@md:col-span-2"
+          />
+          <Input
+            id="patient-age"
+            label="Age"
+            type="number"
+            min={0}
+            max={130}
+            value={patientAge}
+            onChange={(e) => setPatientAge(e.target.value)}
+            readOnly={patientLocked}
+            disabled={locked}
+          />
+          <Input
+            id="patient-weight"
+            label="Weight (kg)"
+            type="number"
+            inputMode="decimal"
+            min={0.5}
+            max={400}
+            step={0.1}
+            value={patientWeight}
+            onChange={(e) => setPatientWeight(e.target.value)}
+            readOnly={patientLocked}
+            disabled={locked}
+          />
+          <div className="@md:col-span-2">
+            <SexField id="patient-sex" value={patientSex} onChange={setPatientSex} disabled={locked} />
+          </div>
+          <Textarea
+            id="patient-allergies"
+            label="Known allergies"
+            rows={2}
+            className="min-h-16"
+            value={patientAllergies}
+            onChange={(e) => setPatientAllergies(e.target.value)}
+            readOnly={patientLocked}
+            disabled={locked}
+            fieldClassName="@md:col-span-2"
+          />
+        </div>
       </Card>
 
       {items.map((item, index) => (
@@ -257,7 +372,7 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
               </ul>
             ) : null}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 @md:grid-cols-2">
             <Input
               value={item.strength || ""}
               onChange={(e) => patchItem(item.key, { strength: e.target.value })}
@@ -320,15 +435,70 @@ export function PrescriptionClient({ appointmentId }: { appointmentId: string })
         </Button>
       ) : null}
 
+      <Card className="flex flex-col gap-4">
+        <p className="text-label text-ink">Signature &amp; seal</p>
+        {credentialsMissing ? (
+          <Alert tone="warning">
+            Add your signature and seal before issuing.{" "}
+            <Link href="/profile#signature" className="font-semibold text-brand underline underline-offset-4">
+              Open profile
+            </Link>
+          </Alert>
+        ) : null}
+        <div className="grid grid-cols-2 gap-3">
+          <CredentialPreview label="Signature" src={signatureSrc} />
+          <CredentialPreview label="Seal" src={sealSrc} />
+        </div>
+      </Card>
+
       {issued ? (
         <Button size="lg" fullWidth leading={<Download className="size-4" />} onClick={() => void openPdf(issued.id)}>
           Download PDF
         </Button>
       ) : (
-        <Button size="lg" fullWidth busy={issuing} onClick={() => void issue()}>
+        <Button
+          size="lg"
+          fullWidth
+          busy={issuing}
+          disabled={credentialsMissing}
+          onClick={requestIssue}
+        >
           {issuing ? "Generating PDF…" : "Issue prescription"}
         </Button>
       )}
+
+      <Modal
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Issue this prescription?"
+        description="Issued prescriptions are signed and can't be changed. Check the patient details and every drug line first."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              Keep editing
+            </Button>
+            <Button onClick={() => void issue()}>Issue and sign</Button>
+          </>
+        }
+      />
     </div>
+  );
+}
+
+function CredentialPreview({ label, src }: { label: string; src: string | null | undefined }) {
+  return (
+    <figure className="flex flex-col gap-2">
+      <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-border-default bg-surface p-2">
+        {src === undefined ? (
+          <span className="h-10 w-3/4 animate-pulse rounded bg-ink-50" />
+        ) : src ? (
+          // eslint-disable-next-line @next/next/no-img-element -- blob: URL
+          <img src={src} alt={`Your ${label.toLowerCase()}`} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <span className="text-body-sm text-faint">Not added</span>
+        )}
+      </div>
+      <figcaption className="text-body-sm text-muted">{label}</figcaption>
+    </figure>
   );
 }

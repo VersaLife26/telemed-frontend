@@ -20,10 +20,11 @@ import {
   PRACTICE_LANGUAGES,
   consultLanguages,
   doctorFeeCents,
-  documentMetadataBody,
+  credentialDocumentError,
   practiceProfileBody,
 } from "@/lib/consumer/features/practice";
 import { profilePhotoError, profilePhotoSrc } from "@/lib/consumer/features/profile";
+import { SignatureCard } from "@/components/consumer/signature-card";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
@@ -39,7 +40,8 @@ export default function ProfilePage() {
   const [docType, setDocType] = useState<(typeof CREDENTIAL_DOC_TYPES)[number]["value"]>(
     "slmc_certificate",
   );
-  const [docFilename, setDocFilename] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -203,22 +205,25 @@ export default function ProfilePage() {
 
   async function saveDocument(e: React.FormEvent) {
     e.preventDefault();
-    if (!docFilename.trim()) {
-      setError("Filename is required. Bytes are not uploaded here — only metadata.");
+    const invalid = credentialDocumentError(docFile);
+    if (invalid || !docFile) {
+      setError(invalid);
+      setNotice(null);
       return;
     }
     setSaving("document");
     setNotice(null);
     setError(null);
     try {
-      await browserApi("/doctors/me/documents", {
-        method: "POST",
-        body: documentMetadataBody(docType, docFilename),
-      });
-      setDocFilename("");
-      setNotice("Document metadata recorded. Object storage still holds the file bytes.");
+      const form = new FormData();
+      form.append("document_type", docType);
+      form.append("file", docFile);
+      await browserApi("/doctors/me/documents", { method: "POST", body: form });
+      setDocFile(null);
+      if (docInputRef.current) docInputRef.current.value = "";
+      setNotice("Document uploaded for review.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not record document");
+      setError(err instanceof Error ? err.message : "Could not upload document");
     } finally {
       setSaving(null);
     }
@@ -385,10 +390,12 @@ export default function ProfilePage() {
         </form>
       </Card>
 
+      <SignatureCard />
+
       <Card>
         <h2 className="text-h4 text-ink">Credential documents</h2>
         <p className="mt-1 text-body-sm text-muted">
-          Records document type and filename only. File bytes are not sent on this call.
+          Upload certificates for the verification team. PDF, JPEG, PNG or WebP, up to 5 MB each.
         </p>
         <form onSubmit={(e) => void saveDocument(e)} className="mt-5 flex flex-col gap-5">
           <Select
@@ -405,13 +412,23 @@ export default function ProfilePage() {
               </option>
             ))}
           </Select>
-          <Input
-            id="doc-filename"
-            label="Filename"
-            value={docFilename}
-            onChange={(e) => setDocFilename(e.target.value)}
-            placeholder="slmc-certificate.pdf"
-          />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-label text-ink">File</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" size="sm" onClick={() => docInputRef.current?.click()}>
+                {docFile ? "Choose another" : "Choose file"}
+              </Button>
+              <span className="min-w-0 truncate text-body-sm text-muted">{docFile?.name || "No file chosen"}</span>
+            </div>
+            <input
+              ref={docInputRef}
+              id="doc-file"
+              type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
           <Button
             type="submit"
             variant="outline"
@@ -419,7 +436,7 @@ export default function ProfilePage() {
             busy={saving === "document"}
             disabled={saving !== null}
           >
-            Record document
+            Upload document
           </Button>
         </form>
       </Card>

@@ -22,10 +22,11 @@ import {
   profileUpdateError,
   type ProfileDraft,
 } from "@/lib/consumer/features/profile";
+import { SexField } from "@/components/consumer/sex-field";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
-const emptyDraft: ProfileDraft = { name: "", phone: "", address: "", dateOfBirth: "" };
+const emptyDraft: ProfileDraft = { name: "", phone: "", address: "", dateOfBirth: "", sex: "", allergies: "" };
 
 export default function ProfilePage() {
   const [user, setUser] = useState<TelemedUser | null>(null);
@@ -250,6 +251,20 @@ export default function ProfilePage() {
             value={draft.dateOfBirth}
             onChange={(e) => setDraft((d) => ({ ...d, dateOfBirth: e.target.value }))}
             autoComplete="bday"
+          />
+          <SexField
+            id="profile-sex"
+            value={draft.sex}
+            onChange={(sex) => setDraft((d) => ({ ...d, sex }))}
+          />
+          <Textarea
+            id="profile-allergies"
+            label="Known allergies"
+            hint="Shared with your doctor when you book. Leave empty if none."
+            value={draft.allergies}
+            onChange={(e) => setDraft((d) => ({ ...d, allergies: e.target.value }))}
+            rows={2}
+            maxLength={1000}
           />
 
           {notice ? <Alert tone="success">{notice}</Alert> : null}

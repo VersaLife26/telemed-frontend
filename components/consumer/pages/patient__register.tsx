@@ -8,6 +8,9 @@ import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Reveal } from "@/components/consumer/ui/Reveal";
 import { Input } from "@/components/consumer/ui/Input";
+import { Textarea } from "@/components/consumer/ui/Textarea";
+import { SexField } from "@/components/consumer/sex-field";
+import type { Sex } from "@/lib/consumer/api/types";
 
 function readError(json: unknown, fallback: string): string {
   if (json && typeof json === "object" && "message" in json) {
@@ -23,6 +26,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [sex, setSex] = useState<Sex | "">("");
+  const [allergies, setAllergies] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"email" | "google" | null>(null);
 
@@ -42,7 +47,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/email/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, date_of_birth: dateOfBirth }),
+        body: JSON.stringify({ email, password, name, date_of_birth: dateOfBirth, sex, allergies }),
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(readError(json, "Could not create account"));
@@ -105,6 +110,17 @@ export default function RegisterPage() {
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
               className="tabular-time"
+            />
+            <SexField id="register-sex" value={sex} onChange={setSex} />
+            <Textarea
+              id="register-allergies"
+              label="Known allergies"
+              hint="Optional. Medicines, foods or anything else your doctor should know."
+              rows={2}
+              className="min-h-16"
+              value={allergies}
+              onChange={(e) => setAllergies(e.target.value)}
+              placeholder="e.g. Penicillin"
             />
             <Input
               id="register-email"

@@ -1,4 +1,4 @@
-import type { Appointment, TelemedUser } from "@/lib/consumer/api/types";
+import type { Appointment, Sex, TelemedUser } from "@/lib/consumer/api/types";
 
 /** Whole years between DOB and visit start (Asia/Colombo calendar day). */
 export function ageAtVisitDate(dob: string, visitStartIso: string): number {
@@ -17,20 +17,29 @@ export type VisitSubject = "self" | "other";
 export function visitPatientFromUser(user: TelemedUser | null): {
   name: string;
   dob: string;
+  sex: Sex | "";
+  allergies: string;
 } {
   return {
     name: (user?.name || "").trim(),
     dob: (user?.date_of_birth || "").trim(),
+    sex: user?.sex || "",
+    allergies: (user?.allergies || "").trim(),
   };
 }
 
-/** Name and age for the prescription pad from the appointment snapshot. */
-export function prescriptionPatientFields(appt: Appointment | null): {
+export type PrescriptionPatient = {
   name: string;
   age: string;
+  sex: Sex | "";
+  weightKg: string;
+  allergies: string;
   locked: boolean;
-} {
-  if (!appt) return { name: "", age: "", locked: false };
+};
+
+/** Patient block for the prescription pad, from the booking snapshot. */
+export function prescriptionPatientFields(appt: Appointment | null): PrescriptionPatient {
+  if (!appt) return { name: "", age: "", sex: "", weightKg: "", allergies: "", locked: false };
   const name = (appt.visit_patient_name || appt.patient_name || "").trim();
   const visitStart = appt.start_at_local || appt.start_at || "";
   let age = appt.visit_patient_age;
@@ -41,6 +50,9 @@ export function prescriptionPatientFields(appt: Appointment | null): {
   return {
     name,
     age: age != null && age > 0 ? String(age) : "",
+    sex: appt.visit_patient_sex || "",
+    weightKg: appt.visit_patient_weight_kg ? String(appt.visit_patient_weight_kg) : "",
+    allergies: (appt.visit_patient_allergies || "").trim(),
     locked,
   };
 }

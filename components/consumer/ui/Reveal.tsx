@@ -14,13 +14,17 @@ import { cx } from "@/lib/consumer/cx";
 export function Reveal({
   children,
   delay = 0,
+  index,
   className,
 }: {
   children: React.ReactNode;
-  /** Stagger index, not milliseconds. Multiplied by --stagger-step. */
+  /** Stagger index, not milliseconds. Multiplied by --stagger-step (40ms). */
   delay?: number;
+  /** Position in a staggered group; 40ms per step. Takes precedence over `delay`. */
+  index?: number;
   className?: string;
 }) {
+  const step = index ?? delay;
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
@@ -50,10 +54,10 @@ export function Reveal({
   return (
     <div
       ref={ref}
-      style={{ transitionDelay: `calc(var(--stagger-step) * ${delay})` }}
+      style={{ transitionDelay: `calc(var(--stagger-step) * ${step})` }}
       className={cx(
-        "transition-[opacity,transform] duration-[600ms] ease-out motion-reduce:transition-none",
-        shown ? "translate-y-0 opacity-100" : "translate-y-5 opacity-0 motion-reduce:opacity-100",
+        "transition-[opacity,translate] duration-[var(--dur-slow)] ease-out motion-reduce:transition-none",
+        shown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 motion-reduce:opacity-100",
         className,
       )}
     >

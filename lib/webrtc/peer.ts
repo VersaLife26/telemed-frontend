@@ -72,6 +72,9 @@ export type PeerHandlers = {
   onError?: (code: string, message: string) => void;
   onChat?: (msg: { id: string; body: string }) => void;
   onPointer?: (pointer: PointerState) => void;
+  onFileShared?: (file: { name: string }) => void;
+  /** Screen capture stopped outside setScreenShare, e.g. from the browser's own "Stop sharing" bar. */
+  onScreenShareEnded?: () => void;
   onLog?: (line: string) => void;
 };
 
@@ -130,6 +133,7 @@ export class PeerCall {
   private signaling: SignalingClient;
   private localStream: MediaStream | null = null;
   private remoteStream = new MediaStream();
+  private displayStream: MediaStream | null = null;
 
   private polite = false;
   private peerPresent = false;
@@ -193,6 +197,10 @@ export class PeerCall {
     return this.signaling.send({ type: FrameType.Pointer, data: pointer });
   }
 
+  sendFileShared(name: string): boolean {
+    return this.signaling.send({ type: FrameType.FileShared, data: { name: name.slice(0, 255) } });
+  }
+
   // --- signalling ------------------------------------------------------
 
   private async onWelcome(w: Welcome): Promise<void> {
@@ -246,6 +254,11 @@ export class PeerCall {
     if (env.type === FrameType.Pointer) {
       const pointer = parsePointer(env.data);
       if (pointer) this.handlers.onPointer?.(pointer);
+      return;
+    }
+    if (env.type === FrameType.FileShared) {
+      const name = (env.data as { name?: unknown } | undefined)?.name;
+      if (typeof name === "string" && name.trim()) this.handlers.onFileShared?.({ name: name.trim() });
       return;
     }
 
@@ -650,23 +663,51 @@ export class PeerCall {
    * reads without touching the transceiver, so no renegotiation happens and
    * the far side sees the picture change with no interruption.
    */
-  async setScreenShare(on: boolean): Promise<void> {
-    const sender = this.pc?.getSenders().find((s) => s.track?.kind === "video");
-    if (!sender) return;
+  async setScreenShare(on: boolean): Promise<MediaStream | null> {
+    const sender = this.videoSender();
+    if (!sender) throw new Error("Screen sharing is available once the call has connected.");
 
     if (on) {
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      if (this.displayStream) return this.displayStream;
+      const display = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 15 },
+        audio: true,
+      });
       const track = display.getVideoTracks()[0];
-      if (!track) return;
+      if (!track) {
+        display.getTracks().forEach((t) => t.stop());
+        return null;
+      }
       // The browser's own "stop sharing" control ends the track without going
       // through this method, so the camera has to be restored from the track.
-      track.onended = () => void this.setScreenShare(false);
+      track.onended = () => {
+        if (this.displayStream !== display) return;
+        void this.setScreenShare(false).finally(() => this.handlers.onScreenShareEnded?.());
+      };
       await sender.replaceTrack(track);
-      return;
+      this.displayStream = display;
+      return display;
     }
 
+    const display = this.displayStream;
+    this.displayStream = null;
+    display?.getTracks().forEach((t) => {
+      t.onended = null;
+      t.stop();
+    });
     const camera = this.localStream?.getVideoTracks()[0];
     if (camera) await sender.replaceTrack(camera);
+    return null;
+  }
+
+  get screen(): MediaStream | null {
+    return this.displayStream;
+  }
+
+  private videoSender(): RTCRtpSender | undefined {
+    return this.pc
+      ?.getTransceivers()
+      .find((t) => t.sender.track?.kind === "video" || t.receiver.track?.kind === "video")?.sender;
   }
 
   private setState(next: CallState): void {
@@ -691,6 +732,10 @@ export class PeerCall {
     this.signaling.close();
     this.pc?.close();
     this.pc = null;
+    this.displayStream?.getTracks().forEach((t) => {
+      t.stop();
+    });
+    this.displayStream = null;
     this.localStream?.getTracks().forEach((t) => {
       t.stop();
     });

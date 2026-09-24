@@ -31,6 +31,7 @@ import type {
   VaultFolderListing,
   VaultPatient,
 } from "@/lib/consumer/api/types";
+import { useOptionalCall } from "@/components/consumer/call/call-provider";
 import { cx } from "@/lib/consumer/cx";
 import {
   VAULT_TYPES,
@@ -68,6 +69,7 @@ export function VaultBrowser({
 }) {
   const owner = lockedRoot || ownerUserId;
   const canMutate = mode === "owner";
+  const liveCall = useOptionalCall();
   const [patients, setPatients] = useState<VaultPatient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<string | undefined>(owner);
   const vaultOwner = mode === "doctor" ? selectedPatient : owner;
@@ -222,6 +224,7 @@ export function VaultBrowser({
       if (vaultOwner) form.append("owner_user_id", vaultOwner);
       if (targetFolder) form.append("folder_id", targetFolder);
       await browserApi<VaultDocument>(recordsUploadPath(), { method: "POST", body: form });
+      if (liveCall?.activeId && liveCall.call.live) liveCall.call.announceFile(file.name);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -335,197 +338,232 @@ export function VaultBrowser({
     : undefined;
 
   return (
-    <div className={cx("flex min-h-0 flex-1", compact ? "flex-col" : "flex-col lg:flex-row")}>
-      {mode === "doctor" && !compact ? (
-        <aside className={cx("w-full shrink-0 border-b p-3 lg:w-56 lg:border-b-0 lg:border-r", dark ? "border-white/10" : "border-border-subtle")}>
-          <p className={cx("mb-2 text-caption uppercase", muted)}>Patients</p>
-          {lockedRoot ? (
-            <p className={cx("text-label", text)}>
-              {patients.find((p) => p.user_id === lockedRoot)?.name || "Current patient"}
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {patients.map((patient) => (
-                <li key={patient.user_id}>
+    <div className="@container flex min-h-0 flex-1 flex-col">
+      <div className={cx("flex min-h-0 flex-1", compact ? "flex-col" : "flex-col @3xl:flex-row")}>
+        {mode === "doctor" && !compact ? (
+          <aside className={cx("w-full shrink-0 border-b p-3 @3xl:w-56 @3xl:border-b-0 @3xl:border-r", dark ? "border-white/10" : "border-border-subtle")}>
+            <p className={cx("mb-2 text-caption uppercase", muted)}>Patients</p>
+            {lockedRoot ? (
+              <p className={cx("text-label", text)}>
+                {patients.find((p) => p.user_id === lockedRoot)?.name || "Current patient"}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {patients.map((patient) => (
+                  <li key={patient.user_id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPatient(patient.user_id);
+                        setFolderId(null);
+                      }}
+                      className={cx(
+                        "min-h-11 w-full rounded-md px-3 py-2 text-left text-body-sm",
+                        selectedPatient === patient.user_id
+                          ? "bg-brand text-on-brand"
+                          : dark
+                            ? "text-white/80 can-hover:hover:bg-white/10"
+                            : "can-hover:hover:bg-tint",
+                      )}
+                    >
+                      {patient.name || "Unnamed"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </aside>
+        ) : null}
+
+        <div
+          ref={dropRef}
+          className="flex min-w-0 flex-1 flex-col"
+          onDragOver={(event) => {
+            event.preventDefault();
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            const file = event.dataTransfer.files[0];
+            if (file) void uploadTo(file);
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-2 p-3">
+            <nav aria-label="Folder path" className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-body-sm">
+              {crumbs.map((crumb, index) => (
+                <span key={crumb.id ?? "root"} className="flex items-center gap-1">
+                  {index > 0 ? <span className={muted}>/</span> : null}
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedPatient(patient.user_id);
-                      setFolderId(null);
-                    }}
-                    className={cx(
-                      "min-h-11 w-full rounded-md px-3 py-2 text-left text-body-sm",
-                      selectedPatient === patient.user_id
-                        ? "bg-brand text-on-brand"
-                        : dark
-                          ? "text-white/80 can-hover:hover:bg-white/10"
-                          : "can-hover:hover:bg-tint",
-                    )}
+                    className={cx("min-h-9 truncate rounded-md px-1", index === crumbs.length - 1 ? text : muted, dark && "can-hover:hover:bg-white/10")}
+                    onClick={() => setFolderId(crumb.id)}
                   >
-                    {patient.name || "Unnamed"}
+                    {crumb.name}
                   </button>
+                </span>
+              ))}
+            </nav>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={ghost}
+                aria-pressed={layout === "grid"}
+                aria-label="Grid"
+                onClick={() => setLayout("grid")}
+                leading={<Grid2x2 className="size-4" />}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className={ghost}
+                aria-pressed={layout === "list"}
+                aria-label="List"
+                onClick={() => setLayout("list")}
+                leading={<List className="size-4" />}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
+            <Input
+              icon={<Search className="size-4" />}
+              placeholder="Search this folder"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className={cx("min-w-[12rem] flex-1", field)}
+            />
+            <Select
+              aria-label="Document type filter"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              className={field}
+            >
+              <option value="">All types</option>
+              {VAULT_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </Select>
+            {canMutate || mode === "doctor" ? (
+              <>
+                <Select
+                  aria-label="Upload as"
+                  value={docType}
+                  onChange={(event) => setDocType(event.target.value as VaultDocType)}
+                  className={field}
+                >
+                  {VAULT_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  size="sm"
+                  busy={uploading}
+                  leading={<Upload className="size-4" />}
+                  onClick={() => dropRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+                >
+                  Upload
+                </Button>
+                <input
+                  type="file"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void uploadTo(file);
+                    event.target.value = "";
+                  }}
+                />
+              </>
+            ) : null}
+            {canMutate ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                leading={<FolderPlus className="size-4" />}
+                onClick={() => setNewFolder(true)}
+              >
+                New folder
+              </Button>
+            ) : null}
+          </div>
+
+          {error ? (
+            <Alert tone="danger" title="Vault" className="mx-3 mb-3">
+              {error}
+            </Alert>
+          ) : null}
+
+          {loading ? (
+            <p className={cx("p-6 text-body", muted)}>Loading…</p>
+          ) : shownFolders.length === 0 && shownDocs.length === 0 ? (
+            <EmptyState
+              title="This folder is empty"
+              body="Drop a file here or upload one to keep it with this visit."
+              icon={<FolderIcon className="size-5" />}
+              tone={dark ? "dark" : "light"}
+            />
+          ) : layout === "grid" ? (
+            <ul className="grid grid-cols-2 gap-3 p-3 @md:grid-cols-3 @xl:grid-cols-4">
+              {shownFolders.map((folder) => (
+                <li key={folder.id}>
+                  <VaultTile
+                    name={folder.name}
+                    meta="Folder"
+                    icon={<FolderIcon className="size-8 text-amber-500" />}
+                    dark={dark}
+                    onOpen={() => setFolderId(folder.id)}
+                    onDropFile={(file) => void uploadTo(file, folder.id)}
+                    canMutate={canMutate}
+                    onRename={() => setRenaming({ kind: "folder", id: folder.id, name: folder.name })}
+                    onMove={() => setMoving({ kind: "folder", id: folder.id })}
+                    onDelete={() => setPendingDelete(folder)}
+                  />
+                </li>
+              ))}
+              {shownDocs.map((doc) => (
+                <li key={doc.id}>
+                  <VaultTile
+                    name={doc.filename}
+                    meta={[doc.document_type, formatBytes(doc.size_bytes)].filter(Boolean).join(" · ")}
+                    icon={<TypeIcon type={doc.content_type} />}
+                    thumb={previewKind(doc.content_type) === "image" ? `/api/proxy/records/${doc.id}/content` : null}
+                    dark={dark}
+                    onOpen={() => openFile(doc)}
+                    canMutate={canMutate}
+                    onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.filename })}
+                    onMove={() => setMoving({ kind: "file", id: doc.id })}
+                    onDelete={() => setPendingDelete(doc)}
+                  />
                 </li>
               ))}
             </ul>
-          )}
-        </aside>
-      ) : null}
-
-      <div
-        ref={dropRef}
-        className="flex min-w-0 flex-1 flex-col"
-        onDragOver={(event) => {
-          event.preventDefault();
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          const file = event.dataTransfer.files[0];
-          if (file) void uploadTo(file);
-        }}
-      >
-        <div className="flex flex-wrap items-center gap-2 p-3">
-          <nav aria-label="Folder path" className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-body-sm">
-            {crumbs.map((crumb, index) => (
-              <span key={crumb.id ?? "root"} className="flex items-center gap-1">
-                {index > 0 ? <span className={muted}>/</span> : null}
-                <button
-                  type="button"
-                  className={cx("min-h-9 truncate rounded-md px-1", index === crumbs.length - 1 ? text : muted, dark && "can-hover:hover:bg-white/10")}
-                  onClick={() => setFolderId(crumb.id)}
-                >
-                  {crumb.name}
-                </button>
-              </span>
-            ))}
-          </nav>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={ghost}
-              aria-pressed={layout === "grid"}
-              aria-label="Grid"
-              onClick={() => setLayout("grid")}
-              leading={<Grid2x2 className="size-4" />}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              className={ghost}
-              aria-pressed={layout === "list"}
-              aria-label="List"
-              onClick={() => setLayout("list")}
-              leading={<List className="size-4" />}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
-          <Input
-            icon={<Search className="size-4" />}
-            placeholder="Search this folder"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className={cx("min-w-[12rem] flex-1", field)}
-          />
-          <Select
-            aria-label="Document type filter"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-            className={field}
-          >
-            <option value="">All types</option>
-            {VAULT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </Select>
-          {canMutate || mode === "doctor" ? (
-            <>
-              <Select
-                aria-label="Upload as"
-                value={docType}
-                onChange={(event) => setDocType(event.target.value as VaultDocType)}
-                className={field}
-              >
-                {VAULT_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                size="sm"
-                busy={uploading}
-                leading={<Upload className="size-4" />}
-                onClick={() => dropRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-              >
-                Upload
-              </Button>
-              <input
-                type="file"
-                className="sr-only"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void uploadTo(file);
-                  event.target.value = "";
-                }}
-              />
-            </>
-          ) : null}
-          {canMutate ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              leading={<FolderPlus className="size-4" />}
-              onClick={() => setNewFolder(true)}
-            >
-              New folder
-            </Button>
-          ) : null}
-        </div>
-
-        {error ? (
-          <Alert tone="danger" title="Vault" className="mx-3 mb-3">
-            {error}
-          </Alert>
-        ) : null}
-
-        {loading ? (
-          <p className={cx("p-6 text-body", muted)}>Loading…</p>
-        ) : shownFolders.length === 0 && shownDocs.length === 0 ? (
-          <EmptyState
-            title="This folder is empty"
-            body="Drop a file here or upload one to keep it with this visit."
-            icon={<FolderIcon className="size-5" />}
-            tone={dark ? "dark" : "light"}
-          />
-        ) : layout === "grid" ? (
-          <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4">
-            {shownFolders.map((folder) => (
-              <li key={folder.id}>
-                <VaultTile
+          ) : (
+            <ul className={cx("divide-y", dark ? "divide-white/10" : "divide-border-subtle")}>
+              {shownFolders.map((folder) => (
+                <Row
+                  key={folder.id}
                   name={folder.name}
                   meta="Folder"
-                  icon={<FolderIcon className="size-8 text-amber-500" />}
+                  icon={<FolderIcon className="size-5 text-amber-500" />}
                   dark={dark}
                   onOpen={() => setFolderId(folder.id)}
-                  onDropFile={(file) => void uploadTo(file, folder.id)}
                   canMutate={canMutate}
                   onRename={() => setRenaming({ kind: "folder", id: folder.id, name: folder.name })}
                   onMove={() => setMoving({ kind: "folder", id: folder.id })}
                   onDelete={() => setPendingDelete(folder)}
                 />
-              </li>
-            ))}
-            {shownDocs.map((doc) => (
-              <li key={doc.id}>
-                <VaultTile
+              ))}
+              {shownDocs.map((doc) => (
+                <Row
+                  key={doc.id}
                   name={doc.filename}
-                  meta={[doc.document_type, formatBytes(doc.size_bytes)].filter(Boolean).join(" · ")}
+                  meta={[doc.document_type, formatBytes(doc.size_bytes), doc.created_at?.slice(0, 10)]
+                    .filter(Boolean)
+                    .join(" · ")}
                   icon={<TypeIcon type={doc.content_type} />}
-                  thumb={previewKind(doc.content_type) === "image" ? `/api/proxy/records/${doc.id}/content` : null}
                   dark={dark}
                   onOpen={() => openFile(doc)}
                   canMutate={canMutate}
@@ -533,137 +571,104 @@ export function VaultBrowser({
                   onMove={() => setMoving({ kind: "file", id: doc.id })}
                   onDelete={() => setPendingDelete(doc)}
                 />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <ul className={cx("divide-y", dark ? "divide-white/10" : "divide-border-subtle")}>
-            {shownFolders.map((folder) => (
-              <Row
-                key={folder.id}
-                name={folder.name}
-                meta="Folder"
-                icon={<FolderIcon className="size-5 text-amber-500" />}
-                dark={dark}
-                onOpen={() => setFolderId(folder.id)}
-                canMutate={canMutate}
-                onRename={() => setRenaming({ kind: "folder", id: folder.id, name: folder.name })}
-                onMove={() => setMoving({ kind: "folder", id: folder.id })}
-                onDelete={() => setPendingDelete(folder)}
-              />
-            ))}
-            {shownDocs.map((doc) => (
-              <Row
-                key={doc.id}
-                name={doc.filename}
-                meta={[doc.document_type, formatBytes(doc.size_bytes), doc.created_at?.slice(0, 10)]
-                  .filter(Boolean)
-                  .join(" · ")}
-                icon={<TypeIcon type={doc.content_type} />}
-                dark={dark}
-                onOpen={() => openFile(doc)}
-                canMutate={canMutate}
-                onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.filename })}
-                onMove={() => setMoving({ kind: "file", id: doc.id })}
-                onDelete={() => setPendingDelete(doc)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {preview && !onOpenFile ? (
-        <div
-          className={cx(
-            "flex min-h-[16rem] flex-col border-t lg:w-[28rem] lg:border-l lg:border-t-0",
-            dark ? "border-white/10" : "border-border-subtle",
-            compact && "fixed inset-x-0 bottom-0 z-30 max-h-[70vh] rounded-t-xl bg-surface shadow-lg",
+              ))}
+            </ul>
           )}
-        >
-          <FilePreview
-            doc={preview}
-            url={previewUrl}
-            dark={dark}
-            pointer={pointer}
-            onDownload={() => void download(preview)}
-          />
-          <Button variant="ghost" size="sm" className={cx("m-2 self-end", ghost)} onClick={() => setPreview(null)}>
-            Close
-          </Button>
         </div>
-      ) : null}
 
-      <Modal
-        open={newFolder}
-        onClose={() => setNewFolder(false)}
-        title="New folder"
-        footer={
-          <Button onClick={() => void createFolder()} disabled={!folderName.trim()}>
-            Create
-          </Button>
-        }
-      >
-        <Input label="Name" value={folderName} onChange={(event) => setFolderName(event.target.value)} />
-      </Modal>
+        {preview && !onOpenFile ? (
+          <div
+            className={cx(
+              "flex min-h-[16rem] flex-col border-t @3xl:w-[28rem] @3xl:border-l @3xl:border-t-0",
+              dark ? "border-white/10" : "border-border-subtle",
+              compact && "fixed inset-x-0 bottom-0 z-30 max-h-[70vh] rounded-t-xl bg-surface shadow-lg",
+            )}
+          >
+            <FilePreview
+              doc={preview}
+              url={previewUrl}
+              dark={dark}
+              pointer={pointer}
+              onDownload={() => void download(preview)}
+            />
+            <Button variant="ghost" size="sm" className={cx("m-2 self-end", ghost)} onClick={() => setPreview(null)}>
+              Close
+            </Button>
+          </div>
+        ) : null}
 
-      <Modal
-        open={Boolean(renaming)}
-        onClose={() => setRenaming(null)}
-        title="Rename"
-        footer={
-          <Button onClick={() => void applyRename()} disabled={!renaming?.name.trim()}>
-            Save
-          </Button>
-        }
-      >
-        <Input
-          label="Name"
-          value={renaming?.name ?? ""}
-          onChange={(event) =>
-            setRenaming((current) => (current ? { ...current, name: event.target.value } : current))
+        <Modal
+          open={newFolder}
+          onClose={() => setNewFolder(false)}
+          title="New folder"
+          footer={
+            <Button onClick={() => void createFolder()} disabled={!folderName.trim()}>
+              Create
+            </Button>
+          }
+        >
+          <Input label="Name" value={folderName} onChange={(event) => setFolderName(event.target.value)} />
+        </Modal>
+
+        <Modal
+          open={Boolean(renaming)}
+          onClose={() => setRenaming(null)}
+          title="Rename"
+          footer={
+            <Button onClick={() => void applyRename()} disabled={!renaming?.name.trim()}>
+              Save
+            </Button>
+          }
+        >
+          <Input
+            label="Name"
+            value={renaming?.name ?? ""}
+            onChange={(event) =>
+              setRenaming((current) => (current ? { ...current, name: event.target.value } : current))
+            }
+          />
+        </Modal>
+
+        <Modal
+          open={Boolean(moving)}
+          onClose={() => setMoving(null)}
+          title="Move to folder"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => void applyMove("")}>
+                Vault root
+              </Button>
+              {folders
+                .filter((folder) => folder.id !== moving?.id)
+                .map((folder) => (
+                  <Button key={folder.id} variant="outline" onClick={() => void applyMove(folder.id)}>
+                    {folder.name}
+                  </Button>
+                ))}
+            </>
+          }
+        >
+          <p>Choose a folder in this vault. Files cannot move between patients.</p>
+        </Modal>
+
+        <Modal
+          open={Boolean(pendingDelete)}
+          onClose={() => setPendingDelete(null)}
+          title="Delete?"
+          description={
+            pendingDelete && "filename" in pendingDelete
+              ? `Delete ${pendingDelete.filename}? This cannot be undone.`
+              : pendingDelete
+                ? `Delete folder ${(pendingDelete as VaultFolder).name}? It must be empty.`
+                : undefined
+          }
+          footer={
+            <Button variant="danger" onClick={() => void confirmDelete()}>
+              Delete
+            </Button>
           }
         />
-      </Modal>
-
-      <Modal
-        open={Boolean(moving)}
-        onClose={() => setMoving(null)}
-        title="Move to folder"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => void applyMove("")}>
-              Vault root
-            </Button>
-            {folders
-              .filter((folder) => folder.id !== moving?.id)
-              .map((folder) => (
-                <Button key={folder.id} variant="outline" onClick={() => void applyMove(folder.id)}>
-                  {folder.name}
-                </Button>
-              ))}
-          </>
-        }
-      >
-        <p>Choose a folder in this vault. Files cannot move between patients.</p>
-      </Modal>
-
-      <Modal
-        open={Boolean(pendingDelete)}
-        onClose={() => setPendingDelete(null)}
-        title="Delete?"
-        description={
-          pendingDelete && "filename" in pendingDelete
-            ? `Delete ${pendingDelete.filename}? This cannot be undone.`
-            : pendingDelete
-              ? `Delete folder ${(pendingDelete as VaultFolder).name}? It must be empty.`
-              : undefined
-        }
-        footer={
-          <Button variant="danger" onClick={() => void confirmDelete()}>
-            Delete
-          </Button>
-        }
-      />
+      </div>
     </div>
   );
 }
