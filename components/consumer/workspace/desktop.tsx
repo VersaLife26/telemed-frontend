@@ -43,7 +43,7 @@ export function WorkspaceDesktop() {
 }
 
 function visitName(a: Appointment) {
-  return a.visit_patient_name || a.patient_name || a.counterpart_name || "Patient";
+  return a.visitPatient?.name || "Patient";
 }
 
 function WorkspaceInner() {
@@ -82,7 +82,7 @@ function WorkspaceInner() {
     browserApi<Appointment>(`/appointments/${callId}`)
       .then((appointment) => {
         if (cancelled) return;
-        setPatientId(appointment.patient_id ?? null);
+        setPatientId(appointment.patientId);
         const label = visitName(appointment);
         // Ready in the dock/recents for the whole consultation, without
         // piling windows on top of the video.
@@ -126,7 +126,7 @@ function WorkspaceInner() {
 
   function openFile(doc: VaultDocument) {
     setViewers((current) => ({ ...current, [doc.id]: doc }));
-    open("viewer", { id: `viewer:${doc.id}`, title: doc.filename, props: { id: doc.id } });
+    open("viewer", { id: `viewer:${doc.id}`, title: doc.fileName, props: { id: doc.id } });
   }
 
   function closeMeet() {

@@ -2,62 +2,70 @@ import { apiFetch } from "@/lib/consumer/api/client";
 import {
   completeEmailRegister,
   finishAuth,
+  problem,
   toClientError,
-  type AuthTokens,
 } from "@/lib/consumer/auth/session";
-import type { TelemedUser } from "@/lib/consumer/api/types";
+import type { AuthResponse, Sex, TelemedUser } from "@/lib/consumer/api/types";
+
+const SEXES: Sex[] = ["female", "male", "other"];
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as {
       email?: string;
       password?: string;
-      name?: string;
-      date_of_birth?: string;
+      fullName?: string;
+      dateOfBirth?: string;
       sex?: string;
       allergies?: string;
     };
     if (!body.email?.trim() || !body.password) {
-      return Response.json({ message: "Email and password are required" }, { status: 400 });
+      return problem(400, "Email and password are required");
     }
-    const dob = body.date_of_birth?.trim();
+    const fullName = body.fullName?.trim();
+    if (!fullName) {
+      return problem(400, "Enter your name.");
+    }
+    const dob = body.dateOfBirth?.trim();
     if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-      return Response.json({ message: "Date of birth must be YYYY-MM-DD." }, { status: 400 });
+      return problem(400, "Date of birth must be YYYY-MM-DD.");
     }
 
     const payload = {
       email: body.email.trim(),
       password: body.password,
-      name: body.name?.trim() || undefined,
+      fullName,
+      language: "en",
     };
 
-    const sex = ["female", "male", "other"].includes(body.sex || "") ? body.sex : "";
-    const allergies = body.allergies?.trim().slice(0, 1000) || "";
+    const sex = SEXES.find((s) => s === body.sex) ?? null;
+    const allergies = body.allergies?.trim().slice(0, 1000) || null;
 
     if (!dob && !sex && !allergies) {
       return await completeEmailRegister(payload);
     }
 
-    const tokens = await apiFetch<AuthTokens>("/api/v1/auth/register/email", {
+    // Register takes identity only; the clinical profile is a follow-up PUT /me.
+    const tokens = await apiFetch<AuthResponse>("/api/v1/auth/register/email", {
       method: "POST",
       body: payload,
     });
     const user = tokens.user;
-    if (tokens.access_token && user) {
-      await apiFetch<TelemedUser>("/api/v1/users/me", {
+    if (tokens.accessToken && user) {
+      const updated = await apiFetch<TelemedUser>("/api/v1/me", {
         method: "PUT",
-        token: tokens.access_token,
+        token: tokens.accessToken,
         body: {
-          name: user.name || body.name?.trim() || "Patient",
-          phone: user.phone || "",
-          address: user.address || "",
-          date_of_birth: dob || user.date_of_birth || "",
+          fullName: user.fullName || fullName,
+          address: user.address ?? null,
+          dateOfBirth: dob || user.dateOfBirth || null,
           sex,
           allergies,
           language: user.language || "en",
-          version: user.version ?? 0,
+          version: user.version,
         },
       }).catch(() => undefined);
+      if (updated) tokens.user = updated;
     }
     return finishAuth(tokens);
   } catch (err) {

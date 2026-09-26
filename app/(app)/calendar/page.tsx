@@ -6,13 +6,14 @@ import { Badge } from "@/components/consumer/ui/Badge";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Appointment, WorkingHour } from "@/lib/consumer/api/types";
+import type { Appointment, Holiday, Paged, Schedule, WorkingHour } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import {
   colomboDayKey,
   eventsByDay,
   gridWindow,
   isDayKey,
+  shiftDay,
   shiftWeek,
   weekDayKeys,
   weekRangeLabel,
@@ -23,30 +24,29 @@ import { afterEndPath, callPath } from "@/lib/consumer/features/consult";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
-type Holiday = { id: string; date: string; reason?: string; platform_wide?: boolean };
-
 /**
- * The doctor's week, as a timetable.
- *
- * The appointments endpoint has no date filter -- `ListMyAppointments` takes
- * status, limit and offset only -- so a generous page is fetched and bucketed
- * into the requested week here. `per_page` is the ceiling on how far back the
- * grid can see, not a display limit.
+ * The doctor's week, as a timetable. The query window is a day wider on each
+ * side than the Colombo week so no UTC instant near midnight is missed; the
+ * grid buckets by Colombo day and drops the rest.
  */
-const APPOINTMENT_PAGE = 200;
+const APPOINTMENT_PAGE = 100;
 
 async function load(token: string, mondayKey: string) {
   const sundayKey = weekDayKeys(mondayKey)[6] ?? mondayKey;
+  const from = shiftDay(mondayKey, -1);
+  const to = shiftDay(sundayKey, 1);
 
   const [appointments, workingHours, holidays] = await Promise.all([
-    apiFetch<Appointment[]>(`/api/v1/appointments?per_page=${APPOINTMENT_PAGE}`, { token })
-      .then((data) => (Array.isArray(data) ? data : []))
+    apiFetch<Paged<Appointment>>(
+      `/api/v1/appointments?from=${from}T00:00:00Z&to=${to}T00:00:00Z&pageSize=${APPOINTMENT_PAGE}`,
+      { token },
+    )
+      .then((data) => data.items)
       .catch((e: unknown) => (e instanceof Error ? e : new Error("Could not load appointments"))),
-    apiFetch<WorkingHour[]>("/api/v1/doctors/me/availability", { token })
-      .then((data) => (Array.isArray(data) ? data : []))
+    apiFetch<Schedule>("/api/v1/doctors/me/schedule", { token })
+      .then((data) => data.workingHours ?? [])
       .catch(() => [] as WorkingHour[]),
     apiFetch<Holiday[]>(`/api/v1/doctors/me/holidays?from=${mondayKey}&to=${sundayKey}`, { token })
-      .then((data) => (Array.isArray(data) ? data : []))
       .catch(() => [] as Holiday[]),
   ]);
 
@@ -55,9 +55,8 @@ async function load(token: string, mondayKey: string) {
 
 /** Where a block goes when clicked: into the call, or into its notes once past. */
 function hrefForEvent(event: PlacedEvent): string | null {
-  const status = (event.status || "").toLowerCase();
-  if (status === "completed") return afterEndPath("doctor", event.id);
-  if (status === "confirmed" || status === "in_progress") return callPath(event.id);
+  if (event.status === "completed") return afterEndPath("doctor", event.id);
+  if (event.status === "confirmed") return callPath(event.id);
   return null;
 }
 
@@ -95,7 +94,7 @@ export default async function CalendarPage({
   for (const holiday of holidays) {
     if (!holiday.date) continue;
     leaveByDayKey[holiday.date] =
-      holiday.reason || (holiday.platform_wide ? "Platform closure" : "Leave");
+      holiday.reason || (holiday.doctorId ? "Leave" : "Platform closure");
   }
 
   const thisWeekKey = weekStart(todayKey);

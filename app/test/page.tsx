@@ -13,9 +13,9 @@ import { TestConsole } from "@/components/test/TestConsole";
  * page module runs. This one covers the case where that table is edited and
  * this check is not, and costs nothing.
  *
- * Neither gate is the real control. The backend's own TELEMED_TEST_MODE is --
- * these only decide whether the page renders, while that decides whether the
- * endpoints behind it exist at all.
+ * Neither gate is the real control. The API's own Testing switches and the
+ * server-only TEST_SECRET are -- these only decide whether the page renders,
+ * while those decide whether the endpoints behind it answer at all.
  */
 export const metadata: Metadata = {
   title: "Test console",

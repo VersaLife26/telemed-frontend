@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { API_BASE_URL } from "@/lib/consumer/env";
+import { API_BASE_URL, TEST_SECRET } from "@/lib/consumer/env";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
-import { refreshAuthCookies } from "@/lib/consumer/auth/session";
+import { gatewayUnreachable, refreshAuthCookies } from "@/lib/consumer/auth/session";
 import { gatewayUrl, isNullBodyStatus, shouldForwardBody } from "@/lib/consumer/proxy";
 
 type Ctx = { params: Promise<{ path: string[] }> };
@@ -30,7 +30,10 @@ async function forward(req: Request, ctx: Ctx) {
     refreshed = Boolean(token);
   }
 
-  const run = (bearer?: string) => fetchUpstream(target, req.method, contentType, bearer, body, streamMultipart);
+  const uploadToken = req.headers.get("x-upload-token");
+  const testSecret = path[0] === "test" ? TEST_SECRET : "";
+  const run = (bearer?: string) =>
+    fetchUpstream(target, req.method, contentType, bearer, body, streamMultipart, uploadToken, testSecret);
 
   try {
     let upstream = await run(token);
@@ -64,14 +67,7 @@ async function forward(req: Request, ctx: Ctx) {
       },
     });
   } catch {
-    return NextResponse.json(
-      {
-        code: "GATEWAY_UNREACHABLE",
-        message:
-          "Cannot reach telemed-api-gateway. Start infra (`cd telemed-infra && make bootstrap`) and set NEXT_PUBLIC_API_BASE_URL.",
-      },
-      { status: 502 },
-    );
+    return gatewayUnreachable();
   }
 }
 
@@ -82,11 +78,15 @@ async function fetchUpstream(
   token: string | undefined,
   body: BodyInit | undefined,
   streamMultipart: boolean,
+  uploadToken: string | null,
+  testSecret: string,
 ) {
   const headers = new Headers();
   headers.set("Accept", "application/json");
   if (contentType) headers.set("Content-Type", contentType);
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (uploadToken) headers.set("X-Upload-Token", uploadToken);
+  if (testSecret) headers.set("X-Test-Secret", testSecret);
 
   const init: RequestInit = {
     method,

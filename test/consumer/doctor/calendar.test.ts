@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { Appointment } from "@/lib/consumer/api/types";
 import {
   colomboDayKey,
   colomboMinutes,
@@ -9,7 +10,6 @@ import {
   gridWindow,
   isDayKey,
   minuteLabel,
-  parseClock,
   placeEvents,
   shiftWeek,
   toCalendarEvent,
@@ -20,6 +20,32 @@ import {
   workingBands,
   type CalendarEvent,
 } from "@/lib/consumer/features/calendar";
+
+function appt(overrides: Partial<Appointment>): Appointment {
+  return {
+    id: "a1",
+    patientId: "p1",
+    doctorId: "d1",
+    startAt: "2026-09-21T03:30:00Z",
+    endAt: "2026-09-21T04:00:00Z",
+    status: "confirmed",
+    feeCents: 250000,
+    currency: "LKR",
+    visitPatient: { name: "Kamala", dateOfBirth: "1990-01-01", sex: null, weightKg: null, allergies: null },
+    intake: { symptoms: "fever", visitRelation: null },
+    paymentDueAt: null,
+    confirmedAt: null,
+    completedAt: null,
+    noShowAt: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancellationReason: null,
+    refundPercent: null,
+    isTest: false,
+    createdAt: "2026-09-01T00:00:00Z",
+    ...overrides,
+  };
+}
 
 function event(id: string, startMinute: number, endMinute: number): CalendarEvent {
   return {
@@ -82,35 +108,30 @@ test("isDayKey refuses a malformed or impossible date", () => {
   assert.equal(isDayKey(undefined), false);
 });
 
-test("an appointment with no end gets a nominal slot rather than zero height", () => {
-  const placed = toCalendarEvent({ id: "a1", start_at: "2026-09-21T03:30:00Z" });
+test("an event spans the booked start and end, titled with the visit patient", () => {
+  const placed = toCalendarEvent(appt({ endAt: "2026-09-21T04:15:00Z" }));
   assert.ok(placed);
+  assert.equal(placed.dayKey, "2026-09-21");
   assert.equal(placed.event.startMinute, 540);
-  assert.equal(placed.event.endMinute, 570);
+  assert.equal(placed.event.endMinute, 585);
+  assert.equal(placed.event.title, "Kamala");
 });
 
 test("an end at or before the start is treated as missing", () => {
-  const placed = toCalendarEvent({
-    id: "a1",
-    start_at: "2026-09-21T03:30:00Z",
-    end_at: "2026-09-21T03:30:00Z",
-  });
+  const placed = toCalendarEvent(appt({ endAt: "2026-09-21T03:30:00Z" }));
   assert.equal(placed?.event.endMinute, 570);
 });
 
-test("cancelled visits are off the schedule and never drawn", () => {
-  for (const status of ["cancelled", "CANCELED", "refunded", "no_show"]) {
-    assert.equal(
-      toCalendarEvent({ id: "a1", start_at: "2026-09-21T03:30:00Z", status }),
-      null,
-      status,
-    );
+test("cancelled and no-show visits are off the schedule and never drawn", () => {
+  for (const status of ["cancelled", "noShow"] as const) {
+    assert.equal(toCalendarEvent(appt({ status })), null, status);
   }
-  assert.ok(toCalendarEvent({ id: "a1", start_at: "2026-09-21T03:30:00Z", status: "confirmed" }));
+  assert.ok(toCalendarEvent(appt({ status: "confirmed" })));
+  assert.ok(toCalendarEvent(appt({ status: "pendingPayment" })));
 });
 
 test("an appointment with no start cannot be positioned", () => {
-  assert.equal(toCalendarEvent({ id: "a1" }), null);
+  assert.equal(toCalendarEvent(appt({ startAt: "" })), null);
 });
 
 test("overlapping events split the column, and neighbours keep full width", () => {
@@ -139,9 +160,9 @@ test("eventsByDay returns a bucket for every day, including empty ones", () => {
   const days = weekDayKeys("2026-09-21");
   const byDay = eventsByDay(
     [
-      { id: "a1", start_at: "2026-09-21T03:30:00Z", status: "confirmed" },
-      { id: "a2", start_at: "2026-09-23T05:00:00Z", status: "completed" },
-      { id: "a3", start_at: "2026-09-23T05:00:00Z", status: "cancelled" },
+      appt({ id: "a1", startAt: "2026-09-21T03:30:00Z", endAt: "2026-09-21T04:00:00Z" }),
+      appt({ id: "a2", startAt: "2026-09-23T05:00:00Z", endAt: "2026-09-23T05:30:00Z", status: "completed" }),
+      appt({ id: "a3", startAt: "2026-09-23T05:00:00Z", endAt: "2026-09-23T05:30:00Z", status: "cancelled" }),
     ],
     days,
   );
@@ -154,7 +175,7 @@ test("eventsByDay returns a bucket for every day, including empty ones", () => {
 
 test("an appointment outside the requested week is dropped, not misfiled", () => {
   const byDay = eventsByDay(
-    [{ id: "a1", start_at: "2026-10-05T03:30:00Z", status: "confirmed" }],
+    [appt({ startAt: "2026-10-05T03:30:00Z", endAt: "2026-10-05T04:00:00Z" })],
     weekDayKeys("2026-09-21"),
   );
   assert.deepEqual(
@@ -166,7 +187,7 @@ test("an appointment outside the requested week is dropped, not misfiled", () =>
 test("the grid widens to cover every event and every working hour", () => {
   const window = gridWindow(
     placeEvents([event("early", 6 * 60 + 15, 7 * 60)]),
-    [{ day_of_week: 1, start_time: "09:00", end_time: "20:30", is_available: true }],
+    [{ dayOfWeek: 1, startMinute: 540, endMinute: 1230 }],
   );
   assert.equal(window.startMinute, 6 * 60);
   assert.equal(window.endMinute, 21 * 60);
@@ -174,21 +195,18 @@ test("the grid widens to cover every event and every working hour", () => {
   assert.equal(window.hours.at(-1), 21 * 60);
 });
 
-test("an unavailable working day does not stretch the grid", () => {
-  const window = gridWindow([], [
-    { day_of_week: 1, start_time: "05:00", end_time: "23:00", is_available: false },
-  ]);
+test("with no events or working hours the grid shows the default day", () => {
+  const window = gridWindow([], []);
   assert.equal(window.startMinute, 8 * 60);
   assert.equal(window.endMinute, 18 * 60);
 });
 
-test("workingBands keeps only the available ranges for that weekday", () => {
+test("workingBands keeps only the non-empty ranges for that weekday", () => {
   const hours = [
-    { day_of_week: 1, start_time: "09:00", end_time: "12:00", is_available: true },
-    { day_of_week: 1, start_time: "13:00", end_time: "17:00", is_available: true },
-    { day_of_week: 1, start_time: "18:00", end_time: "18:00", is_available: true },
-    { day_of_week: 2, start_time: "09:00", end_time: "17:00", is_available: true },
-    { day_of_week: 1, start_time: "20:00", end_time: "22:00", is_available: false },
+    { dayOfWeek: 1, startMinute: 540, endMinute: 720 },
+    { dayOfWeek: 1, startMinute: 780, endMinute: 1020 },
+    { dayOfWeek: 1, startMinute: 1080, endMinute: 1080 },
+    { dayOfWeek: 2, startMinute: 540, endMinute: 1020 },
   ];
   assert.deepEqual(workingBands(hours, 1), [
     { startMinute: 540, endMinute: 720 },
@@ -196,15 +214,13 @@ test("workingBands keeps only the available ranges for that weekday", () => {
   ]);
 });
 
-test("dayOfWeek matches the Sunday-zero convention the availability API uses", () => {
+test("dayOfWeek matches the Sunday-zero convention the schedule API uses", () => {
   assert.equal(dayOfWeek("2026-09-20"), 0);
   assert.equal(dayOfWeek("2026-09-21"), 1);
   assert.equal(dayOfWeek("2026-09-26"), 6);
 });
 
-test("clock strings round-trip through minutes", () => {
-  assert.equal(parseClock("09:00"), 540);
-  assert.equal(parseClock("13:45:00"), 825);
+test("minute labels use a 12-hour clock", () => {
   assert.equal(minuteLabel(540), "9:00 AM");
   assert.equal(minuteLabel(825), "1:45 PM");
   assert.equal(minuteLabel(0), "12:00 AM");

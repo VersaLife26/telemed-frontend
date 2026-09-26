@@ -7,13 +7,11 @@ import { DashboardBookingsChart, DashboardRevenueChart } from "@/components/admi
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { RangePickerLinks } from "@/components/admin/dashboard/range-picker-links";
-import { UtilisationTable } from "@/components/admin/dashboard/utilisation-table";
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer } from "@/lib/admin/api/server";
-import type { DashboardSummary, DoctorTotalsRow, RevenuePoint, BookingsPoint } from "@/lib/admin/api/types";
-import { DISTRICTS, districtName } from "@/lib/admin/districts";
-import { formatCount, formatDate, formatMoney, formatPercent, humanise } from "@/lib/admin/format";
+import type { BookingsDay, DashboardSummary, RevenuePoint, TopDoctor } from "@/lib/admin/api/types";
+import { formatCount, formatDate, formatMoney, formatPercent } from "@/lib/admin/format";
 
 const metadata: Metadata = { title: "Dashboard" };
 
@@ -26,15 +24,10 @@ type Range = (typeof RANGES)[number];
 /**
  * The dashboard.
  *
- * A server component: this is five aggregate reads that nobody interacts with
+ * A server component: this is four aggregate reads that nobody interacts with
  * beyond changing the date range, and the range lives in the URL. Fetching on
- * the server means the first paint is the data rather than five skeletons and
- * a waterfall of client requests.
- *
- * Everything here comes from the materialized views in migration 000004 —
- * `revenue_daily`, `bookings_daily`, `doctor_utilization_daily`,
- * `district_activity_daily`. None of it touches a clinical table, and none of
- * it could: the console's database role has no grant on one.
+ * the server means the first paint is the data rather than four skeletons and
+ * a waterfall of client requests. None of it touches clinical content.
  */
 export default async function DashboardPage({
   searchParams,
@@ -55,8 +48,8 @@ export default async function DashboardPage({
   const [result, revenueResult, bookingsResult, doctorsResult] = await Promise.all([
     tryGetServer<DashboardSummary>(endpoints.analytics.dashboard(range)),
     tryGetServer<RevenuePoint[]>(endpoints.analytics.revenue(range)),
-    tryGetServer<BookingsPoint[]>(endpoints.analytics.bookings(range)),
-    tryGetServer<DoctorTotalsRow[]>(endpoints.analytics.doctors(query({
+    tryGetServer<BookingsDay[]>(endpoints.analytics.bookings(range)),
+    tryGetServer<TopDoctor[]>(endpoints.analytics.topDoctors(query({
       from: from.toISOString().slice(0, 10),
       to: to.toISOString().slice(0, 10),
       limit: 10,
@@ -89,24 +82,10 @@ export default async function DashboardPage({
   const summary = result.data;
   const currency = summary.currency || "LKR";
 
-  const topSpecialties = summary.top_specialties ?? [];
-  const districts = summary.districts ?? [];
-  const doctorUtilisation = summary.doctor_utilisation ?? [];
-  const revenue = revenueResult.ok ? revenueResult.data : (summary.revenue ?? []);
-  const bookingsDaily = bookingsResult.ok ? bookingsResult.data : (summary.bookings_daily ?? []);
+  const revenue = revenueResult.ok ? revenueResult.data : [];
+  const bookingsDaily = bookingsResult.ok ? bookingsResult.data : [];
   const topDoctors = doctorsResult.ok ? doctorsResult.data : [];
-
-  // Every district, including the ones with no activity — a chart built only
-  // from returned rows hides exactly the coverage gaps this view exists to show.
-  const districtCounts = new Map(
-    districts.map((row) => [districtName(row.district), row.booking_count]),
-  );
-  const districtItems = DISTRICTS.map((district) => ({
-    key: district.code,
-    label: district.name,
-    note: district.province,
-    value: districtCounts.get(district.name) ?? 0,
-  }));
+  const noShowRate = summary.bookings > 0 ? summary.noShows / summary.bookings : 0;
 
   return (
     <>
@@ -115,28 +94,27 @@ export default async function DashboardPage({
       <section aria-label="Headline figures" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatTile
           label="Gross revenue"
-          value={formatMoney(summary.gross_cents, currency)}
-          hint={`Commission ${formatMoney(summary.commission_cents, currency)}`}
+          value={formatMoney(summary.grossRevenueCents, currency)}
+          hint={`Commission ${formatMoney(summary.commissionCents, currency)}`}
           icon={Coins}
         />
         <StatTile
           label="Bookings"
           value={formatCount(summary.bookings)}
-          hint={`${formatCount(summary.completed_consultations)} completed`}
+          hint={`${formatCount(summary.completed)} completed`}
           icon={CalendarCheck}
         />
-        <StatTile label="Active users" value={formatCount(summary.active_users)} icon={UserRound} />
+        <StatTile label="New patients" value={formatCount(summary.newPatients)} icon={UserRound} />
         <StatTile
           label="No-show rate"
-          value={formatPercent(summary.no_show_rate)}
-          hint="Share of appointments the patient did not attend"
+          value={formatPercent(noShowRate)}
+          hint="Share of appointments marked no-show"
           icon={Percent}
-          tone={summary.no_show_rate > 0.15 ? "warning" : "default"}
+          tone={noShowRate > 0.15 ? "warning" : "default"}
         />
         <StatTile
-          label="Specialties active"
-          value={formatCount(topSpecialties.length)}
-          hint="Distinct specialties with at least one booking"
+          label="Active doctors"
+          value={formatCount(summary.activeDoctors)}
           icon={Stethoscope}
         />
       </section>
@@ -146,39 +124,17 @@ export default async function DashboardPage({
         <DashboardBookingsChart points={bookingsDaily} />
 
         <RankedBars
-          title="Top specialties"
-          description="Bookings by specialty over the selected range."
-          items={topSpecialties.map((row) => ({
-            key: row.specialty_code,
-            label: humanise(row.specialty_code),
-            value: row.booking_count,
-          }))}
-          emptyLabel="No bookings recorded in this range."
-        />
-
-        <RankedBars
           title="Top doctors"
-          description="Booking volume from GET /analytics/doctors."
+          description="Completed consultations over the selected range."
           items={topDoctors.map((row) => ({
-            key: row.doctor_id,
-            label: row.doctor_id.slice(0, 8),
-            value: row.total_count,
+            key: row.doctorId,
+            label: row.displayName,
+            note: formatMoney(row.netCents, currency),
+            value: row.completed,
           }))}
-          emptyLabel="No doctor totals in this range."
-        />
-
-        <RankedBars
-          title="Bookings by district"
-          description="All 25 districts, including those with no activity."
-          items={districtItems}
-          emptyLabel="No district data recorded in this range."
-          maxRows={25}
+          emptyLabel="No completed consultations in this range."
         />
       </div>
-
-      <section className="mt-6">
-        <UtilisationTable rows={doctorUtilisation} />
-      </section>
     </>
   );
 }

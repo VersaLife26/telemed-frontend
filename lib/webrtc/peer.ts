@@ -1,7 +1,7 @@
 /**
  * The call itself: one RTCPeerConnection between exactly two people.
  *
- * This is the replacement for the LiveKit client. There is no SFU in the path,
+ * There is no SFU in the path,
  * so what would have been the server's job -- deciding how much bitrate a
  * degraded link should carry, noticing a connection died and rebuilding it --
  * has to happen here. That is what the two features below are:
@@ -18,6 +18,7 @@
  *   for the whole call even though it is idle for most of it.
  */
 
+import type { Consultation, ConsultationMessage } from "@/lib/consumer/api/types";
 import type { PointerState } from "@/lib/consumer/features/pointer";
 import { parsePointer } from "@/lib/consumer/features/pointer";
 import {
@@ -59,18 +60,16 @@ export type PeerHandlers = {
   onStateChange?: (state: CallState) => void;
   onQuality?: (q: CallQuality) => void;
   onRemoteQuality?: (q: CallQuality) => void;
-  onRemoteRecording?: (recording: boolean) => void;
-  /**
-   * A signalling-level error frame from the server.
-   *
-   * Surfaced rather than only logged because one of these codes is a state the
-   * UI must render: ROOM_FULL arrives AFTER the socket opens successfully, so
-   * a screen that ignores it shows "Connecting…" forever to a third
-   * participant who will never be admitted. The server sends it as a frame
-   * precisely so the client can tell that apart from the server being down.
-   */
+  /** A signalling-level error frame from the server. */
   onError?: (code: string, message: string) => void;
-  onChat?: (msg: { id: string; body: string }) => void;
+  /** The hub accepted this connection (also after every signalling reconnect). */
+  onWelcome?: () => void;
+  /** The server closed the room; `replaced` means this user connected elsewhere. */
+  onRoomClosed?: (reason: string) => void;
+  /** The consultation changed state (waiting, admitted, started, ended). */
+  onConsultation?: (consultation: Consultation) => void;
+  /** A persisted chat message, including this participant's own. */
+  onMessage?: (message: ConsultationMessage) => void;
   onPointer?: (pointer: PointerState) => void;
   onFileShared?: (file: { name: string }) => void;
   /** Screen capture stopped outside setScreenShare, e.g. from the browser's own "Stop sharing" bar. */
@@ -78,9 +77,8 @@ export type PeerHandlers = {
   onLog?: (line: string) => void;
 };
 
-/** Error codes the signalling server can send. Mirrors protocol.go. */
+/** Error codes the signalling hub can send. */
 export const SIGNAL_ERROR = {
-  roomFull: "ROOM_FULL",
   unknownType: "UNKNOWN_TYPE",
   malformed: "MALFORMED",
   noPeer: "NO_PEER",
@@ -148,28 +146,31 @@ export class PeerCall {
   private goodRun = 0;
   private lastSample: { bytesSent: number; bytesReceived: number; at: number } | null = null;
 
-  private recorder: MediaRecorder | null = null;
-  private recordedChunks: Blob[] = [];
-
   private state: CallState = "idle";
   private ended = false;
 
+  /** See SignalingClient for `refreshSignalUrl` and `issuedAt`. */
   constructor(
-    private readonly signalUrl: string,
+    signalUrl: string,
     private readonly handlers: PeerHandlers = {},
+    refreshSignalUrl?: () => Promise<string>,
+    issuedAt?: number,
   ) {
     this.signaling = new SignalingClient(signalUrl, {
       onWelcome: (w) => void this.onWelcome(w),
       onPeerJoined: () => void this.onPeerJoined(),
       onPeerLeft: () => this.onPeerLeft(),
-      onRoomClosed: () => this.hangUp("room closed by the server"),
+      onRoomClosed: (reason) => {
+        this.hangUp(`room closed by the server (${reason})`);
+        this.handlers.onRoomClosed?.(reason);
+      },
       onFrame: (env) => void this.onFrame(env),
       onError: (code, message) => {
         this.log(`signalling error ${code}: ${message}`);
         this.handlers.onError?.(code, message);
       },
       onStateChange: (s) => this.log(`signalling ${s}`),
-    });
+    }, refreshSignalUrl, issuedAt);
   }
 
   /** Acquires camera and microphone and connects to the room. */
@@ -188,11 +189,6 @@ export class PeerCall {
     return this.remoteStream;
   }
 
-  /** Relays an in-call chat line to the other participant. */
-  sendChat(msg: { id: string; body: string }): boolean {
-    return this.signaling.send({ type: FrameType.Chat, data: msg });
-  }
-
   sendPointer(pointer: PointerState): boolean {
     return this.signaling.send({ type: FrameType.Pointer, data: pointer });
   }
@@ -205,9 +201,10 @@ export class PeerCall {
 
   private async onWelcome(w: Welcome): Promise<void> {
     this.polite = w.polite;
-    this.peerPresent = w.peer_present;
-    this.iceServers = w.ice_servers ?? [];
-    this.log(`joined ${w.room} as ${w.peer_id} (${w.polite ? "polite" : "impolite"})`);
+    this.peerPresent = w.peerPresent;
+    this.iceServers = w.iceServers ?? [];
+    this.log(`joined as ${w.peerId} (${w.polite ? "polite" : "impolite"})`);
+    this.handlers.onWelcome?.();
 
     // Rebuilt on every welcome rather than only the first: a welcome after a
     // signalling reconnect means the server may have handed out fresh TURN
@@ -243,12 +240,14 @@ export class PeerCall {
   }
 
   private async onFrame(env: Envelope): Promise<void> {
+    if (env.type === FrameType.StateChanged) {
+      this.handlers.onConsultation?.(env.data as Consultation);
+      return;
+    }
     if (env.type === FrameType.Chat) {
-      const data = env.data as { id?: string; body?: string } | undefined;
-      const body = data?.body?.trim() ?? "";
-      if (body) {
-        this.handlers.onChat?.({ id: data?.id?.trim() || `${Date.now()}`, body });
-      }
+      // Only the server's own chat frames (no `from`) are persisted messages;
+      // peer-relayed chat frames are ephemeral and this client sends none.
+      if (!env.from && env.data) this.handlers.onMessage?.(env.data as ConsultationMessage);
       return;
     }
     if (env.type === FrameType.Pointer) {
@@ -267,10 +266,6 @@ export class PeerCall {
 
     if (env.type === FrameType.Quality) {
       this.handlers.onRemoteQuality?.(env.data as CallQuality);
-      return;
-    }
-    if (env.type === FrameType.RecordingState) {
-      this.handlers.onRemoteRecording?.(Boolean((env.data as { recording?: boolean })?.recording));
       return;
     }
     if (env.type === FrameType.Bye) {
@@ -322,8 +317,8 @@ export class PeerCall {
     const pc = new RTCPeerConnection({
       iceServers: this.iceServers.map((s) => ({
         urls: s.urls,
-        username: s.username,
-        credential: s.credential,
+        username: s.username ?? undefined,
+        credential: s.credential ?? undefined,
       })),
       // Pooling warms candidates before the first offer, which shaves a
       // noticeable amount off time-to-first-frame on a slow mobile link.
@@ -414,7 +409,7 @@ export class PeerCall {
    * restartIce() makes the next offer carry fresh ICE credentials and
    * candidates, so a connection whose network path died -- wifi to cellular,
    * a NAT rebinding, a TURN allocation expiring -- can find a new one while
-   * the tracks, the transceivers and the recording all stay in place.
+   * the tracks and the transceivers stay in place.
    *
    * Only the impolite peer drives it, for the same reason it drives the
    * initial offer: two simultaneous restarts collide, and the collision
@@ -425,9 +420,9 @@ export class PeerCall {
     const pc = this.pc;
     if (!pc || this.ended) return;
     if (!this.signaling.ready) {
-      // No socket, no way to deliver a new offer. The signalling client is
-      // already retrying; this will be driven again by the next state change.
-      this.log("ICE restart deferred: signalling socket is down");
+      // No hub connection, no way to deliver a new offer. The signalling client
+      // is already reconnecting; this will be driven again by the next state change.
+      this.log("ICE restart deferred: signalling is down");
       return;
     }
     if (this.polite) return;
@@ -568,80 +563,6 @@ export class PeerCall {
     });
   }
 
-  /** Forces a rung, for the test page's manual override. */
-  setBitrateRung(rung: number): void {
-    this.rung = Math.max(0, Math.min(BITRATE_LADDER_KBPS.length - 1, rung));
-    this.applyBitrate();
-  }
-
-  static get ladder(): readonly number[] {
-    return BITRATE_LADDER_KBPS;
-  }
-
-  // --- local recording ----------------------------------------------------
-
-  /**
-   * Records the call in this browser.
-   *
-   * A peer-to-peer call has no server in the media path, so there is nothing
-   * server-side to record: this is the only place a recording can be made.
-   * The trade is worth stating plainly -- the recording lives and dies with
-   * this tab. A crash, a closed laptop or a browser that reclaims memory
-   * loses it, which is a materially weaker guarantee than an SFU writing to
-   * object storage, and it is the direct cost of dropping the SFU.
-   *
-   * Both tracks are mixed into one recording rather than kept separate,
-   * because a consultation record is a conversation and two files that must be
-   * aligned by hand afterwards are not one.
-   */
-  startRecording(): boolean {
-    if (this.recorder || !this.localStream) return false;
-
-    const mixed = new MediaStream();
-    this.localStream.getTracks().forEach((t) => mixed.addTrack(t));
-    this.remoteStream.getTracks().forEach((t) => mixed.addTrack(t));
-
-    const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(
-      (type) => MediaRecorder.isTypeSupported(type),
-    );
-    if (!mimeType) {
-      this.log("this browser cannot record");
-      return false;
-    }
-
-    this.recordedChunks = [];
-    this.recorder = new MediaRecorder(mixed, { mimeType });
-    this.recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.recordedChunks.push(e.data);
-    };
-    // Timesliced rather than one blob at stop: a crash then costs the last
-    // second instead of the whole consultation.
-    this.recorder.start(1_000);
-    this.signaling.send({ type: FrameType.RecordingState, data: { recording: true } });
-    this.log("recording started (local to this browser)");
-    return true;
-  }
-
-  async stopRecording(): Promise<Blob | null> {
-    const recorder = this.recorder;
-    if (!recorder) return null;
-
-    const done = new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-    recorder.stop();
-    await done;
-    this.recorder = null;
-    this.signaling.send({ type: FrameType.RecordingState, data: { recording: false } });
-
-    if (this.recordedChunks.length === 0) return null;
-    return new Blob(this.recordedChunks, { type: recorder.mimeType });
-  }
-
-  get recording(): boolean {
-    return this.recorder !== null;
-  }
-
   // --- controls -----------------------------------------------------------
 
   setMicrophoneEnabled(enabled: boolean): void {
@@ -728,7 +649,6 @@ export class PeerCall {
 
     this.stopStats();
     this.clearRestartTimer();
-    if (this.recorder) void this.stopRecording();
     this.signaling.close();
     this.pc?.close();
     this.pc = null;

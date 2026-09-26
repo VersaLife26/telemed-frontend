@@ -13,55 +13,57 @@ import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Doctor, TelemedUser } from "@/lib/consumer/api/types";
+import { hasCode, problemMessage } from "@/lib/consumer/api/errors";
+import type { DoctorDocumentType, DoctorProfile, Specialty, TelemedUser } from "@/lib/consumer/api/types";
 import { assets } from "@/lib/consumer/assets";
 import {
   CREDENTIAL_DOC_TYPES,
   PRACTICE_LANGUAGES,
+  apiFileSrc,
   consultLanguages,
   doctorFeeCents,
   credentialDocumentError,
   practiceProfileBody,
 } from "@/lib/consumer/features/practice";
-import { profilePhotoError, profilePhotoSrc } from "@/lib/consumer/features/profile";
+import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
+import { profilePhotoError } from "@/lib/consumer/features/profile";
 import { SignatureCard } from "@/components/consumer/signature-card";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
 export default function ProfilePage() {
-  const [me, setMe] = useState<Doctor | null>(null);
+  const [me, setMe] = useState<DoctorProfile | null>(null);
   const [user, setUser] = useState<TelemedUser | null>(null);
-  const [email, setEmail] = useState("");
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [bio, setBio] = useState("");
   const [feeRupees, setFeeRupees] = useState("");
   const [languages, setLanguages] = useState<string[]>(["en"]);
   const [experienceYears, setExperienceYears] = useState(0);
-  const [docType, setDocType] = useState<(typeof CREDENTIAL_DOC_TYPES)[number]["value"]>(
-    "slmc_certificate",
-  );
+  const [docType, setDocType] = useState<DoctorDocumentType>("slmcCertificate");
   const [docFile, setDocFile] = useState<File | null>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<"email" | "password" | "practice" | "document" | null>(
-    null,
-  );
+  const [saving, setSaving] = useState<"password" | "practice" | "document" | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([browserApi<Doctor>("/doctors/me"), browserApi<TelemedUser>("/users/me")])
+    browserApi<Specialty[]>("/specialties")
+      .then(setSpecialties)
+      .catch(() => undefined);
+    Promise.all([browserApi<DoctorProfile>("/doctors/me"), browserApi<TelemedUser>("/me")])
       .then(([doctor, account]) => {
         setMe(doctor);
         setUser(account);
-        setEmail(account.email || "");
         setBio(doctor.bio || "");
         setFeeRupees(String(doctorFeeCents(doctor) / 100));
         setLanguages(consultLanguages(doctor.languages));
-        setExperienceYears(doctor.experience_years ?? 0);
+        setExperienceYears(doctor.experienceYears ?? 0);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Sign in required"))
       .finally(() => setLoading(false));
@@ -78,44 +80,27 @@ export default function ProfilePage() {
     window.location.href = "/login";
   }
 
-  async function saveEmail(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-    setSaving("email");
-    setNotice(null);
-    setError(null);
-    try {
-      const updated = await browserApi<TelemedUser>("/users/me", {
-        method: "PUT",
-        body: {
-          name: user.name || me?.display_name || "Doctor",
-          email: email.trim() || undefined,
-          language: user.language || "en",
-          version: user.version ?? 0,
-        },
-      });
-      setUser(updated);
-      setEmail(updated.email || email);
-      setNotice("Email saved. You can now sign in with Google using this address.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save email");
-    } finally {
-      setSaving(null);
-    }
-  }
-
   async function savePassword(e: React.FormEvent) {
     e.preventDefault();
     setSaving("password");
     setNotice(null);
     setError(null);
     try {
-      await browserApi<void>("/users/me/password", {
+      const res = await fetch("/api/auth/password", {
         method: "PUT",
-        body: { new_password: password },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: user?.hasPassword ? currentPassword : null,
+          newPassword: password,
+        }),
       });
+      if (!res.ok) {
+        throw new Error(problemMessage(await res.json().catch(() => null), "Could not save password"));
+      }
       setPassword("");
-      setNotice("Password saved. You can sign in with email next time.");
+      setCurrentPassword("");
+      setUser((prev) => (prev ? { ...prev, hasPassword: true } : prev));
+      setNotice("Password saved. Other devices have been signed out.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save password");
     } finally {
@@ -134,7 +119,7 @@ export default function ProfilePage() {
     setNotice(null);
     setError(null);
     try {
-      const updated = await browserApi<Doctor>("/doctors/me", {
+      const updated = await browserApi<DoctorProfile>("/doctors/me", {
         method: "PUT",
         body: practiceProfileBody(me, {
           bio,
@@ -147,10 +132,16 @@ export default function ProfilePage() {
       setBio(updated.bio || "");
       setFeeRupees(String(doctorFeeCents(updated) / 100));
       setLanguages(updated.languages?.length ? updated.languages : languages);
-      setExperienceYears(updated.experience_years ?? experienceYears);
+      setExperienceYears(updated.experienceYears ?? experienceYears);
       setNotice("Practice profile saved.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save practice profile");
+      setError(
+        hasCode(err, "concurrency_conflict")
+          ? "Your profile was changed elsewhere. Reload the page and try again."
+          : err instanceof Error
+            ? err.message
+            : "Could not save practice profile",
+      );
     } finally {
       setSaving(null);
     }
@@ -171,7 +162,7 @@ export default function ProfilePage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const updated = await browserApi<Doctor>("/doctors/me/photo", {
+      const updated = await browserApi<DoctorProfile>("/doctors/me/photo", {
         method: "PUT",
         body: form,
       });
@@ -190,7 +181,8 @@ export default function ProfilePage() {
     setError(null);
     setNotice(null);
     try {
-      const updated = await browserApi<Doctor>("/doctors/me/photo", { method: "DELETE" });
+      await browserApi("/doctors/me/photo", { method: "DELETE" });
+      const updated = { ...me, photoUrl: null };
       setMe(updated);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -216,7 +208,7 @@ export default function ProfilePage() {
     setError(null);
     try {
       const form = new FormData();
-      form.append("document_type", docType);
+      form.append("type", docType);
       form.append("file", docFile);
       await browserApi("/doctors/me/documents", { method: "POST", body: form });
       setDocFile(null);
@@ -255,23 +247,23 @@ export default function ProfilePage() {
     );
   }
 
-  const photoSrc = previewUrl || profilePhotoSrc(me?.photo_url) || assets.avatarPlaceholder;
-  const hasStoredPhoto = Boolean(me?.photo_url) || Boolean(previewUrl);
+  const photoSrc = previewUrl || apiFileSrc(me?.photoUrl) || assets.avatarPlaceholder;
+  const hasStoredPhoto = Boolean(me?.photoUrl) || Boolean(previewUrl);
 
   return (
     <div className="flex flex-col gap-10">
       <PageHero
         {...HEROES.doctorProfile}
-        eyebrow={me?.specialty || HEROES.doctorProfile.eyebrow}
-        title={me?.display_name || "Doctor"}
+        eyebrow={me?.specialtyCode ? specialtyLabel(me.specialtyCode, specialties) : HEROES.doctorProfile.eyebrow}
+        title={me?.displayName || "Doctor"}
         image={photoSrc}
-        imageAlt={me?.display_name || "Your profile photo"}
+        imageAlt={me?.displayName || "Your profile photo"}
         framed
       >
         <div className="flex flex-wrap gap-2">
-          <Badge tone="brand">SLMC {me?.slmc_number || "—"}</Badge>
-          <Badge tone={me?.verification_status === "approved" ? "success" : "warning"}>
-            {me?.verification_status || "unverified"}
+          <Badge tone="brand">SLMC {me?.slmcNumber || "—"}</Badge>
+          <Badge tone={me?.status === "suspended" ? "warning" : "success"}>
+            {me?.status === "suspended" ? "Suspended" : "Active"}
           </Badge>
         </div>
       </PageHero>
@@ -395,16 +387,14 @@ export default function ProfilePage() {
       <Card>
         <h2 className="text-h4 text-ink">Credential documents</h2>
         <p className="mt-1 text-body-sm text-muted">
-          Upload certificates for the verification team. PDF, JPEG, PNG or WebP, up to 5 MB each.
+          Upload certificates for the verification team. PDF, JPEG or PNG, up to 5 MB each.
         </p>
         <form onSubmit={(e) => void saveDocument(e)} className="mt-5 flex flex-col gap-5">
           <Select
             id="doc-type"
             label="Document type"
             value={docType}
-            onChange={(e) =>
-              setDocType(e.target.value as (typeof CREDENTIAL_DOC_TYPES)[number]["value"])
-            }
+            onChange={(e) => setDocType(e.target.value as DoctorDocumentType)}
           >
             {CREDENTIAL_DOC_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
@@ -424,7 +414,7 @@ export default function ProfilePage() {
               ref={docInputRef}
               id="doc-file"
               type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
+              accept="application/pdf,image/jpeg,image/png"
               className="hidden"
               onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
             />
@@ -444,26 +434,28 @@ export default function ProfilePage() {
       <Card>
         <h2 className="text-h4 text-ink">Sign-in details</h2>
 
-        <form onSubmit={(e) => void saveEmail(e)} className="mt-5 flex flex-col gap-4">
-          <Input
-            id="doctor-email"
-            label="Login email"
-            hint="Used for Google and email sign-in."
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.lk"
-          />
-          <Button type="submit" fullWidth busy={saving === "email"} disabled={saving !== null}>
-            Save email
-          </Button>
-        </form>
+        {user?.email ? (
+          <p className="mt-2 text-body-sm text-muted">
+            Login email: <span className="font-semibold text-ink">{user.email}</span>
+          </p>
+        ) : null}
 
-        <form onSubmit={(e) => void savePassword(e)} className="mt-6 flex flex-col gap-4">
+        <form onSubmit={(e) => void savePassword(e)} className="mt-5 flex flex-col gap-4">
+          {user?.hasPassword ? (
+            <Input
+              id="doctor-current-password"
+              label="Current password"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          ) : null}
           <Input
             id="doctor-password"
-            label="Set a password"
-            hint="At least 8 characters."
+            label={user?.hasPassword ? "New password" : "Set a password"}
+            hint="At least 8 characters. Other devices are signed out."
             type="password"
             minLength={8}
             required

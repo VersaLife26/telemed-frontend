@@ -1,36 +1,22 @@
 import { NextResponse } from "next/server";
 import { apiFetch } from "@/lib/consumer/api/client";
-import { ApiError } from "@/lib/consumer/api/envelope";
+import { problem, toClientError } from "@/lib/consumer/auth/session";
 import { sendOtpBody, sendOtpError } from "@/lib/consumer/features/otp";
+import type { OtpSent } from "@/lib/consumer/api/types";
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { phone?: string; purpose?: string };
+    const body = (await req.json()) as { phone?: string };
     const missing = sendOtpError(body.phone);
     if (missing) {
-      return NextResponse.json({ message: missing }, { status: 400 });
+      return problem(400, missing);
     }
-
-    const data = await apiFetch<{
-      request_id: string;
-      expires_in: number;
-      attempts_remaining: number;
-    }>("/api/v1/auth/otp/send", {
+    const data = await apiFetch<OtpSent>("/api/v1/auth/otp/send", {
       method: "POST",
-      body: sendOtpBody(body.phone!, body.purpose),
+      body: sendOtpBody(body.phone!),
     });
-
-    return NextResponse.json({ data });
+    return NextResponse.json(data);
   } catch (err) {
-    if (err instanceof ApiError) {
-      return NextResponse.json(err.body, { status: err.status });
-    }
-    return NextResponse.json(
-      {
-        message:
-          "Could not reach API gateway. Start telemed-api-gateway or check NEXT_PUBLIC_API_BASE_URL.",
-      },
-      { status: 502 },
-    );
+    return toClientError(err);
   }
 }

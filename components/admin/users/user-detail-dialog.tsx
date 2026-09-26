@@ -12,8 +12,8 @@ import {
 import { Skeleton } from "@/components/admin/ui/skeleton";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiQuery } from "@/lib/admin/api/hooks";
-import type { AdminUserRecord } from "@/lib/admin/api/types";
-import { formatDate, shortId } from "@/lib/admin/format";
+import type { PlatformUserDetail } from "@/lib/admin/api/types";
+import { formatDate, humanise, shortId } from "@/lib/admin/format";
 
 export function UserDetailDialog({
   userId,
@@ -23,7 +23,7 @@ export function UserDetailDialog({
   onClose: () => void;
 }) {
   const enabled = userId !== null;
-  const detail = useApiQuery<AdminUserRecord>(
+  const detail = useApiQuery<PlatformUserDetail>(
     ["user-detail", userId ?? ""],
     userId ? endpoints.users.detail(userId) : "",
     { enabled },
@@ -35,7 +35,7 @@ export function UserDetailDialog({
         <DialogHeader>
           <DialogTitle>User record</DialogTitle>
           <DialogDescription>
-            Projection from user-service. No clinical fields are stored here.
+            Account details only. No clinical fields are readable here.
           </DialogDescription>
         </DialogHeader>
         {detail.isPending ? (
@@ -44,16 +44,19 @@ export function UserDetailDialog({
           <p className="text-sm text-destructive">{detail.error.userMessage}</p>
         ) : detail.data ? (
           <dl className="grid gap-2 text-sm">
-            <Row label="Name" value={detail.data.full_name ?? "Unnamed"} />
-            <Row label="User ID" value={detail.data.user_id} mono />
-            <Row label="Role" value={detail.data.role} />
-            <Row label="Status" value={detail.data.status} />
+            <Row label="Name" value={detail.data.fullName || "Unnamed"} />
+            <Row label="User ID" value={detail.data.id} mono />
+            <Row label="Role" value={humanise(detail.data.role)} />
+            <Row label="Status" value={humanise(detail.data.status)} />
+            {detail.data.suspendedReason ? (
+              <Row label="Suspension reason" value={detail.data.suspendedReason} />
+            ) : null}
             <Row label="Email" value={detail.data.email ?? "—"} />
-            <Row label="Phone" value={detail.data.phone ?? "—"} />
-            <Row
-              label="Registered"
-              value={detail.data.registered_at ? formatDate(detail.data.registered_at) : "—"}
-            />
+            <Row label="Phone" value={detail.data.phoneNumber ?? "—"} />
+            <Row label="Registered" value={formatDate(detail.data.createdAt)} />
+            {detail.data.erasureDueAt ? (
+              <Row label="Erasure due" value={formatDate(detail.data.erasureDueAt)} />
+            ) : null}
           </dl>
         ) : null}
       </DialogContent>

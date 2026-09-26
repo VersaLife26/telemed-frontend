@@ -7,29 +7,48 @@ import { ShieldCheck } from "lucide-react";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
+import { Input } from "@/components/consumer/ui/Input";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
+import type { OrderSummary, Payment, PaymentIntent } from "@/lib/consumer/api/types";
 import {
   afterPaymentPath,
-  consultationTotal,
+  canChangePromo,
+  intentBody,
+  intentPath,
   isPaymentAuthorized,
-  mockIntentBody,
-  payhereIntentBody,
-  paymentStatus,
-  shouldGoToWaitingRoom,
+  mockCompletePath,
+  orderPath,
+  promoPath,
 } from "@/lib/consumer/features/payment";
 import { formatMoney, paymentSettled } from "@/lib/consumer/money";
+
+type Checkout = NonNullable<PaymentIntent["checkout"]>;
+
+/** PayHere's hosted page takes a form POST; the API hands us the signed fields. */
+function submitCheckout(checkout: Checkout) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = checkout.actionUrl;
+  form.style.display = "none";
+  for (const [name, value] of Object.entries(checkout.fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
 
 export function PaymentClient({ appointmentId }: { appointmentId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [order, setOrder] = useState<OrderSummary | null>(null);
-  const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [intent, setIntent] = useState<PaymentIntentView | null>(null);
-  const [payment, setPayment] = useState<Payment | null>(null);
+  const [promo, setPromo] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<"payhere" | "mock" | "promo" | null>(null);
   const [hydrating, setHydrating] = useState(true);
   const [polling, setPolling] = useState(false);
 
@@ -44,161 +63,118 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const [o, a] = await Promise.all([
-          browserApi<OrderSummary>(`/payments/order/${appointmentId}`).catch(() => null),
-          browserApi<Appointment>(`/appointments/${appointmentId}`).catch(() => null),
-        ]);
-        if (!cancelled) {
-          setOrder(o);
-          setAppointment(a);
-          if (o?.payment_id) {
-            const res = await browserApi<{ payment: Payment } | Payment>(`/payments/${o.payment_id}`).catch(() => null);
-            const p = res && "payment" in res ? res.payment : (res as Payment | null);
-            if (p) setPayment(p);
-          }
-          setHydrating(false);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Could not load order");
-          setHydrating(false);
-        }
-      }
-    })();
+    browserApi<OrderSummary>(orderPath(appointmentId))
+      .then((o) => {
+        if (!cancelled) setOrder(o);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load order");
+      })
+      .finally(() => {
+        if (!cancelled) setHydrating(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [appointmentId]);
 
-  const goAppointments = useCallback(() => {
-    router.push(afterPaymentPath());
-  }, [router]);
+  const settled = paymentSettled(order?.status);
 
   useEffect(() => {
-    const id = payment?.id || intent?.payment?.id || order?.payment_id;
-    if (!polling && !searchParams.has("order_id") && searchParams.get("payhere") !== "return") return;
-    if (shouldGoToWaitingRoom(intent, payment)) {
+    if (!polling) return;
+    if (settled) {
       setPolling(false);
       return;
     }
     const timer = window.setInterval(async () => {
       try {
-        if (id) {
-          const res = await browserApi<{ payment: Payment } | Payment>(`/payments/${id}`);
-          const latest = res && "payment" in res ? res.payment : (res as Payment);
-          if (latest) {
-            setPayment(latest);
-            if (paymentSettled(latest.status)) {
-              setPolling(false);
-            }
-          }
-        } else {
-          const ord = await browserApi<OrderSummary>(`/payments/order/${appointmentId}`).catch(() => null);
-          if (ord?.payment_id) {
-            const res = await browserApi<{ payment: Payment } | Payment>(`/payments/${ord.payment_id}`);
-            const latest = res && "payment" in res ? res.payment : (res as Payment);
-            if (latest) {
-              setPayment(latest);
-              if (paymentSettled(latest.status)) {
-                setPolling(false);
-              }
-            }
-          }
-        }
+        setOrder(await browserApi<OrderSummary>(orderPath(appointmentId)));
       } catch {
         /* keep polling */
       }
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [appointmentId, intent, order?.payment_id, payment, polling, searchParams]);
+  }, [appointmentId, polling, settled]);
+
+  const goAppointments = useCallback(() => {
+    router.push(afterPaymentPath());
+  }, [router]);
 
   async function payPayHere() {
     setError(null);
-    setLoading(true);
+    setBusy("payhere");
     try {
-      const returnUrl = `${window.location.origin}/appointments/${appointmentId}/payment?payhere=return`;
-      const created = await browserApi<PaymentIntentView>("/payments/intent", {
+      const intent = await browserApi<PaymentIntent>(intentPath(appointmentId), {
         method: "POST",
-        body: payhereIntentBody(appointmentId, returnUrl),
+        body: intentBody("payhere"),
       });
-      setIntent(created);
-      setPayment(created.payment);
-
-      if (paymentSettled(created.payment?.status, created.next_action)) {
+      if (intent.checkout) {
+        submitCheckout(intent.checkout);
+        return;
+      }
+      if (paymentSettled(intent.status)) {
         goAppointments();
         return;
       }
-
-      if (created.next_action === "redirect" && created.redirect_url) {
-        if (created.reference) {
-          try {
-            const fields = JSON.parse(created.reference) as Record<string, unknown>;
-            const form = document.createElement("form");
-            form.method = "POST";
-            form.action = created.redirect_url;
-            form.style.display = "none";
-
-            for (const [key, value] of Object.entries(fields)) {
-              if (value != null) {
-                const input = document.createElement("input");
-                input.type = "hidden";
-                input.name = key;
-                input.value = String(value);
-                form.appendChild(input);
-              }
-            }
-            document.body.appendChild(form);
-            form.submit();
-            return;
-          } catch {
-            window.location.href = created.redirect_url;
-            return;
-          }
-        }
-        window.location.href = created.redirect_url;
-        return;
-      }
-
       setPolling(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "PayHere checkout failed");
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
   async function payMock() {
     setError(null);
-    setLoading(true);
+    setBusy("mock");
     try {
-      const created = await browserApi<PaymentIntentView>("/payments/intent", {
+      const intent = await browserApi<PaymentIntent>(intentPath(appointmentId), {
         method: "POST",
-        body: mockIntentBody(appointmentId),
+        body: intentBody("mock"),
       });
-      setIntent(created);
-      setPayment(created.payment);
-      if (paymentSettled(created.payment?.status, created.next_action)) {
+      const payment = paymentSettled(intent.status)
+        ? null
+        : await browserApi<Payment>(mockCompletePath(intent.paymentId), {
+            method: "POST",
+            body: { outcome: "succeed" },
+          });
+      if (paymentSettled(payment?.status ?? intent.status)) {
         goAppointments();
         return;
       }
-      setPolling(true);
+      setError("The test payment did not go through.");
+      setOrder(await browserApi<OrderSummary>(orderPath(appointmentId)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Payment failed");
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
-  const total = consultationTotal(order, appointment);
-  const currency = order?.currency || appointment?.currency || "LKR";
-  const settled = shouldGoToWaitingRoom(intent, payment);
-  const authorized = isPaymentAuthorized(intent, payment);
+  async function changePromo(action: "apply" | "remove") {
+    setError(null);
+    setBusy("promo");
+    try {
+      const updated = await browserApi<OrderSummary>(promoPath(appointmentId), {
+        method: action === "apply" ? "PUT" : "DELETE",
+        body: action === "apply" ? { code: promo.trim() } : undefined,
+      });
+      setOrder(updated);
+      setPromo("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update the promo code");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (hydrating) {
     return <FormSkeleton />;
   }
+
+  const currency = order?.currency || "LKR";
+  const authorized = isPaymentAuthorized(order);
+  const providers = order?.availableProviders ?? [];
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-5">
@@ -208,24 +184,57 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
           about how it gets paid, which matters less than what it is. */}
       <Card variant="tint" className="p-5">
         <p className="text-eyebrow text-brand">Consultation fee</p>
-        <p className="mt-2 text-h1 text-ink tabular-time">{formatMoney(total, currency)}</p>
-        {order?.discount_cents ? (
+        <p className="mt-2 text-h1 text-ink tabular-time">{formatMoney(order?.amountCents, currency)}</p>
+        {order?.discountCents ? (
           <p className="mt-1 text-body-sm text-muted tabular-time">
-            Discount {formatMoney(order.discount_cents, currency)}
+            {formatMoney(order.grossCents, currency)} less {formatMoney(order.discountCents, currency)}
+            {order.promoCode ? ` (${order.promoCode})` : ""}
           </p>
         ) : null}
       </Card>
 
+      {order && canChangePromo(order) ? (
+        order.promoCode ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-body-sm text-muted">
+              Promo code <span className="font-semibold text-ink">{order.promoCode}</span> applied.
+            </p>
+            <Button size="sm" variant="ghost" busy={busy === "promo"} onClick={() => void changePromo("remove")}>
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void changePromo("apply");
+            }}
+          >
+            <Input
+              id="promo-code"
+              label="Promo code"
+              value={promo}
+              onChange={(e) => setPromo(e.target.value)}
+              fieldClassName="flex-1"
+            />
+            <Button type="submit" variant="outline" busy={busy === "promo"} disabled={!promo.trim()}>
+              Apply
+            </Button>
+          </form>
+        )
+      ) : null}
+
       {authorized ? (
         <Alert tone="info" title="Card pre-authorised">
-          {formatMoney(total, currency)} is held on your card. You are only charged after the
-          consultation is completed.
+          {formatMoney(order?.amountCents, currency)} is held on your card. You are only charged after
+          the consultation is completed.
         </Alert>
       ) : settled ? (
         <Alert tone="success" title="Payment confirmed">
           Your appointment is confirmed. Join from Appointments when it is time.
         </Alert>
-      ) : (
+      ) : providers.includes("payhere") ? (
         <Card className="flex gap-3 p-5">
           <span
             aria-hidden="true"
@@ -241,11 +250,11 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
             </p>
           </div>
         </Card>
-      )}
+      ) : null}
 
-      {paymentStatus(intent, payment) ? (
+      {order?.status ? (
         <p className="text-body-sm text-muted" role="status">
-          Status: {paymentStatus(intent, payment)}
+          Status: {order.status}
           {polling ? " · waiting for confirmation…" : ""}
         </p>
       ) : null}
@@ -256,21 +265,32 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
         <Button size="lg" fullWidth onClick={goAppointments}>
           View appointment
         </Button>
-      ) : (
+      ) : order ? (
         <div className="flex flex-col gap-3">
-          <Button size="lg" fullWidth busy={loading || polling} onClick={() => void payPayHere()}>
-            {loading ? "Redirecting…" : polling ? "Verifying authorisation…" : "Pay with card"}
-          </Button>
-          <Button
-            variant="outline"
-            fullWidth
-            busy={loading || polling}
-            onClick={() => void payMock()}
-          >
-            Pay with mock (test)
-          </Button>
+          {providers.includes("payhere") ? (
+            <Button
+              size="lg"
+              fullWidth
+              busy={busy === "payhere" || polling}
+              disabled={busy !== null}
+              onClick={() => void payPayHere()}
+            >
+              {busy === "payhere" ? "Redirecting…" : polling ? "Verifying authorisation…" : "Pay with card"}
+            </Button>
+          ) : null}
+          {providers.includes("mock") ? (
+            <Button
+              variant="outline"
+              fullWidth
+              busy={busy === "mock"}
+              disabled={busy !== null || polling}
+              onClick={() => void payMock()}
+            >
+              Pay with mock (test)
+            </Button>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       {polling ? (
         <p className="text-body-sm text-muted">

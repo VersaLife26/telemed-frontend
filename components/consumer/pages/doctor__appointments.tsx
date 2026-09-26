@@ -11,26 +11,21 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { Tabs } from "@/components/consumer/ui/Tabs";
 import { AppointmentsSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment } from "@/lib/consumer/api/types";
+import type { Appointment, Paged } from "@/lib/consumer/api/types";
 import { appointmentsListPath } from "@/lib/consumer/features/appointments";
-import { formatVisitClock, formatVisitDate, statusLabel } from "@/lib/consumer/features/patient-appointment";
+import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
+import { ageAtVisitDate } from "@/lib/consumer/features/visit-patient";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
 type Tab = "upcoming" | "past";
 
-function visitLabel(a: Appointment): string {
-  return a.visit_patient_name || a.patient_name || a.counterpart_name || "Patient";
-}
-
 function isPast(a: Appointment): boolean {
-  const s = (a.status || "").toLowerCase();
-  return s === "completed" || s === "cancelled" || s === "no_show";
+  return a.status === "completed" || a.status === "cancelled" || a.status === "noShow";
 }
 
 function isUpcoming(a: Appointment): boolean {
-  const s = (a.status || "").toLowerCase();
-  return s === "confirmed" || s === "pending_payment";
+  return a.status === "confirmed" || a.status === "pendingPayment";
 }
 
 export default function DoctorAppointmentsPage() {
@@ -42,8 +37,8 @@ export default function DoctorAppointmentsPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await browserApi<Appointment[]>(appointmentsListPath(100));
-      setItems(Array.isArray(data) ? data : []);
+      const data = await browserApi<Paged<Appointment>>(appointmentsListPath(100));
+      setItems(data.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load visits");
     } finally {
@@ -58,8 +53,8 @@ export default function DoctorAppointmentsPage() {
   const filtered = useMemo(() => {
     const list = tab === "past" ? items.filter(isPast) : items.filter(isUpcoming);
     return [...list].sort((a, b) => {
-      const ta = a.start_at || "";
-      const tb = b.start_at || "";
+      const ta = a.startAt;
+      const tb = b.startAt;
       return tab === "past" ? tb.localeCompare(ta) : ta.localeCompare(tb);
     });
   }, [items, tab]);
@@ -94,20 +89,19 @@ export default function DoctorAppointmentsPage() {
         />
       ) : (
         <ul className="flex flex-col gap-3">
-          {filtered.map((a) => (
+          {filtered.map((a) => {
+            const age = a.visitPatient?.dateOfBirth ? ageAtVisitDate(a.visitPatient.dateOfBirth, a.startAt) : 0;
+            return (
             <li key={a.id}>
               <Card className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-h5 text-ink truncate">{visitLabel(a)}</p>
+                    <p className="text-h5 text-ink truncate">{a.visitPatient?.name || "Patient"}</p>
                     <StatusBadge status={a.status} />
-                    {a.visit_patient_age != null && a.visit_patient_age > 0 ? (
-                      <span className="text-caption text-muted">Age {a.visit_patient_age}</span>
-                    ) : null}
+                    {age > 0 ? <span className="text-caption text-muted">Age {age}</span> : null}
                   </div>
                   <p className="mt-1 text-body-sm text-muted tabular-time">
-                    {formatVisitDate(a.start_at_local || a.start_at)} ·{" "}
-                    {formatVisitClock(a.start_at_local || a.start_at)}
+                    {formatVisitDate(a.startAt)} · {formatVisitClock(a.startAt)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -146,7 +140,8 @@ export default function DoctorAppointmentsPage() {
                 </div>
               </Card>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
-import { parseEnvelope } from "@/lib/consumer/api/envelope";
+import type { ConsultationLanguage, DoctorApplicationCreated, Specialty } from "@/lib/consumer/api/types";
 import {
   APPLY_DOCUMENT_TYPES,
   LANGUAGE_OPTIONS,
-  SPECIALTIES,
   TERMS_HREF,
   WEEKDAYS,
   applyDocumentPath,
@@ -102,7 +101,7 @@ const emptyForm: DoctorApplyForm = {
   availableEnd: "17:00",
   availabilityExtra: "",
   isGeneralPractitioner: null,
-  specialty: "general_practice",
+  specialty: "",
   experienceYears: "",
   practicingLocations: "",
   bankName: "",
@@ -122,14 +121,27 @@ export default function RegisterPage() {
   const [submitted, setSubmitted] = useState(false);
   const [pendingDocs, setPendingDocs] = useState<{
     applicationId: string;
+    uploadToken: string;
     remaining: ApplyDocumentType[];
   } | null>(null);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+
+  useEffect(() => {
+    fetch("/api/proxy/specialties", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<Specialty[]>) : []))
+      .then((list) => {
+        const sorted = [...list].sort((a, b) => a.displayOrder - b.displayOrder);
+        setSpecialties(sorted);
+        setForm((prev) => (prev.specialty ? prev : { ...prev, specialty: sorted[0]?.code ?? "" }));
+      })
+      .catch(() => undefined);
+  }, []);
 
   function patch(partial: Partial<DoctorApplyForm>) {
     setForm((prev) => ({ ...prev, ...partial }));
   }
 
-  function toggleLanguage(code: string) {
+  function toggleLanguage(code: ConsultationLanguage) {
     setForm((prev) => ({
       ...prev,
       languages: prev.languages.includes(code)
@@ -153,14 +165,18 @@ export default function RegisterPage() {
     else patch({ slmcCertificate: file });
   }
 
-  async function uploadDocuments(applicationId: string, docs: { type: ApplyDocumentType; file: File }[]) {
+  async function uploadDocuments(
+    applicationId: string,
+    uploadToken: string,
+    docs: { type: ApplyDocumentType; file: File }[],
+  ) {
     const failed: ApplyDocumentType[] = [];
     for (const doc of docs) {
       const body = new FormData();
       body.append("file", doc.file);
-      body.append("document_type", doc.type);
-      const res = await fetch(`/api/proxy${applyDocumentPath(applicationId)}`, {
-        method: "POST",
+      const res = await fetch(`/api/proxy${applyDocumentPath(applicationId, doc.type)}`, {
+        method: "PUT",
+        headers: { "X-Upload-Token": uploadToken },
         body,
       });
       if (!res.ok) {
@@ -182,18 +198,19 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      let applicationId = pendingDocs?.applicationId;
-      if (!applicationId) {
-        const res = await fetch("/api/proxy/doctors/apply", {
+      let application = pendingDocs
+        ? { id: pendingDocs.applicationId, uploadToken: pendingDocs.uploadToken }
+        : null;
+      if (!application) {
+        const res = await fetch("/api/proxy/doctor-applications", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(doctorApplyPayload(form)),
         });
         const json: unknown = await res.json().catch(() => null);
         if (!res.ok) throw new Error(readApplyError(json, "Could not submit application"));
-        const data = parseEnvelope<{ application_id?: string }>(json);
-        applicationId = data.application_id;
-        if (!applicationId) throw new Error("Application was accepted without an id.");
+        const created = json as DoctorApplicationCreated;
+        application = { id: created.id, uploadToken: created.uploadToken };
       }
 
       const docs = applyDocuments(form);
@@ -201,9 +218,9 @@ export default function RegisterPage() {
       const toUpload = remainingTypes
         ? docs.filter((d) => remainingTypes.includes(d.type))
         : docs;
-      const failed = await uploadDocuments(applicationId, toUpload);
+      const failed = await uploadDocuments(application.id, application.uploadToken, toUpload);
       if (failed.length > 0) {
-        setPendingDocs({ applicationId, remaining: failed });
+        setPendingDocs({ applicationId: application.id, uploadToken: application.uploadToken, remaining: failed });
         throw new Error(
           `Application saved, but these documents failed to upload: ${failed.join(", ")}. Fix the files and submit again.`,
         );
@@ -488,9 +505,9 @@ export default function RegisterPage() {
                       type="file"
                       required={!pendingDocs}
                       accept={
-                        doc.type === "slmc_certificate"
-                          ? "image/*,application/pdf"
-                          : "image/*"
+                        doc.type === "slmcCertificate"
+                          ? "image/png,image/jpeg,application/pdf"
+                          : "image/png,image/jpeg"
                       }
                       onChange={(e) => setFile(doc.type, e.target.files?.[0] ?? null)}
                     />
@@ -523,9 +540,9 @@ export default function RegisterPage() {
                     value={form.specialty}
                     onChange={(e) => patch({ specialty: e.target.value })}
                   >
-                    {SPECIALTIES.map((s) => (
+                    {specialties.map((s) => (
                       <option key={s.code} value={s.code}>
-                        {s.label}
+                        {s.nameEn}
                       </option>
                     ))}
                   </select>

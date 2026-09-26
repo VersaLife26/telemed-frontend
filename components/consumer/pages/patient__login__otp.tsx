@@ -9,16 +9,9 @@ import { Button } from "@/components/consumer/ui/Button";
 import { Reveal } from "@/components/consumer/ui/Reveal";
 import { OtpInput } from "@/components/consumer/ui/OtpInput";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
+import { problemMessage } from "@/lib/consumer/api/errors";
 
 const RESEND_COOLDOWN_SEC = 30;
-
-function readError(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const message = (json as { message?: string }).message;
-    if (message) return message;
-  }
-  return fallback;
-}
 
 function OtpForm() {
   const router = useRouter();
@@ -46,10 +39,10 @@ function OtpForm() {
       const res = await fetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp: code, purpose: "login" }),
+        body: JSON.stringify({ phone, code }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Invalid OTP"));
+      if (!res.ok) throw new Error(problemMessage(json, "Invalid OTP"));
       router.replace("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid OTP");
@@ -67,10 +60,10 @@ function OtpForm() {
       const res = await fetch("/api/auth/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, purpose: "login" }),
+        body: JSON.stringify({ phone }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Could not resend code"));
+      if (!res.ok) throw new Error(problemMessage(json, "Could not resend code"));
       setCode("");
       setCooldown(RESEND_COOLDOWN_SEC);
       setInfo("A new code was sent.");

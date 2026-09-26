@@ -9,17 +9,15 @@ import { StatCard } from "@/components/consumer/ui/StatCard";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
-import {
-  type DoctorEarnings,
-  summarizePracticeEarnings,
-} from "@/lib/consumer/features/practice";
-import { periodLabel } from "@/lib/consumer/features/earnings";
+import type { DoctorEarnings, Paged, Payout } from "@/lib/consumer/api/types";
+import { payoutStatusLabel, periodLabel, summarizeEarnings } from "@/lib/consumer/features/earnings";
 import { formatMoney } from "@/lib/consumer/money";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
 export function EarningsClient() {
   const [earnings, setEarnings] = useState<DoctorEarnings | null>(null);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,8 +25,14 @@ export function EarningsClient() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await browserApi<DoctorEarnings>("/doctors/me/earnings");
-        if (!cancelled) setEarnings(data);
+        const [data, paged] = await Promise.all([
+          browserApi<DoctorEarnings>("/doctors/me/earnings"),
+          browserApi<Paged<Payout>>("/doctors/me/payouts?pageSize=50"),
+        ]);
+        if (!cancelled) {
+          setEarnings(data);
+          setPayouts(paged.items);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not load earnings");
       } finally {
@@ -40,11 +44,7 @@ export function EarningsClient() {
     };
   }, []);
 
-  const totals = useMemo(
-    () => summarizePracticeEarnings(earnings ?? {}),
-    [earnings],
-  );
-  const payouts = earnings?.payouts ?? [];
+  const totals = useMemo(() => summarizeEarnings(earnings), [earnings]);
 
   if (loading) {
     return (
@@ -63,7 +63,7 @@ export function EarningsClient() {
         {...HEROES.earnings}
         lede={
           earnings?.from && earnings?.to
-            ? `${periodLabel(earnings.from, earnings.to)}${earnings.timezone ? ` · ${earnings.timezone}` : ""}`
+            ? periodLabel(earnings.from, earnings.to)
             : "Settled consults from your practice ledger."
         }
       />
@@ -76,7 +76,6 @@ export function EarningsClient() {
           icon={<Wallet className="size-5" />}
           value={formatMoney(totals.earned, totals.currency)}
           label="Earned (net)"
-          trend={totals.status}
         />
         <StatCard
           icon={<Banknote className="size-5" />}
@@ -86,33 +85,34 @@ export function EarningsClient() {
         <StatCard
           icon={<PiggyBank className="size-5" />}
           value={formatMoney(totals.pending, totals.currency)}
-          label="Unpaid"
+          label="Awaiting payout"
         />
       </div>
 
-      {/* Gross and commission are the arithmetic behind the net figure above,
-          so they sit together on one tinted card rather than competing with
-          it as two more tiles. */}
+      {/* Gross, refunds and fees are the arithmetic behind the net figure
+          above, so they sit together on one tinted card rather than competing
+          with it as more tiles. */}
       <Card variant="tint" className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <p className="text-eyebrow text-brand">Gross</p>
-          <p className="mt-1 text-h4 text-ink tabular-time">
-            {formatMoney(totals.gross, totals.currency)}
-          </p>
-        </div>
-        <div>
-          <p className="text-eyebrow text-brand">Commission</p>
-          <p className="mt-1 text-h4 text-ink tabular-time">
-            {formatMoney(totals.commission, totals.currency)}
-          </p>
-        </div>
+        {(
+          [
+            ["Gross", totals.gross],
+            ["Refunded", totals.refunded],
+            ["Commission", totals.commission],
+            ["Payment fees", totals.providerFee],
+          ] as const
+        ).map(([label, cents]) => (
+          <div key={label}>
+            <p className="text-eyebrow text-brand">{label}</p>
+            <p className="mt-1 text-h4 text-ink tabular-time">{formatMoney(cents, totals.currency)}</p>
+          </div>
+        ))}
       </Card>
 
       <section className="flex flex-col gap-4">
         <h2 className="text-h3 text-ink">Payout batches</h2>
         {payouts.length === 0 ? (
           <EmptyState
-            title="No payouts in this window"
+            title="No payouts yet"
             body="Finance settles captured consults on a cycle; this list fills after that job runs."
             icon={<Banknote className="size-5" />}
           />
@@ -121,15 +121,16 @@ export function EarningsClient() {
             {payouts.map((p) => (
               <Card
                 as="li"
-                key={p.payout_id}
+                key={p.id}
                 className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
               >
                 <p className="text-h5 text-ink tabular-time">
-                  {formatMoney(p.amount_cents, p.currency || totals.currency)}
+                  {formatMoney(p.amountCents, p.currency || totals.currency)}
                 </p>
                 <p className="text-body-sm text-muted tabular-time">
-                  {periodLabel(p.period_start, p.period_end)}
-                  {p.sent_at ? ` · sent ${p.sent_at.slice(0, 10)}` : ""}
+                  {p.period} · {p.paymentCount} {p.paymentCount === 1 ? "consult" : "consults"} ·{" "}
+                  {payoutStatusLabel(p.status)}
+                  {p.paidAt ? ` ${p.paidAt.slice(0, 10)}` : ""}
                 </p>
               </Card>
             ))}

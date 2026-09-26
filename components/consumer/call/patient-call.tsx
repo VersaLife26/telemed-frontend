@@ -18,17 +18,12 @@ import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment, Doctor } from "@/lib/consumer/api/types";
 import {
   afterEndPath,
-  consultJoinError,
   isBeforeJoinWindow,
   isConsultTerminal,
   isJoinWindow,
   isPastLateJoinCutoff,
 } from "@/lib/consumer/features/consult";
-import {
-  appointmentDoctorName,
-  formatVisitClock,
-  formatVisitDate,
-} from "@/lib/consumer/features/patient-appointment";
+import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import type { ConsultationControls } from "@/lib/consumer/features/use-consultation";
 import { formatWait } from "@/lib/consumer/money";
 import { cx } from "@/lib/consumer/cx";
@@ -52,13 +47,8 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
         const visit = await browserApi<Appointment>(`/appointments/${appointmentId}`);
         if (cancelled) return;
         setAppointment(visit);
-        if (visit.counterpart_name?.trim()) {
-          setDoctorName(visit.counterpart_name.trim());
-          return;
-        }
-        if (!visit.doctor_id) return;
-        const doctor = await browserApi<Doctor>(`/doctors/${visit.doctor_id}`).catch(() => null);
-        if (!cancelled && doctor?.display_name) setDoctorName(doctor.display_name);
+        const doctor = await browserApi<Doctor>(`/doctors/${visit.doctorId}`).catch(() => null);
+        if (!cancelled && doctor?.displayName) setDoctorName(doctor.displayName);
       } catch {
         if (!cancelled) setAppointment(null);
       }
@@ -68,14 +58,12 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
     };
   }, [appointmentId]);
 
-  const startAt = appointment?.start_at_local || appointment?.start_at;
-  const endAt = appointment?.end_at_local || appointment?.end_at;
+  const startAt = appointment?.startAt;
+  const endAt = appointment?.endAt;
   const open = isJoinWindow(startAt, endAt, now);
   const tooSoon = isBeforeJoinWindow(startAt, now);
   const tooLate = isPastLateJoinCutoff(startAt, now, endAt);
-  const name = appointmentDoctorName(appointment ?? { id: appointmentId }, {
-    [appointment?.doctor_id || ""]: doctorName,
-  });
+  const name = doctorName || "Consultation";
 
   const { call, activeId, start, stop } = useCall();
   const [panel, setPanel] = useState<"chat" | "files" | null>(null);
@@ -123,7 +111,7 @@ export function PatientCall({ appointmentId }: { appointmentId: string }) {
       {call.notice ? <Alert tone="info">{call.notice}</Alert> : null}
       {call.error ? (
         <Alert tone="danger">
-          <p>{consultJoinError(call.error)}</p>
+          <p>{call.error}</p>
           {!call.hasLocalMedia ? (
             <Button className="mt-3" size="sm" variant="secondary" onClick={() => void call.retryMedia()}>
               Try again
@@ -342,7 +330,7 @@ function Lobby({
   onLeave: () => void;
   alerts: React.ReactNode;
 }) {
-  const when = call.join?.scheduled_at || startAt;
+  const when = call.join?.scheduledStartAt || startAt;
   return (
     <div className="relative flex h-full flex-col items-center justify-center gap-6 overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center">
       <div className="relative aspect-[4/3] w-full max-w-sm overflow-hidden rounded-2xl bg-ink-800 shadow-2xl ring-1 ring-white/15">
@@ -373,9 +361,9 @@ function Lobby({
             {formatVisitDate(when)} · {formatVisitClock(when)}
           </p>
         ) : null}
-        {call.queue?.position != null ? (
+        {call.queue?.waiting ? (
           <p className="mt-3 text-body text-white/80 tabular-time">
-            Position #{call.queue.position} · {formatWait(call.queue.estimated_wait_seconds)}
+            Position #{call.queue.position} · {formatWait(call.queue.estimatedWaitSeconds)}
           </p>
         ) : null}
         <p className="mt-2 text-body-sm text-white/60">

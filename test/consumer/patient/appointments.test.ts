@@ -8,8 +8,8 @@ import {
 } from "@/lib/consumer/features/appointments";
 
 test("appointments list path pages through the caller's bookings", () => {
-  assert.equal(appointmentsListPath(), "/appointments?per_page=50");
-  assert.equal(appointmentsListPath(5), "/appointments?per_page=5");
+  assert.equal(appointmentsListPath(), "/appointments?pageSize=50");
+  assert.equal(appointmentsListPath(5), "/appointments?pageSize=5");
 });
 
 test("reschedule requests are nested under the appointment", () => {
@@ -18,6 +18,6 @@ test("reschedule requests are nested under the appointment", () => {
 
 test("only confirmed visits can carry a pending reschedule or early-join offer", () => {
   assert.equal(isConfirmedAppointment({ status: "confirmed" }), true);
-  assert.equal(isConfirmedAppointment({ status: "pending_payment" }), false);
+  assert.equal(isConfirmedAppointment({ status: "pendingPayment" }), false);
   assert.equal(isConfirmedAppointment({ status: "cancelled" }), false);
 });

@@ -6,10 +6,11 @@ import { Pill, Search, StickyNote, UserRound, Video } from "lucide-react";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment } from "@/lib/consumer/api/types";
+import type { Appointment, Paged } from "@/lib/consumer/api/types";
 import { appointmentsListPath } from "@/lib/consumer/features/appointments";
 import { colomboDayKey } from "@/lib/consumer/features/calendar";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
+import { ageAtVisitDate } from "@/lib/consumer/features/visit-patient";
 import { cx } from "@/lib/consumer/cx";
 
 type Tab = "today" | "upcoming" | "past";
@@ -17,13 +18,12 @@ type Tab = "today" | "upcoming" | "past";
 const PAGE = 20;
 
 function visitLabel(a: Appointment): string {
-  return a.visit_patient_name || a.patient_name || a.counterpart_name || "Patient";
+  return a.visitPatient?.name || "Patient";
 }
 
 function bucket(a: Appointment, today: string): Tab {
-  const s = (a.status || "").toLowerCase();
-  if (s === "completed" || s === "cancelled" || s === "no_show") return "past";
-  return colomboDayKey(a.start_at || "") === today ? "today" : "upcoming";
+  if (a.status === "completed" || a.status === "cancelled" || a.status === "noShow") return "past";
+  return colomboDayKey(a.startAt) === today ? "today" : "upcoming";
 }
 
 export function VisitsApp({
@@ -43,9 +43,9 @@ export function VisitsApp({
 
   useEffect(() => {
     let cancelled = false;
-    browserApi<Appointment[]>(appointmentsListPath(200))
+    browserApi<Paged<Appointment>>(appointmentsListPath(100))
       .then((data) => {
-        if (!cancelled) setItems(Array.isArray(data) ? data : []);
+        if (!cancelled) setItems(data.items);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not load visits");
@@ -64,8 +64,8 @@ export function VisitsApp({
       .filter((a) => bucket(a, today) === tab)
       .filter((a) => !q || visitLabel(a).toLowerCase().includes(q))
       .sort((a, b) => {
-        const ta = a.start_at || "";
-        const tb = b.start_at || "";
+        const ta = a.startAt;
+        const tb = b.startAt;
         return tab === "past" ? tb.localeCompare(ta) : ta.localeCompare(tb);
       });
   }, [items, query, tab, today]);
@@ -135,7 +135,9 @@ export function VisitsApp({
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {filtered.slice(0, limit).map((a) => (
+            {filtered.slice(0, limit).map((a) => {
+              const age = a.visitPatient?.dateOfBirth ? ageAtVisitDate(a.visitPatient.dateOfBirth, a.startAt) : 0;
+              return (
               <li
                 key={a.id}
                 className="flex flex-col gap-3 rounded-lg bg-white/[0.06] p-3 ring-1 ring-white/10 @xl:flex-row @xl:items-center"
@@ -154,14 +156,13 @@ export function VisitsApp({
                       <StatusBadge status={a.status} />
                     </span>
                     <span className="mt-0.5 block text-caption text-white/60 tabular-time">
-                      {formatVisitDate(a.start_at_local || a.start_at)} ·{" "}
-                      {formatVisitClock(a.start_at_local || a.start_at)}
-                      {a.visit_patient_age ? ` · Age ${a.visit_patient_age}` : ""}
+                      {formatVisitDate(a.startAt)} · {formatVisitClock(a.startAt)}
+                      {age > 0 ? ` · Age ${age}` : ""}
                     </span>
                   </span>
                 </button>
                 <div className="flex flex-wrap gap-1.5">
-                  {tab !== "past" && (a.status || "").toLowerCase() === "confirmed" ? (
+                  {tab !== "past" && a.status === "confirmed" ? (
                     <RowButton primary onClick={() => onJoin(a.id)} icon={<Video className="size-4" />}>
                       Join
                     </RowButton>
@@ -174,7 +175,8 @@ export function VisitsApp({
                   </RowButton>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
         {filtered.length > limit ? (

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createLiveChat, createMemoryChat } from "@/lib/consumer/features/chat";
+import type { ConsultationMessage } from "@/lib/consumer/api/types";
+import { consultationMessagesPath, createLiveChat, createMemoryChat } from "@/lib/consumer/features/chat";
+
+function message(id: string, body: string, senderRole: "patient" | "doctor", createdAt: string): ConsultationMessage {
+  return { id, consultationId: "c-1", senderUserId: `${senderRole}-user`, senderRole, body, createdAt };
+}
 
 test("the chat stub echoes the sender locally", () => {
   const chat = createMemoryChat();
@@ -17,52 +22,46 @@ test("the chat stub echoes the sender locally", () => {
   assert.deepEqual(seen, ["hello"]);
 });
 
-test("live chat delivers the far side's messages into the same thread", () => {
-  const sent: { id: string; body: string }[] = [];
-  const chat = createLiveChat((msg) => sent.push(msg));
+test("live chat hands the trimmed body to the sender and shows nothing until the server stores it", () => {
+  const sent: string[] = [];
+  const chat = createLiveChat("doctor", (body) => sent.push(body));
   let bodies: string[] = [];
-  const fromSelf: boolean[] = [];
   chat.subscribe((messages) => {
     bodies = messages.map((m) => m.body);
-    fromSelf.splice(0, fromSelf.length, ...messages.map((m) => m.fromSelf));
   });
-  chat.send("from doctor");
-  chat.receive({ id: sent[0]?.id ?? "x", body: "from doctor" });
-  chat.receive({ id: "remote-1", body: "from patient" });
-  assert.deepEqual(bodies, ["from doctor", "from patient"]);
-  assert.deepEqual(fromSelf, [true, false]);
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0]?.body, "from doctor");
+  chat.send("  from doctor  ");
+  chat.send("   ");
+  assert.deepEqual(sent, ["from doctor"]);
+  assert.deepEqual(bodies, []);
 });
 
-test("server history merges without duplicating a client-sent line", () => {
-  const chat = createLiveChat();
+test("the POST response, the hub frame and history merge on the server id", () => {
+  const chat = createLiveChat("doctor");
   let ids: string[] = [];
+  let fromSelf: boolean[] = [];
   chat.subscribe((messages) => {
     ids = messages.map((m) => m.id);
+    fromSelf = messages.map((m) => m.fromSelf);
   });
-  chat.send("hi");
-  const localId = ids[0];
-  chat.mergeFromServer(
-    [
-      {
-        id: "server-uuid",
-        content: "hi",
-        sender_role: "doctor",
-        created_at: "2026-09-21T04:00:00.000Z",
-        metadata: { client_id: localId },
-      },
-      {
-        id: "other",
-        content: "hello",
-        sender_role: "patient",
-        created_at: "2026-09-21T04:00:01.000Z",
-      },
-    ],
-    "doctor",
-  );
-  assert.equal(ids.length, 2);
-  assert.equal(new Set(ids).size, 2);
-  assert.ok(ids.includes(localId!));
-  assert.ok(ids.includes("other"));
+  const mine = message("m-1", "hi", "doctor", "2026-09-21T04:00:00.000Z");
+  chat.merge([mine]);
+  chat.merge([mine]);
+  chat.merge([mine, message("m-2", "hello", "patient", "2026-09-21T04:00:01.000Z")]);
+  assert.deepEqual(ids, ["m-1", "m-2"]);
+  assert.deepEqual(fromSelf, [true, false]);
+});
+
+test("messages are ordered by creation time", () => {
+  const chat = createLiveChat("patient");
+  let bodies: string[] = [];
+  chat.subscribe((messages) => {
+    bodies = messages.map((m) => m.body);
+  });
+  chat.merge([message("b", "second", "doctor", "2026-09-21T04:00:02.000Z")]);
+  chat.merge([message("a", "first", "patient", "2026-09-21T04:00:01.000Z")]);
+  assert.deepEqual(bodies, ["first", "second"]);
+});
+
+test("messages are keyed by appointment id", () => {
+  assert.equal(consultationMessagesPath("appt-1"), "/appointments/appt-1/consultation/messages");
 });

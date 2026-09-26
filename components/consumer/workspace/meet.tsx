@@ -7,10 +7,10 @@ import { Button } from "@/components/consumer/ui/Button";
 import { Modal } from "@/components/consumer/ui/Modal";
 import { CallStage } from "@/components/consumer/call/call-stage";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment } from "@/lib/consumer/api/types";
+import type { Appointment, Paged } from "@/lib/consumer/api/types";
 import { appointmentsListPath } from "@/lib/consumer/features/appointments";
 import { colomboDayKey } from "@/lib/consumer/features/calendar";
-import { admitDisabled, canAdmit, consultJoinError, doctorLobbyCopy } from "@/lib/consumer/features/consult";
+import { admitDisabled, canAdmit, doctorLobbyCopy } from "@/lib/consumer/features/consult";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 import type { ConsultationControls } from "@/lib/consumer/features/use-consultation";
 
@@ -39,10 +39,10 @@ function MeetQueue({ onJoin }: { onJoin: (id: string) => void }) {
 
   useEffect(() => {
     let cancelled = false;
-    browserApi<Appointment[]>(`${appointmentsListPath()}&status=confirmed`)
+    browserApi<Paged<Appointment>>(`${appointmentsListPath(100)}&status=confirmed`)
       .then((data) => {
         if (cancelled) return;
-        const list = (Array.isArray(data) ? data : []).filter((a) => colomboDayKey(a.start_at || "") === today);
+        const list = data.items.filter((a) => colomboDayKey(a.startAt) === today);
         setAppointments(list);
       })
       .catch((e) => {
@@ -68,10 +68,10 @@ function MeetQueue({ onJoin }: { onJoin: (id: string) => void }) {
             >
               <div className="min-w-0">
                 <p className="truncate text-label">
-                  {appointment.counterpart_name || appointment.patient_name || "Patient"}
+                  {appointment.visitPatient.name || "Patient"}
                 </p>
                 <p className="text-caption text-white/60 tabular-time">
-                  {formatVisitClock(appointment.start_at_local || appointment.start_at)}
+                  {formatVisitClock(appointment.startAt)}
                 </p>
               </div>
               <Button size="sm" className="min-h-11 shrink-0" onClick={() => onJoin(appointment.id)}>
@@ -112,7 +112,7 @@ function MeetWaiting({ call, onLeave }: { call: ConsultationControls; onLeave: (
       ) : null}
       {call.error ? (
         <Alert tone="danger">
-          <p>{consultJoinError(call.error, "doctor")}</p>
+          <p>{call.error}</p>
           {!call.hasLocalMedia ? (
             <Button className="mt-3" size="sm" variant="secondary" onClick={() => void call.retryMedia()}>
               Enable camera and microphone

@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/lib/consumer/env";
-import { ApiError, parseEnvelope, type ApiErrorBody } from "@/lib/consumer/api/envelope";
+import { ApiError, type ProblemDetails } from "@/lib/consumer/api/errors";
 
 type RequestOptions = {
   method?: string;
@@ -40,15 +40,15 @@ export async function apiFetch<T>(
     try {
       json = JSON.parse(text);
     } catch {
-      json = { message: text };
+      json = { detail: text };
     }
   }
 
   if (!res.ok) {
-    throw new ApiError(res.status, (json as ApiErrorBody) || { message: res.statusText });
+    throw new ApiError(res.status, (json as ProblemDetails) || { title: res.statusText });
   }
 
-  return parseEnvelope<T>(json);
+  return json as T;
 }
 
 /** Browser-side helper: goes through same-origin BFF so cookies attach the JWT. */
@@ -94,14 +94,14 @@ export async function browserApi<T>(
     try {
       json = JSON.parse(text);
     } catch {
-      json = { message: text };
+      json = { detail: text };
     }
   }
   if (!res.ok) {
-    throw new ApiError(res.status, (json as ApiErrorBody) || { message: res.statusText });
+    throw new ApiError(res.status, (json as ProblemDetails) || { title: res.statusText });
   }
   if (!text) {
     return undefined as T;
   }
-  return parseEnvelope<T>(json);
+  return json as T;
 }

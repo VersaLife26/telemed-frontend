@@ -1,122 +1,84 @@
 import type { Appointment, Doctor } from "@/lib/consumer/api/types";
-import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 
 const COLOMBO = "Asia/Colombo";
 
-const PAST_STATUSES = new Set(["completed", "cancelled", "no_show", "ended"]);
-const LIVE_STATUSES = new Set([
-  "pending_payment",
-  "unpaid",
-  "confirmed",
-  "scheduled",
-  "waiting",
-  "active",
-]);
+const PAST_STATUSES = new Set(["completed", "cancelled", "noShow"]);
 
 export type AppointmentAction = {
   href: string;
   label: string;
 };
 
-export function normalizeStatus(status?: string): string {
-  return (status || "").trim().toLowerCase();
-}
-
 export function appointmentAction(id: string, status?: string): AppointmentAction | null {
-  const s = normalizeStatus(status);
-  if (s === "pending_payment" || s === "unpaid") {
+  if (status === "pendingPayment") {
     return { href: `/appointments/${id}/payment`, label: "Pay" };
   }
-  if (s === "waiting" || s === "active" || s === "confirmed" || s === "scheduled") {
+  if (status === "confirmed") {
     return { href: `/appointments/${id}/call`, label: "Join" };
   }
-  if (s === "completed" || s === "ended") {
+  if (status === "completed") {
     return { href: `/appointments/${id}/summary`, label: "Summary" };
   }
   return null;
 }
 
 export function statusLabel(status?: string): string {
-  const s = normalizeStatus(status);
-  switch (s) {
-    case "pending_payment":
-    case "unpaid":
+  switch (status) {
+    case "pendingPayment":
       return "Pay now";
     case "confirmed":
       return "Confirmed";
-    case "scheduled":
-      return "Scheduled";
-    case "waiting":
-      return "In queue";
-    case "active":
-      return "In progress";
     case "completed":
-    case "ended":
       return "Completed";
     case "cancelled":
       return "Cancelled";
-    case "no_show":
+    case "noShow":
       return "No-show";
     default:
-      return s ? s.replaceAll("_", " ") : "Unknown";
+      return status || "Unknown";
   }
 }
 
 export type BadgeTone = "amber" | "teal" | "muted" | "danger";
 
 export function statusTone(status?: string): BadgeTone {
-  const s = normalizeStatus(status);
-  if (s === "pending_payment" || s === "unpaid") return "amber";
-  if (s === "confirmed" || s === "scheduled" || s === "waiting" || s === "active") return "teal";
-  if (s === "cancelled" || s === "no_show") return "danger";
+  if (status === "pendingPayment") return "amber";
+  if (status === "confirmed") return "teal";
+  if (status === "cancelled" || status === "noShow") return "danger";
   return "muted";
 }
 
-export function isUpcomingAppointment(appointment: Appointment, now = Date.now()): boolean {
-  const s = normalizeStatus(appointment.status);
-  if (PAST_STATUSES.has(s)) return false;
-  if (LIVE_STATUSES.has(s)) return true;
-  const start = Date.parse(appointment.start_at || appointment.start_at_local || "");
-  return Number.isFinite(start) && start >= now;
+export function isUpcomingAppointment(appointment: Pick<Appointment, "status">): boolean {
+  return !PAST_STATUSES.has(appointment.status);
 }
 
-export function pickNextAppointment(
-  appointments: Appointment[],
-  now = Date.now(),
-): Appointment | null {
+export function pickNextAppointment(appointments: Appointment[]): Appointment | null {
   const upcoming = appointments
-    .filter((a) => isUpcomingAppointment(a, now))
+    .filter((a) => isUpcomingAppointment(a))
     .slice()
-    .sort((a, b) => {
-      const aStart = Date.parse(a.start_at || a.start_at_local || "") || Number.POSITIVE_INFINITY;
-      const bStart = Date.parse(b.start_at || b.start_at_local || "") || Number.POSITIVE_INFINITY;
-      return aStart - bStart;
-    });
+    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
   return upcoming[0] ?? null;
 }
 
-export function formatVisitClock(iso?: string): string {
+/** Wall-clock time of an instant, in the doctor's zone when the caller knows it. */
+export function formatVisitClock(iso?: string, timeZone = COLOMBO): string {
   if (!iso) return "—";
   const date = new Date(iso);
-  if (!Number.isNaN(date.getTime())) {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: COLOMBO,
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).format(date);
-  }
-  const clock = iso.match(/T(\d{2}:\d{2})/)?.[1];
-  if (!clock) return "—";
-  return clock;
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
 }
 
-export function formatVisitDate(iso?: string, now = new Date()): string {
+export function formatVisitDate(iso?: string, now = new Date(), timeZone = COLOMBO): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   const dayKey = new Intl.DateTimeFormat("en-CA", {
-    timeZone: COLOMBO,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -127,7 +89,7 @@ export function formatVisitDate(iso?: string, now = new Date()): string {
   if (visitDay === today) return "Today";
   if (visitDay === tomorrow) return "Tomorrow";
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: COLOMBO,
+    timeZone,
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -156,42 +118,27 @@ export function firstName(name?: string | null): string | null {
   return trimmed.split(/\s+/)[0] ?? null;
 }
 
-export function uniqueDoctorIds(appointments: Appointment[]): string[] {
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (const appointment of appointments) {
-    const id = appointment.doctor_id;
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    ids.push(id);
-  }
-  return ids;
+export function uniqueDoctorIds(appointments: Pick<Appointment, "doctorId">[]): string[] {
+  return [...new Set(appointments.map((a) => a.doctorId).filter(Boolean))];
 }
 
-/** Doctor's name for a patient-facing visit row. */
+/** Doctor's name for a patient-facing visit row. Appointments carry only the doctor id. */
 export function appointmentDoctorName(
-  appointment: Appointment,
+  appointment: Partial<Pick<Appointment, "id" | "doctorId">>,
   names: Record<string, string> = {},
 ): string {
-  const named =
-    appointment.counterpart_name?.trim() ||
-    (appointment.doctor_id ? names[appointment.doctor_id]?.trim() : "") ||
-    "";
-  if (named) return named;
-  if (appointment.specialty?.trim()) return specialtyLabel(appointment.specialty);
-  return "Consultation";
+  return (appointment.doctorId ? names[appointment.doctorId]?.trim() : "") || "Consultation";
 }
 
 export async function resolveDoctorNames(
-  appointments: Appointment[],
-  fetchDoctor: (id: string) => Promise<Pick<Doctor, "display_name">>,
+  appointments: Pick<Appointment, "doctorId">[],
+  fetchDoctor: (id: string) => Promise<Pick<Doctor, "displayName">>,
 ): Promise<Record<string, string>> {
-  const ids = uniqueDoctorIds(appointments.filter((a) => !a.counterpart_name?.trim()));
   const entries = await Promise.all(
-    ids.map(async (id) => {
+    uniqueDoctorIds(appointments).map(async (id) => {
       try {
         const doctor = await fetchDoctor(id);
-        return [id, doctor.display_name?.trim() || ""] as const;
+        return [id, doctor.displayName?.trim() || ""] as const;
       } catch {
         return [id, ""] as const;
       }

@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { AppointmentsTable } from "@/components/admin/appointments/appointments-table";
-import { DoubleBookingPanel } from "@/components/admin/appointments/double-booking-panel";
 import { RescheduleQueue } from "@/components/admin/appointments/reschedule-queue";
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
@@ -9,13 +8,15 @@ import { FilterBar } from "@/components/admin/data-table/filter-bar";
 import { Pagination } from "@/components/admin/data-table/pagination";
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
-import { tryGetServer, tryListServer } from "@/lib/admin/api/server";
-import type { AdminAppointment, AdminRescheduleRequest, DoubleBooking } from "@/lib/admin/api/types";
-import { DISTRICTS } from "@/lib/admin/districts";
+import { tryListServer } from "@/lib/admin/api/server";
+import type { Appointment, RescheduleRequest } from "@/lib/admin/api/types";
 import { filterValues, pageQuery } from "@/lib/admin/url-query";
 import { cn } from "@/lib/admin/utils";
 
 const PER_PAGE = 25;
+
+/** The filter bar's dates are Colombo calendar days; the API takes instants. */
+const COLOMBO_OFFSET = "+05:30";
 
 export default async function AppointmentsPage({
   searchParams,
@@ -29,7 +30,7 @@ export default async function AppointmentsPage({
   const header = (
     <PageHeader
       title="Appointments"
-      description="Every booking, with force-cancel, double-booking resolution, and doctor-requested reschedules. Intake forms, symptoms and consultation notes are not readable from this console."
+      description="Every booking, with admin cancellation and doctor-requested reschedules. Consultation notes are not readable from this console."
     />
   );
 
@@ -57,9 +58,9 @@ export default async function AppointmentsPage({
   );
 
   if (tab === "reschedule") {
-    const listResult = await tryListServer<AdminRescheduleRequest>(
+    const listResult = await tryListServer<RescheduleRequest>(
       endpoints.appointments.rescheduleRequests(
-        query({ page, per_page: PER_PAGE }),
+        query({ status: "pending", page, pageSize: PER_PAGE }),
       ),
     );
 
@@ -69,9 +70,9 @@ export default async function AppointmentsPage({
         {tabs}
         {listResult.ok ? (
           <>
-            <RescheduleQueue requests={listResult.page.data} />
+            <RescheduleQueue requests={listResult.page.items} />
             <Pagination
-              meta={listResult.page.meta}
+              meta={listResult.page}
               label="Reschedule requests"
               query="tab=reschedule"
             />
@@ -83,70 +84,57 @@ export default async function AppointmentsPage({
     );
   }
 
-  const [listResult, conflictsResult] = await Promise.all([
-    tryListServer<AdminAppointment>(
-      endpoints.appointments.list(
-        query({
-          status: params.status,
-          district: params.district,
-          from: params.from,
-          to: params.to,
-          q: params.q,
-          page,
-          per_page: PER_PAGE,
-        }),
-      ),
+  const listResult = await tryListServer<Appointment>(
+    endpoints.appointments.list(
+      query({
+        status: params.status,
+        doctorId: params.doctorId,
+        patientId: params.patientId,
+        from: params.from ? `${params.from}T00:00:00${COLOMBO_OFFSET}` : undefined,
+        to: params.to ? `${params.to}T23:59:59.999${COLOMBO_OFFSET}` : undefined,
+        page,
+        pageSize: PER_PAGE,
+      }),
     ),
-    tryGetServer<DoubleBooking[]>(endpoints.appointments.doubleBookings()),
-  ]);
+  );
 
   const filters = [
     {
-      name: "q",
-      label: "Appointment or doctor",
+      name: "doctorId",
+      label: "Doctor ID",
       kind: "search" as const,
-      placeholder: "UUID or doctor name",
+      placeholder: "Doctor UUID",
+    },
+    {
+      name: "patientId",
+      label: "Patient ID",
+      kind: "search" as const,
+      placeholder: "Patient UUID",
     },
     {
       name: "status",
       label: "Status",
       kind: "select" as const,
       options: [
-        { value: "created", label: "Created" },
+        { value: "pendingPayment", label: "Pending payment" },
         { value: "confirmed", label: "Confirmed" },
         { value: "completed", label: "Completed" },
         { value: "cancelled", label: "Cancelled" },
-        { value: "no_show", label: "No-show" },
+        { value: "noShow", label: "No-show" },
       ],
-    },
-    {
-      name: "district",
-      label: "District",
-      kind: "select" as const,
-      options: DISTRICTS.map((d) => ({ value: d.code, label: d.name })),
     },
     { name: "from", label: "From", kind: "date" as const },
     { name: "to", label: "To", kind: "date" as const },
   ];
 
   const filtered = Boolean(
-    params.q || params.status || params.district || params.from || params.to,
+    params.doctorId || params.patientId || params.status || params.from || params.to,
   );
 
   return (
     <>
       {header}
       {tabs}
-
-      <section className="mb-6">
-        {conflictsResult.ok || conflictsResult.error.code === "NOT_FOUND" ? (
-          <DoubleBookingPanel
-            conflicts={conflictsResult.ok ? conflictsResult.data : []}
-          />
-        ) : (
-          <ErrorState error={conflictsResult.error} what="double-booking detection" />
-        )}
-      </section>
 
       <FilterBar
         filters={filters}
@@ -156,9 +144,9 @@ export default async function AppointmentsPage({
 
       {listResult.ok ? (
         <>
-          <AppointmentsTable appointments={listResult.page.data} filtered={filtered} />
+          <AppointmentsTable appointments={listResult.page.items} filtered={filtered} />
           <Pagination
-            meta={listResult.page.meta}
+            meta={listResult.page}
             label="Appointments"
             query={pageQuery(params)}
           />

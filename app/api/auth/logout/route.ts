@@ -8,12 +8,12 @@ export async function POST() {
     try {
       await apiFetch("/api/v1/auth/logout", {
         method: "POST",
-        body: { refresh_token: refresh },
+        body: { refreshToken: refresh },
       });
     } catch {
       // Cookie clear is the session the browser cares about.
     }
   }
   await clearAuthCookies();
-  return NextResponse.json({ data: { ok: true } });
+  return NextResponse.json({ ok: true });
 }

@@ -7,52 +7,54 @@ import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
 import { Switch } from "@/components/admin/ui/switch";
 import { endpoints } from "@/lib/admin/api/endpoints";
+import { type ApiError, hasCode } from "@/lib/admin/api/errors";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import type { ScheduleSettings, WorkingHour } from "@/lib/admin/api/types";
+import type { Holiday, Schedule, ScheduleUpdated, SlotBlock } from "@/lib/admin/api/types";
 import {
   DAYS,
   type DayRow,
+  type ScheduleSettings,
   dayError,
-  initialBuffer,
-  toAvailabilityRequest,
+  initialSettings,
   toRows,
+  toScheduleRequest,
 } from "@/lib/admin/schedule";
 
 /**
  * Staff-operated schedule editor.
  *
  * Doctors phone or message their hours to the clinic; this is where an
- * administrator enters them. It deliberately does NOT edit leave — that is
- * scheduling-service's holidays table with its own admin route, and two write
- * paths to one set of rows is how they drift apart.
+ * administrator enters them. Leave and one-off blocks are separate resources
+ * with their own forms below, because the weekly pattern replaces the whole
+ * week on every save and must not carry them.
  */
 export function ScheduleEditor({
   doctorId,
   doctorName,
-  initialHours,
-  initialSettings,
+  initialSchedule,
 }: {
   doctorId: string;
   doctorName: string;
-  initialHours: WorkingHour[];
-  initialSettings: ScheduleSettings;
+  initialSchedule: Schedule;
 }) {
-  const [rows, setRows] = useState<DayRow[]>(() => toRows(initialHours));
-  const [slotDuration, setSlotDuration] = useState(initialSettings.slot_duration_minutes || 15);
-  // Kept as a string so the field can be genuinely empty. "" means "leave it
-  // unset"; "0" means back-to-back, which is a different instruction.
-  const [buffer, setBuffer] = useState(() => initialBuffer(initialSettings));
-  const [maxPerDay, setMaxPerDay] = useState(initialSettings.max_per_day || 0);
+  const [rows, setRows] = useState<DayRow[]>(() => toRows(initialSchedule.workingHours ?? []));
+  const [settings, setSettings] = useState<ScheduleSettings>(() => initialSettings(initialSchedule));
+  const setSetting = (patch: Partial<ScheduleSettings>) => setSettings((prev) => ({ ...prev, ...patch }));
 
   const errors = rows.map(dayError);
   const hasError = errors.some((e) => e !== null);
   const anyDayOn = rows.some((r) => r.available);
 
-  const mutation = useApiMutation<WorkingHour[], void>({
+  const mutation = useApiMutation<ScheduleUpdated, void>({
     method: "PUT",
-    path: () => endpoints.doctorSchedule.availability(doctorId),
-    body: () => toAvailabilityRequest(rows, slotDuration, buffer, maxPerDay),
-    successMessage: () => `Saved ${doctorName}'s hours. New slots follow this pattern.`,
+    path: () => endpoints.doctorSchedule.schedule(doctorId),
+    body: () => toScheduleRequest(rows, settings),
+    successMessage: (result) => {
+      const outside = result.appointmentsOutsideNewHours ?? 0;
+      return outside > 0
+        ? `Saved ${doctorName}'s hours. ${outside} booked appointment${outside === 1 ? " falls" : "s fall"} outside them and ${outside === 1 ? "is" : "are"} unchanged.`
+        : `Saved ${doctorName}'s hours. Bookable times follow this pattern straight away.`;
+    },
   });
 
   function setRow(day: number, patch: Partial<DayRow>) {
@@ -106,7 +108,7 @@ export function ScheduleEditor({
         })}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <div className="space-y-2">
           <Label htmlFor="slot-duration">Consultation length (minutes)</Label>
           <Input
@@ -114,8 +116,8 @@ export function ScheduleEditor({
             type="number"
             min={5}
             max={240}
-            value={slotDuration}
-            onChange={(e) => setSlotDuration(Number(e.target.value))}
+            value={settings.slotDurationMinutes}
+            onChange={(e) => setSetting({ slotDurationMinutes: Number(e.target.value) })}
           />
         </div>
         <div className="space-y-2">
@@ -125,13 +127,10 @@ export function ScheduleEditor({
             type="number"
             min={0}
             max={120}
-            value={buffer}
-            placeholder="Not set"
-            onChange={(e) => setBuffer(e.target.value)}
+            value={settings.bufferMinutes}
+            onChange={(e) => setSetting({ bufferMinutes: Number(e.target.value) })}
           />
-          <p className="text-muted-foreground text-sm">
-            Enter 0 for back-to-back. Leave blank to use the platform default.
-          </p>
+          <p className="text-muted-foreground text-sm">Enter 0 for back-to-back.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="max-per-day">Maximum per day</Label>
@@ -140,12 +139,27 @@ export function ScheduleEditor({
             type="number"
             min={0}
             max={100}
-            value={maxPerDay}
-            onChange={(e) => setMaxPerDay(Number(e.target.value))}
+            value={settings.maxPerDay}
+            onChange={(e) => setSetting({ maxPerDay: Number(e.target.value) })}
           />
           <p className="text-muted-foreground text-sm">0 means no limit.</p>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="advance-days">Bookable ahead (days)</Label>
+          <Input
+            id="advance-days"
+            type="number"
+            min={1}
+            max={365}
+            value={settings.advanceDays}
+            onChange={(e) => setSetting({ advanceDays: Number(e.target.value) })}
+          />
+        </div>
       </div>
+
+      <p className="text-muted-foreground text-sm">
+        Times are in the doctor&rsquo;s time zone, {settings.timezone}.
+      </p>
 
       <div className="flex items-center gap-3">
         <Button disabled={hasError || mutation.isPending} onClick={() => mutation.mutate()}>
@@ -153,7 +167,7 @@ export function ScheduleEditor({
         </Button>
         {!anyDayOn ? (
           <span className="text-muted-foreground text-sm">
-            Every day is off, so no new slots will be generated.
+            Every day is off, so this doctor will have no bookable times.
           </span>
         ) : null}
       </div>
@@ -163,7 +177,38 @@ export function ScheduleEditor({
       </p>
 
       <HolidayForm doctorId={doctorId} />
-      <SlotBlockForm />
+      <SlotBlockForm doctorId={doctorId} />
+    </div>
+  );
+}
+
+/** The count the API puts on a `409 appointments_affected`, or null for any other failure. */
+function affectedCount(error: ApiError | null): number | null {
+  if (!hasCode(error, "appointments_affected")) return null;
+  const count = error?.body.affectedAppointments;
+  return typeof count === "number" ? count : 0;
+}
+
+function AffectedPrompt({
+  count,
+  what,
+  pending,
+  onConfirm,
+}: {
+  count: number;
+  what: string;
+  pending: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+      <p>
+        {count} booked appointment{count === 1 ? " is" : "s are"} affected by this {what}.
+        Saving anyway cancels {count === 1 ? "it" : "them"} with a full refund.
+      </p>
+      <Button variant="destructive" size="sm" disabled={pending} onClick={onConfirm}>
+        Cancel {count === 1 ? "it" : "them"} and save
+      </Button>
     </div>
   );
 }
@@ -171,27 +216,18 @@ export function ScheduleEditor({
 function HolidayForm({ doctorId }: { doctorId: string }) {
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
-  const [applyExisting, setApplyExisting] = useState(false);
-  const [cancelBooked, setCancelBooked] = useState(false);
 
-  const mutation = useApiMutation<unknown, void>({
+  const mutation = useApiMutation<Holiday, { cancelBooked: boolean }>({
     method: "POST",
-    path: () => endpoints.doctorSchedule.holidays(),
-    body: () => ({
-      doctor_id: doctorId,
-      date,
-      reason: reason.trim(),
-      apply_to_existing: applyExisting,
-      cancel_booked: cancelBooked,
-    }),
-    successMessage: () => "Leave recorded. Generated slots for that day follow the holiday rules.",
+    path: () => endpoints.doctorSchedule.holidays(doctorId),
+    body: ({ cancelBooked }) => ({ date, reason: reason.trim(), cancelBooked }),
+    successMessage: () => "Leave recorded. That day is no longer bookable.",
     onSuccess: () => {
       setDate("");
       setReason("");
-      setApplyExisting(false);
-      setCancelBooked(false);
     },
   });
+  const affected = affectedCount(mutation.error);
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
@@ -211,26 +247,18 @@ function HolidayForm({ doctorId }: { doctorId: string }) {
           />
         </div>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={applyExisting}
-          onChange={(e) => setApplyExisting(e.target.checked)}
+      {affected !== null ? (
+        <AffectedPrompt
+          count={affected}
+          what="leave"
+          pending={mutation.isPending}
+          onConfirm={() => mutation.mutate({ cancelBooked: true })}
         />
-        Withdraw already-generated slots
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={cancelBooked}
-          onChange={(e) => setCancelBooked(e.target.checked)}
-        />
-        Cancel and refund existing bookings
-      </label>
+      ) : null}
       <Button
         variant="outline"
         disabled={!date || reason.trim().length === 0 || mutation.isPending}
-        onClick={() => mutation.mutate()}
+        onClick={() => mutation.mutate({ cancelBooked: false })}
       >
         Save leave
       </Button>
@@ -238,54 +266,71 @@ function HolidayForm({ doctorId }: { doctorId: string }) {
   );
 }
 
-function SlotBlockForm() {
-  const [slotId, setSlotId] = useState("");
+function SlotBlockForm({ doctorId }: { doctorId: string }) {
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
-  const [status, setStatus] = useState("BLOCKED");
 
-  const mutation = useApiMutation<unknown, void>({
+  const mutation = useApiMutation<SlotBlock, { cancelBooked: boolean }>({
     method: "POST",
-    path: () => endpoints.doctorSchedule.blockSlot(slotId.trim()),
-    body: () => ({ status, reason: reason.trim() }),
-    successMessage: () => "Slot updated.",
+    path: () => endpoints.doctorSchedule.slotBlocks(doctorId),
+    // datetime-local carries no zone; it is read in the browser's own zone.
+    body: ({ cancelBooked }) => ({
+      startAt: new Date(start).toISOString(),
+      endAt: new Date(end).toISOString(),
+      reason: reason.trim(),
+      cancelBooked,
+    }),
+    successMessage: () => "Time blocked. It is no longer bookable.",
     onSuccess: () => {
-      setSlotId("");
+      setStart("");
+      setEnd("");
       setReason("");
     },
   });
+  const affected = affectedCount(mutation.error);
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
-      <h3 className="text-sm font-medium">Block or restore a slot</h3>
+      <h3 className="text-sm font-medium">Block a period</h3>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label htmlFor="slot-id">Slot ID</Label>
+          <Label htmlFor="block-start">From (your local time)</Label>
           <Input
-            id="slot-id"
-            value={slotId}
-            onChange={(e) => setSlotId(e.target.value)}
-            className="font-mono text-xs"
+            id="block-start"
+            type="datetime-local"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="slot-status">Status</Label>
+          <Label htmlFor="block-end">To</Label>
           <Input
-            id="slot-status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            id="block-end"
+            type="datetime-local"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="slot-reason">Reason</Label>
-          <Input id="slot-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <Label htmlFor="block-reason">Reason</Label>
+          <Input id="block-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
       </div>
+      {affected !== null ? (
+        <AffectedPrompt
+          count={affected}
+          what="block"
+          pending={mutation.isPending}
+          onConfirm={() => mutation.mutate({ cancelBooked: true })}
+        />
+      ) : null}
       <Button
         variant="outline"
-        disabled={slotId.trim().length < 8 || reason.trim().length === 0 || mutation.isPending}
-        onClick={() => mutation.mutate()}
+        disabled={!start || !end || start >= end || reason.trim().length === 0 || mutation.isPending}
+        onClick={() => mutation.mutate({ cancelBooked: false })}
       >
-        Update slot
+        Block period
       </Button>
     </div>
   );

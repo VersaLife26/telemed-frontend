@@ -1,10 +1,10 @@
-import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Search, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/admin/ui/badge";
-import type { VerificationStatus } from "@/lib/admin/api/types";
+import type { DoctorApplicationStatus } from "@/lib/admin/api/types";
 
 /** Status carried by an icon and a word, never by colour alone. */
-export function VerificationStatusBadge({ status }: { status: VerificationStatus }) {
+export function VerificationStatusBadge({ status }: { status: DoctorApplicationStatus }) {
   switch (status) {
     case "approved":
       return (
@@ -18,6 +18,13 @@ export function VerificationStatusBadge({ status }: { status: VerificationStatus
         <Badge variant="destructive">
           <XCircle className="size-3" aria-hidden="true" />
           Rejected
+        </Badge>
+      );
+    case "underReview":
+      return (
+        <Badge variant="info">
+          <Search className="size-3" aria-hidden="true" />
+          Under review
         </Badge>
       );
     case "pending":

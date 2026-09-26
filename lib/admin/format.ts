@@ -153,11 +153,14 @@ export function shortId(id: string | null | undefined): string {
   return id.length > 8 ? id.slice(0, 8) : id;
 }
 
-/** snake_case or dotted identifiers → "Sentence case". */
+/** camelCase, snake_case or dotted identifiers → "Sentence case". */
 export function humanise(value: string): string {
-  const spaced = value.replace(/[._-]+/g, " ").trim();
+  const spaced = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[._-]+/g, " ")
+    .trim();
   if (spaced.length === 0) return value;
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
 function toDate(value: string | number | Date | null | undefined): Date | null {

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 
-import { adminRoles } from "@/lib/admin/auth/current";
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { FilterBar } from "@/components/admin/data-table/filter-bar";
 import { Pagination } from "@/components/admin/data-table/pagination";
-import { CommissionEditor } from "@/components/admin/payments/commission-editor";
+import { CommissionView } from "@/components/admin/payments/commission-view";
 import { LedgerTable } from "@/components/admin/payments/ledger-table";
 import { PayoutBatches } from "@/components/admin/payments/payout-batches";
 import { PromoCodesPanel } from "@/components/admin/payments/promo-codes";
@@ -15,15 +14,12 @@ import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer, tryListServer } from "@/lib/admin/api/server";
 import type {
-  CommissionRuleSet,
-  LedgerEntry,
+  AdminRefund,
+  Commission,
+  LedgerPage,
   PayoutBatch,
   PromoCode,
-  RefundRequestRecord,
-  SystemConfig,
 } from "@/lib/admin/api/types";
-import { CONFIG_KEYS } from "@/lib/admin/api/types";
-import { can } from "@/lib/admin/rbac";
 import { filterValues, pageQuery } from "@/lib/admin/url-query";
 
 export const metadata: Metadata = { title: "Payments" };
@@ -33,67 +29,45 @@ const PER_PAGE = 25;
 /**
  * Payments.
  *
- * Four concerns on one route rather than four routes, because they are read
- * together: an admin looking at a refund wants the ledger entry beside it, and
- * an admin changing a commission rule wants to see what the last payout batch
- * paid out under the old one.
- *
- * The whole route is already behind `finance` or `super_admin` in `proxy.ts`
- * and in the gateway. The `readOnly` flag below is belt and braces for the case
- * where a role is granted read access here later.
+ * Several concerns on one route rather than several routes, because they are
+ * read together: an admin looking at a refund wants the ledger entry beside it.
+ * The whole route is behind the `finance` permission.
  */
 export default async function PaymentsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [roles, params] = await Promise.all([adminRoles(), searchParams]);
-  const readOnly = !can(roles, "finance");
+  const params = await searchParams;
 
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
-  const ledgerQuery = query({
-    status: params.status,
-    provider: params.provider,
+  const exportFilter = {
     from: params.from,
     to: params.to,
-    page,
-    per_page: PER_PAGE,
-  });
+    doctorId: params.doctorId,
+  };
+  const ledgerQuery = query({ ...exportFilter, page, pageSize: PER_PAGE });
 
-  const [ledger, rules, batches, refunds, promos] = await Promise.all([
-    tryListServer<LedgerEntry>(endpoints.finance.ledger(ledgerQuery)),
-    tryGetServer<SystemConfig<CommissionRuleSet>>(endpoints.finance.commissionRules()),
-    tryListServer<PayoutBatch>(endpoints.finance.payoutBatches(query({ per_page: 10 }))),
-    tryListServer<RefundRequestRecord>(endpoints.finance.refunds(query({ per_page: 25 }))),
-    tryListServer<PromoCode>(endpoints.finance.promoCodes(query({ per_page: 50, include_inactive: true }))),
+  const [ledger, commission, batches, refunds, promos] = await Promise.all([
+    tryGetServer<LedgerPage>(endpoints.finance.ledger(ledgerQuery)),
+    tryGetServer<Commission>(endpoints.finance.commission()),
+    tryListServer<PayoutBatch>(endpoints.finance.payoutBatches(query({ pageSize: 10 }))),
+    tryListServer<AdminRefund>(endpoints.finance.refunds(query({ pageSize: 25 }))),
+    tryListServer<PromoCode>(endpoints.finance.promoCodes(query({ pageSize: 50 }))),
   ]);
 
   const filters = [
-    {
-      name: "status",
-      label: "Status",
-      kind: "select" as const,
-      options: [
-        { value: "succeeded", label: "Succeeded" },
-        { value: "failed", label: "Failed" },
-        { value: "refunded", label: "Refunded" },
-      ],
-    },
-    {
-      name: "provider",
-      label: "Provider",
-      kind: "select" as const,
-      options: [
-        { value: "stripe", label: "Stripe" },
-        { value: "payhere", label: "PayHere" },
-        { value: "dialog", label: "Dialog carrier billing" },
-      ],
-    },
     { name: "from", label: "From", kind: "date" as const },
     { name: "to", label: "To", kind: "date" as const },
+    {
+      name: "doctorId",
+      label: "Doctor ID",
+      kind: "search" as const,
+      placeholder: "Doctor UUID",
+    },
   ];
 
-  const filtered = Boolean(params.status || params.provider || params.from || params.to);
+  const filtered = Boolean(params.from || params.to || params.doctorId);
 
   return (
     <>
@@ -105,7 +79,7 @@ export default async function PaymentsPage({
       <Tabs defaultValue="ledger">
         <TabsList>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="commission">Commission rules</TabsTrigger>
+          <TabsTrigger value="commission">Commission</TabsTrigger>
           <TabsTrigger value="payouts">Payout batches</TabsTrigger>
           <TabsTrigger value="refunds">Refunds</TabsTrigger>
           <TabsTrigger value="promos">Promo codes</TabsTrigger>
@@ -120,12 +94,13 @@ export default async function PaymentsPage({
           {ledger.ok ? (
             <>
               <LedgerTable
-                entries={ledger.page.data}
+                entries={ledger.data.items}
+                totals={ledger.data.totals}
                 filtered={filtered}
-                exportQuery={ledgerQuery.toString()}
+                exportQuery={query(exportFilter).toString()}
               />
               <Pagination
-                meta={ledger.page.meta}
+                meta={ledger.data}
                 label="Payment ledger"
                 query={pageQuery(params)}
               />
@@ -136,50 +111,32 @@ export default async function PaymentsPage({
         </TabsContent>
 
         <TabsContent value="commission">
-          {rules.ok ? (
-            <CommissionEditor config={rules.data} readOnly={readOnly} />
-          ) : rules.error.code === "NOT_FOUND" ? (
-            <CommissionEditor
-              config={{
-                key: CONFIG_KEYS.commissionRules,
-                value: { default_commission_percent: 0, rules: [] },
-                version: 0,
-                updated_by: null,
-                effective_from: new Date(0).toISOString(),
-                created_at: new Date(0).toISOString(),
-              }}
-              readOnly={readOnly}
-            />
+          {commission.ok ? (
+            <CommissionView commission={commission.data} />
           ) : (
-            <ErrorState error={rules.error} what="the commission rules" />
+            <ErrorState error={commission.error} what="the commission policy" />
           )}
         </TabsContent>
 
         <TabsContent value="payouts">
-          {batches.ok || batches.error.code === "NOT_FOUND" ? (
-            <PayoutBatches
-              batches={batches.ok ? batches.page.data : []}
-              readOnly={readOnly}
-            />
+          {batches.ok ? (
+            <PayoutBatches batches={batches.page.items} />
           ) : (
             <ErrorState error={batches.error} what="payout batches" />
           )}
         </TabsContent>
 
         <TabsContent value="refunds">
-          {refunds.ok || refunds.error.code === "NOT_FOUND" ? (
-            <RefundsPanel
-              refunds={refunds.ok ? refunds.page.data : []}
-              readOnly={readOnly}
-            />
+          {refunds.ok ? (
+            <RefundsPanel refunds={refunds.page.items} />
           ) : (
-            <ErrorState error={refunds.error} what="refund requests" />
+            <ErrorState error={refunds.error} what="refunds" />
           )}
         </TabsContent>
 
         <TabsContent value="promos">
-          {promos.ok || promos.error.code === "NOT_FOUND" ? (
-            <PromoCodesPanel codes={promos.ok ? promos.page.data : []} readOnly={readOnly} />
+          {promos.ok ? (
+            <PromoCodesPanel codes={promos.page.items} />
           ) : (
             <ErrorState error={promos.error} what="promo codes" />
           )}

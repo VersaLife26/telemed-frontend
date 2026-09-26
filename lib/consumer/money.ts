@@ -9,6 +9,7 @@ export function formatWait(seconds?: number | null) {
   return `about ${m} min`;
 }
 
-export function paymentSettled(status?: string, nextAction?: string) {
-  return status === "succeeded" || status === "authorized" || nextAction === "none";
+/** A card hold (`authorized`) confirms the booking just as a capture does. */
+export function paymentSettled(status?: string) {
+  return status === "succeeded" || status === "authorized";
 }

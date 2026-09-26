@@ -1,48 +1,32 @@
-import type { Appointment, OrderSummary, Payment, PaymentIntentView } from "@/lib/consumer/api/types";
-import { paymentSettled } from "@/lib/consumer/money";
+import type { OrderSummary, PaymentProvider } from "@/lib/consumer/api/types";
 
-export function mockIntentBody(appointmentId: string) {
-  return { appointment_id: appointmentId, provider: "mock" as const };
+export function orderPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/payment`;
 }
 
-export function payhereIntentBody(appointmentId: string, returnUrl?: string) {
-  return {
-    appointment_id: appointmentId,
-    provider: "payhere" as const,
-    ...(returnUrl ? { return_url: returnUrl } : {}),
-  };
+export function promoPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/payment/promo`;
 }
 
-export function paymentStatus(
-  intent: PaymentIntentView | null,
-  payment: Payment | null,
-): string | undefined {
-  return payment?.status || intent?.payment?.status;
+export function intentPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/payment/intent`;
 }
 
-export function consultationTotal(
-  order: OrderSummary | null,
-  appointment: Appointment | null,
-): number | undefined {
-  return order?.total_cents ?? order?.consultation_fee_cents ?? appointment?.amount_cents;
+export function intentBody(provider: PaymentProvider) {
+  return { provider };
 }
 
-export function isPaymentAuthorized(
-  intent: PaymentIntentView | null,
-  payment: Payment | null,
-): boolean {
-  return paymentStatus(intent, payment) === "authorized";
+export function mockCompletePath(paymentId: string): string {
+  return `/payments/${paymentId}/mock/complete`;
 }
 
-export function shouldGoToWaitingRoom(
-  intent: PaymentIntentView | null,
-  payment: Payment | null,
-): boolean {
-  return paymentSettled(paymentStatus(intent, payment), intent?.next_action);
+/** Promo codes lock once checkout has started. */
+export function canChangePromo(order: Pick<OrderSummary, "status" | "intentCreated">): boolean {
+  return order.status === "pending" && !order.intentCreated;
 }
 
-export function waitingRoomPath(appointmentId: string): string {
-  return `/appointments/${appointmentId}/waiting-room`;
+export function isPaymentAuthorized(order: Pick<OrderSummary, "status"> | null): boolean {
+  return order?.status === "authorized";
 }
 
 /** After checkout the visit is booked; join from the list when it is time. */

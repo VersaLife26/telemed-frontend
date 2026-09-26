@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle2, Search, ShieldAlert, XCircle } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert";
 import { Button } from "@/components/admin/ui/button";
@@ -23,11 +23,9 @@ import {
 } from "@/components/admin/ui/dialog";
 import { Label } from "@/components/admin/ui/label";
 import { Textarea } from "@/components/admin/ui/textarea";
-import { verifyDecisionBody } from "@/lib/admin/api/adapters/credentialing";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import { isApiError } from "@/lib/admin/api/errors";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import type { PendingDoctor, VerificationChecklist } from "@/lib/admin/api/types";
+import type { DoctorApplication } from "@/lib/admin/api/types";
 import {
   MINIMUM_REASON_LENGTH,
   allChecksPassed,
@@ -47,41 +45,45 @@ import { formatDateTime } from "@/lib/admin/format";
  *    button that does not say why is just a broken button.
  *  - **Rejection is always available.** A reviewer who has found a forged
  *    certificate should not have to answer the other four questions first.
- *  - **Both decisions require a written reason**, with a length floor that
+ *  - **A rejection requires a written reason**, with a length floor that
  *    forces a sentence. "ok" is not a credentialing record. The reason is
- *    stored on `verification_checklists.decision_reason` and copied into the
- *    audit log and the notification the doctor receives.
+ *    stored on the application and sent to the applicant.
  *  - **Confirmation is a modal**, and the modal restates the doctor's name and
  *    SLMC number. Approving the wrong row in a queue of forty is a mistake
  *    somebody will make, and the last thing between them and it should be a
  *    sentence naming the person.
  */
-export function DecisionPanel({
-  doctor,
-  checklist,
-}: {
-  doctor: PendingDoctor;
-  checklist: VerificationChecklist;
-}) {
+export function DecisionPanel({ application }: { application: DoctorApplication }) {
+  const id = application.id ?? "";
+  const checklist = application.checklist;
   const router = useRouter();
   const [action, setAction] = React.useState<"approve" | "reject" | null>(null);
   const [reason, setReason] = React.useState("");
   const [touched, setTouched] = React.useState(false);
 
-  const decided = checklist.overall_status !== "pending";
+  const decided = application.status === "approved" || application.status === "rejected";
   const outstanding = outstandingItems(checklist);
   const failed = failedItems(checklist);
   const canApprove = allChecksPassed(checklist);
-  const problem = reasonProblem(reason);
+  const problem = action === "reject" ? reasonProblem(reason) : null;
 
-  const mutation = useApiMutation<VerificationChecklist, { action: "approve" | "reject" }>({
+  const startReview = useApiMutation<DoctorApplication, void>({
     method: "POST",
-    path: () => endpoints.credentialing.verify(doctor.doctor_id),
-    body: (variables) => verifyDecisionBody(variables.action, reason),
+    path: () => endpoints.credentialing.startReview(id),
+    successMessage: () => `Review started for ${application.displayName}.`,
+  });
+
+  const mutation = useApiMutation<DoctorApplication, { action: "approve" | "reject" }>({
+    method: "POST",
+    path: (variables) =>
+      variables.action === "approve"
+        ? endpoints.credentialing.approve(id)
+        : endpoints.credentialing.reject(id),
+    body: (variables) => (variables.action === "reject" ? { reason: reason.trim() } : undefined),
     successMessage: (_result, variables) =>
       variables.action === "approve"
-        ? `${doctor.full_name} approved. doctor.approved has been queued.`
-        : `${doctor.full_name} rejected. doctor.rejected has been queued.`,
+        ? `${application.displayName} approved. They have been notified.`
+        : `${application.displayName} rejected. They have been notified.`,
     onSuccess: () => {
       setAction(null);
       setReason("");
@@ -95,25 +97,24 @@ export function DecisionPanel({
       <Card>
         <CardHeader>
           <CardTitle>Decision recorded</CardTitle>
-          <CardDescription>
-            This checklist is closed. Re-verification opens a new checklist rather than
-            reopening this one.
-          </CardDescription>
+          <CardDescription>This application is closed.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Alert variant={checklist.overall_status === "approved" ? "success" : "destructive"}>
-            {checklist.overall_status === "approved" ? (
+          <Alert variant={application.status === "approved" ? "success" : "destructive"}>
+            {application.status === "approved" ? (
               <CheckCircle2 aria-hidden="true" />
             ) : (
               <XCircle aria-hidden="true" />
             )}
             <AlertTitle>
-              {checklist.overall_status === "approved" ? "Approved" : "Rejected"}
-              {checklist.decided_at ? ` on ${formatDateTime(checklist.decided_at)}` : ""}
+              {application.status === "approved" ? "Approved" : "Rejected"}
+              {application.decidedAt ? ` on ${formatDateTime(application.decidedAt)}` : ""}
             </AlertTitle>
-            <AlertDescription>
-              {checklist.decision_reason ?? "No reason was recorded."}
-            </AlertDescription>
+            {application.status === "rejected" ? (
+              <AlertDescription>
+                {application.rejectionReason ?? "No reason was recorded."}
+              </AlertDescription>
+            ) : null}
           </Alert>
         </CardContent>
       </Card>
@@ -125,8 +126,8 @@ export function DecisionPanel({
       <CardHeader>
         <CardTitle>Decision</CardTitle>
         <CardDescription>
-          Approving publishes <code className="text-xs">doctor.approved</code>, which is
-          what lets this doctor appear in patient search and take bookings.
+          Approving creates the doctor&rsquo;s account, which is what lets them appear in
+          patient search and take bookings.
         </CardDescription>
       </CardHeader>
 
@@ -163,6 +164,28 @@ export function DecisionPanel({
             </AlertDescription>
           </Alert>
         )}
+
+        {application.status === "pending" ? (
+          <Alert variant="info">
+            <Search aria-hidden="true" />
+            <AlertTitle>Not yet under review</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>Start the review so colleagues can see this application is being worked on.</p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={startReview.isPending}
+                onClick={() => startReview.mutate()}
+              >
+                {startReview.isPending ? "Starting…" : "Start review"}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : application.reviewStartedAt ? (
+          <p className="text-xs text-muted-foreground">
+            Review started {formatDateTime(application.reviewStartedAt)}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Button
@@ -202,17 +225,18 @@ export function DecisionPanel({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {action === "approve" ? "Approve" : "Reject"} {doctor.full_name}
+              {action === "approve" ? "Approve" : "Reject"} {application.displayName}
             </DialogTitle>
             <DialogDescription>
-              SLMC {doctor.slmc_number}
-              {doctor.specialty_code ? ` · ${doctor.specialty_code}` : ""}.{" "}
+              SLMC {application.slmcNumber}
+              {application.specialtyCode ? ` · ${application.specialtyCode}` : ""}.{" "}
               {action === "approve"
                 ? "This doctor will become visible to patients and able to take bookings."
                 : "This doctor will not be able to take bookings. They are notified, with this reason."}
             </DialogDescription>
           </DialogHeader>
 
+          {action === "reject" ? (
           <div className="space-y-2">
             <Label htmlFor="decision-reason">
               Reason <span aria-hidden="true">*</span>
@@ -226,11 +250,7 @@ export function DecisionPanel({
               rows={4}
               aria-invalid={touched && problem !== null}
               aria-describedby="decision-reason-help"
-              placeholder={
-                action === "approve"
-                  ? "e.g. SLMC 41235 confirmed on the register on 20 Aug, NIC and certificate names match, 9 years post-registration."
-                  : "e.g. SLMC number does not appear on the register, and the certificate image has been altered around the registration number."
-              }
+              placeholder="e.g. SLMC number does not appear on the register, and the certificate image has been altered around the registration number."
             />
             <p
               id="decision-reason-help"
@@ -242,28 +262,20 @@ export function DecisionPanel({
             >
               {touched && problem
                 ? problem
-                : `Recorded permanently against this decision and included in the audit log. At least ${MINIMUM_REASON_LENGTH} characters.`}
+                : `Recorded permanently against this decision and sent to the applicant. At least ${MINIMUM_REASON_LENGTH} characters.`}
             </p>
           </div>
+          ) : null}
 
           {mutation.error ? (
             <Alert variant="destructive">
               <ShieldAlert aria-hidden="true" />
-              <AlertTitle>
-                {isApiError(mutation.error)
-                  ? mutation.error.userMessage
-                  : "This decision could not be recorded."}
-              </AlertTitle>
-              <AlertDescription className="space-y-1">
-                {isApiError(mutation.error) && mutation.error.serverMessage ? (
-                  <p>{mutation.error.serverMessage}</p>
-                ) : null}
-                {isApiError(mutation.error) && mutation.error.requestId ? (
-                  <p className="font-mono text-xs">
-                    Request ID: {mutation.error.requestId}
-                  </p>
-                ) : null}
-              </AlertDescription>
+              <AlertTitle>{mutation.error.userMessage}</AlertTitle>
+              {mutation.error.traceId ? (
+                <AlertDescription>
+                  <p className="font-mono text-xs">Trace ID: {mutation.error.traceId}</p>
+                </AlertDescription>
+              ) : null}
             </Alert>
           ) : null}
 

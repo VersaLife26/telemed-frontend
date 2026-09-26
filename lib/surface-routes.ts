@@ -95,7 +95,6 @@ const ROUTES: Record<Surface, readonly string[]> = {
     "/disputes",
     "/audit",
     "/content",
-    "/settings",
     "/settings/admins",
     // No "/login" and no "/api/auth/*": Cloudflare Access authenticates this
     // hostname at the edge, so the console has no sign-in of its own and

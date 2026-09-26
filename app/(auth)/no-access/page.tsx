@@ -18,20 +18,20 @@ export const metadata: Metadata = { title: "No access" };
 
 const AREA_NAMES: Record<RbacGroup, string> = {
   credentialing: "the doctor verification queue",
-  admin_users: "admin account management",
+  doctors: "doctor management",
+  adminUsers: "admin account management",
   users: "user management",
   appointments: "appointments",
   finance: "payments and finance",
   content: "content management",
   disputes: "disputes",
-  config: "settings",
   analytics: "the dashboard",
   audit: "audit logs",
-  audit_export: "the audit log export",
+  auditExport: "the audit log export",
 };
 
 /**
- * Reached when the role check in `proxy.ts` refuses a page.
+ * Reached when the console layout's role check refuses a page.
  *
  * It names the area and the roles that would grant it, so the admin can make a
  * specific request ("I need finance") rather than a vague one ("I can't get
@@ -66,14 +66,14 @@ export default async function NoAccessPage({
           <p className="text-muted-foreground">
             {AREA_NAMES[area].charAt(0).toUpperCase() + AREA_NAMES[area].slice(1)} requires{" "}
             {RBAC_MATRIX[area].map(roleLabel).join(" or ")}. Ask a super admin to
-            change your role in Settings &rarr; Admins; it takes effect within
+            change your role in Admin accounts; it takes effect within
             seconds, without you signing in again.
           </p>
         ) : (
           <p className="text-muted-foreground">
             Cloudflare Access has let you in, which means it recognises you --
             but this platform has no admin role for your account. A super admin
-            has to add you in Settings &rarr; Admins before the console will
+            has to add you in Admin accounts before the console will
             show you anything.
           </p>
         )}

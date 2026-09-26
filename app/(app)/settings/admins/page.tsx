@@ -9,18 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer } from "@/lib/admin/api/server";
-import type { AdminAccount, PermissionMatrix } from "@/lib/admin/api/types";
+import type { AdminAccount, PermissionRoles } from "@/lib/admin/api/types";
 
 export const metadata: Metadata = { title: "Admin accounts" };
 
 /**
- * Admin account management. Super_admin only.
- *
- * The RBAC table in lib/rbac.ts has mapped `/settings/admins` to the
- * `admin_users` group since before this page existed, so the route was already
- * guarded — it simply rendered nothing. Everything here is enforced again
- * server-side by admin-service; the client guard controls navigation, not
- * access.
+ * Admin account management. superAdmin only, via the `adminUsers`
+ * permission. Everything here is enforced again by the API; the client guard
+ * controls navigation, not access.
  */
 export default async function AdminAccountsPage() {
   const header = (
@@ -32,7 +28,7 @@ export default async function AdminAccountsPage() {
 
   const [accounts, matrix] = await Promise.all([
     tryGetServer<AdminAccount[]>(endpoints.adminUsers.list()),
-    tryGetServer<PermissionMatrix>(endpoints.adminUsers.permissions()),
+    tryGetServer<PermissionRoles[]>(endpoints.permissions()),
   ]);
 
   if (!accounts.ok) {
@@ -71,7 +67,7 @@ export default async function AdminAccountsPage() {
           <CardHeader>
             <CardTitle>What each role can reach</CardTitle>
             <CardDescription>
-              Served by admin-service from the permission table it actually
+              Served by the API from the permission table it actually
               enforces, so this grid cannot drift away from what the server
               does.
             </CardDescription>

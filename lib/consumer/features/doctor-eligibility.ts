@@ -1,32 +1,38 @@
-import { parseEnvelope } from "@/lib/consumer/api/envelope";
+import { problemMessage } from "@/lib/consumer/api/errors";
+import type { ApplicantEligibility } from "@/lib/consumer/api/types";
 
-export type ApplicationEligibility = {
-  status: string;
-  application_id?: string;
-  message: string;
-};
+export type EligibilityStatus = ApplicantEligibility["status"];
 
-function readError(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const message = (json as { message?: string }).message;
-    if (message) return message;
+/** Approved applicants and existing doctors may receive an OTP; all other statuses must not. */
+export function canSendDoctorOtp(status: EligibilityStatus): boolean {
+  return status === "approved" || status === "doctor";
+}
+
+export function eligibilityMessage(status: EligibilityStatus): string {
+  switch (status) {
+    case "none":
+      return "No doctor application for this number. Apply to join first.";
+    case "pending":
+      return "Your application has been received and is waiting for review.";
+    case "underReview":
+      return "Your application is under review. We will contact you when it is decided.";
+    case "rejected":
+      return "Your application was not approved. Contact support for details.";
+    case "approved":
+    case "doctor":
+      return "";
   }
-  return fallback;
 }
 
-/** Approved or activated applications may receive an OTP; all other statuses must not. */
-export function canSendDoctorOtp(status: string): boolean {
-  return status === "approved" || status === "activated";
-}
-
-export async function checkDoctorEligibility(phone: string): Promise<ApplicationEligibility> {
+export async function checkDoctorEligibility(phone: string): Promise<ApplicantEligibility & { message: string }> {
   const res = await fetch(
-    `/api/proxy/doctors/applications/eligibility?phone=${encodeURIComponent(phone.trim())}`,
+    `/api/proxy/doctor-applications/eligibility?phone=${encodeURIComponent(phone.trim())}`,
     { cache: "no-store" },
   );
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(readError(json, "Could not check registration status"));
+    throw new Error(problemMessage(json, "Could not check registration status"));
   }
-  return parseEnvelope<ApplicationEligibility>(json);
+  const data = json as ApplicantEligibility;
+  return { ...data, message: eligibilityMessage(data.status) };
 }

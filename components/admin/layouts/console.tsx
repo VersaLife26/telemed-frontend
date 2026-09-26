@@ -9,16 +9,15 @@ import { canVisit, groupForPath } from "@/lib/admin/rbac";
 /**
  * Authenticated frame.
  *
- * This layout now owns the role check that `proxy.ts` used to do. Under
- * Keycloak the roles rode in the session cookie and could be read
- * synchronously in middleware; they now come from this platform's admin_users
- * row over the network, which does not belong on every request for every
- * asset. Here it is one call per page render, shared with the page itself by
- * React's request cache, and the answer is needed anyway to draw the nav.
+ * This layout owns the role check. Roles come from this platform's
+ * admin_users row over the network, which does not belong on every request
+ * for every asset. Here it is one call per page render, shared with the page
+ * itself by React's request cache, and the answer is needed anyway to draw
+ * the nav.
  *
- * Neither this nor the middleware is the control. The gateway and
- * admin-service enforce the same matrix on every call; this decides what to
- * render rather than what is permitted.
+ * Neither this nor the middleware is the control. The API enforces the same
+ * matrix on every call; this decides what to render rather than what is
+ * permitted.
  */
 export default async function AdminConsoleLayout({
   children,
@@ -32,7 +31,11 @@ export default async function AdminConsoleLayout({
     // challenges at the edge -- and throwing here produced Next.js's generic
     // "A server error occurred" page with nothing but a digest, which tells
     // an operator neither what failed nor whether it is their fault.
-    return <ConsoleUnavailable reason={result.reason} />;
+    return result.reason === "ip-blocked" ? (
+      redirect("/ip-blocked")
+    ) : (
+      <ConsoleUnavailable reason={result.reason} />
+    );
   }
 
   const { identity } = result;

@@ -26,7 +26,7 @@ import { SexField } from "@/components/consumer/sex-field";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
-const emptyDraft: ProfileDraft = { name: "", phone: "", address: "", dateOfBirth: "", sex: "", allergies: "" };
+const emptyDraft: ProfileDraft = { name: "", address: "", dateOfBirth: "", sex: "", allergies: "" };
 
 export default function ProfilePage() {
   const [user, setUser] = useState<TelemedUser | null>(null);
@@ -41,7 +41,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    browserApi<TelemedUser>("/users/me")
+    browserApi<TelemedUser>("/me")
       .then((account) => {
         setUser(account);
         setDraft(profileDraftFromUser(account));
@@ -79,7 +79,7 @@ export default function ProfilePage() {
     setError(null);
     setNotice(null);
     try {
-      const updated = await browserApi<TelemedUser>("/users/me", {
+      const updated = await browserApi<TelemedUser>("/me", {
         method: "PUT",
         body: profileUpdateBody(user, draft),
       });
@@ -108,7 +108,7 @@ export default function ProfilePage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const updated = await browserApi<TelemedUser>("/users/me/photo", {
+      const updated = await browserApi<TelemedUser>("/me/photo", {
         method: "PUT",
         body: form,
       });
@@ -127,7 +127,8 @@ export default function ProfilePage() {
     setError(null);
     setNotice(null);
     try {
-      const updated = await browserApi<TelemedUser>("/users/me/photo", { method: "DELETE" });
+      await browserApi<void>("/me/photo", { method: "DELETE" });
+      const updated = await browserApi<TelemedUser>("/me");
       setUser(updated);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -162,8 +163,8 @@ export default function ProfilePage() {
     );
   }
 
-  const photoSrc = previewUrl || profilePhotoSrc(user.photo_url) || assets.avatarPlaceholder;
-  const hasStoredPhoto = Boolean(user.photo_url) || Boolean(previewUrl);
+  const photoSrc = previewUrl || profilePhotoSrc(user.photoUrl) || assets.avatarPlaceholder;
+  const hasStoredPhoto = Boolean(user.photoUrl) || Boolean(previewUrl);
 
   return (
     <div className="flex flex-col gap-10">
@@ -180,14 +181,14 @@ export default function ProfilePage() {
               alt=""
               fill
               className="object-cover"
-              unoptimized={Boolean(previewUrl || user.photo_url)}
+              unoptimized={Boolean(previewUrl || user.photoUrl)}
             />
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-3 text-center sm:text-left">
             <div>
-              <p className="text-h4 text-ink">{user.name || "Your profile"}</p>
-              <p className="mt-0.5 text-body-sm text-blue-800">JPEG, PNG or WebP · up to 2 MB</p>
+              <p className="text-h4 text-ink">{user.fullName || "Your profile"}</p>
+              <p className="mt-0.5 text-body-sm text-blue-800">JPEG, PNG or WebP · up to 5 MB</p>
             </div>
 
             <input
@@ -227,13 +228,11 @@ export default function ProfilePage() {
             required
           />
           <Input
-            id="profile-phone"
-            label="Phone"
-            type="tel"
-            value={draft.phone}
-            onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
-            autoComplete="tel"
-            placeholder="0771234567"
+            id="profile-sign-in"
+            label={user.phoneNumber ? "Phone" : "Email"}
+            value={user.phoneNumber || user.email || ""}
+            readOnly
+            hint="Used to sign in. It cannot be changed here."
           />
           <Textarea
             id="profile-address"
@@ -264,7 +263,7 @@ export default function ProfilePage() {
             value={draft.allergies}
             onChange={(e) => setDraft((d) => ({ ...d, allergies: e.target.value }))}
             rows={2}
-            maxLength={1000}
+            maxLength={2000}
           />
 
           {notice ? <Alert tone="success">{notice}</Alert> : null}

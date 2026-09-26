@@ -1,41 +1,22 @@
+import type { ProblemDetails } from "@/lib/consumer/api/errors";
+import type { ConsultationLanguage, DoctorApplicationRequest, DoctorDocumentType } from "@/lib/consumer/api/types";
+
 export const TERMS_HREF = "/legal/service-retention-agreement";
 
 export const MAX_APPLY_DOCUMENT_BYTES = 5 * 1024 * 1024;
 
-export const SPECIALTIES = [
-  { code: "general_practice", label: "General Practitioner" },
-  { code: "pediatrics", label: "Pediatrics" },
-  { code: "obstetrics_gynae", label: "Obstetrics & Gynaecology" },
-  { code: "cardiology", label: "Cardiology" },
-  { code: "dermatology", label: "Dermatology" },
-  { code: "endocrinology", label: "Endocrinology & Diabetes" },
-  { code: "ent", label: "ENT (Ear, Nose & Throat)" },
-  { code: "psychiatry", label: "Psychiatry" },
-  { code: "psychology", label: "Psychology & Counselling" },
-  { code: "orthopedics", label: "Orthopedics" },
-  { code: "ophthalmology", label: "Ophthalmology (Eye Care)" },
-  { code: "neurology", label: "Neurology" },
-  { code: "gastroenterology", label: "Gastroenterology" },
-  { code: "nephrology", label: "Nephrology" },
-  { code: "urology", label: "Urology" },
-  { code: "pulmonology", label: "Pulmonology (Chest/Lung)" },
-  { code: "general_surgery", label: "General Surgery" },
-  { code: "dental", label: "Dental" },
-  { code: "nutrition", label: "Nutrition & Dietetics" },
-] as const;
-
-export const LANGUAGE_OPTIONS = [
+export const LANGUAGE_OPTIONS: ReadonlyArray<{ code: ConsultationLanguage; label: string }> = [
   { code: "si", label: "Sinhala" },
   { code: "en", label: "English" },
   { code: "ta", label: "Tamil" },
   { code: "other", label: "Other" },
-] as const;
+];
 
 export const APPLY_DOCUMENT_TYPES = [
   { type: "signature", label: "Clear image of your signature" },
   { type: "seal", label: "Clear image of the seal" },
-  { type: "slmc_certificate", label: "Copy of most recent SLMC certificate / latest SLMC renewal" },
-] as const;
+  { type: "slmcCertificate", label: "Copy of most recent SLMC certificate / latest SLMC renewal" },
+] as const satisfies ReadonlyArray<{ type: DoctorDocumentType; label: string }>;
 
 export type ApplyDocumentType = (typeof APPLY_DOCUMENT_TYPES)[number]["type"];
 
@@ -57,7 +38,7 @@ export type DoctorApplyForm = {
   confirmPassword: string;
   phone: string;
   slmcNumber: string;
-  languages: string[];
+  languages: ConsultationLanguage[];
   languageOther: string;
   pgimBoardCertified: boolean | null;
   medicalSchool: string;
@@ -224,42 +205,42 @@ export function doctorApplyError(form: DoctorApplyForm): string | null {
   return null;
 }
 
-export function doctorApplyPayload(form: DoctorApplyForm) {
+export function doctorApplyPayload(form: DoctorApplyForm): DoctorApplicationRequest {
   const minutes = parseConsultationMinutes(form.consultationMinutes) ?? 0;
   const charge = rupeesToCents(form.feeLkr) ?? 0;
   const years = Number(form.experienceYears || "0");
   return {
-    first_name: form.firstName.trim(),
-    last_name: form.lastName.trim(),
+    phone: normalizeSriLankanMobile(form.phone) ?? form.phone.trim(),
     email: form.email.trim(),
     password: form.password,
-    phone: normalizeSriLankanMobile(form.phone) ?? form.phone.trim(),
-    slmc_number: form.slmcNumber.trim(),
-    specialty: form.specialty,
+    firstName: form.firstName.trim(),
+    lastName: form.lastName.trim(),
+    displayName: null,
+    slmcNumber: form.slmcNumber.trim(),
+    specialtyCode: form.specialty,
     languages: form.languages,
-    language_other: form.languages.includes("other") ? form.languageOther.trim() : "",
-    pgim_board_certified: form.pgimBoardCertified === true,
-    medical_school: form.medicalSchool.trim(),
-    qualifications: form.qualifications.trim(),
-    experience_years: Number.isFinite(years) ? Math.floor(years) : 0,
-    // Apply API still requires required_fee_lkr; doctors now declare one list price.
-    required_fee_lkr: charge,
-    fee_lkr: charge,
-    availability_notes: formatAvailabilityNotes(
+    languageOther: form.languages.includes("other") ? form.languageOther.trim() : null,
+    experienceYears: Number.isFinite(years) ? Math.floor(years) : 0,
+    feeCents: charge,
+    bio: null,
+    pgimBoardCertified: form.pgimBoardCertified === true,
+    isGeneralPractitioner: form.isGeneralPractitioner === true,
+    medicalSchool: form.medicalSchool.trim(),
+    qualificationsText: form.qualifications.trim(),
+    availabilityNotes: formatAvailabilityNotes(
       form.availableDays,
       form.availableStart,
       form.availableEnd,
       form.availabilityExtra,
       minutes,
     ),
-    is_general_practitioner: form.isGeneralPractitioner === true,
-    practicing_locations: parseLocations(form.practicingLocations),
-    terms_accepted: form.termsAccepted === true,
+    practicingLocations: parseLocations(form.practicingLocations),
+    termsAccepted: form.termsAccepted === true,
     bank: {
-      bank_name: form.bankName.trim(),
-      branch_name: form.bankBranch.trim(),
-      account_number: form.accountNumber.trim(),
-      account_name: form.accountName.trim(),
+      bankName: form.bankName.trim(),
+      branchName: form.bankBranch.trim(),
+      accountNumber: form.accountNumber.trim(),
+      accountName: form.accountName.trim(),
     },
   };
 }
@@ -268,30 +249,25 @@ export function applyDocuments(form: DoctorApplyForm): { type: ApplyDocumentType
   const out: { type: ApplyDocumentType; file: File }[] = [];
   if (form.signature) out.push({ type: "signature", file: form.signature });
   if (form.seal) out.push({ type: "seal", file: form.seal });
-  if (form.slmcCertificate) out.push({ type: "slmc_certificate", file: form.slmcCertificate });
+  if (form.slmcCertificate) out.push({ type: "slmcCertificate", file: form.slmcCertificate });
   return out;
 }
 
-export function applyDocumentPath(applicationId: string): string {
-  return `/doctors/applications/${applicationId}/documents`;
+export function applyDocumentPath(applicationId: string, type: ApplyDocumentType): string {
+  return `/doctor-applications/${applicationId}/documents/${type}`;
 }
 
+/** The problem `detail` plus every field message, so the applicant sees what to fix. */
 export function readApplyError(json: unknown, fallback: string): string {
   if (!json || typeof json !== "object") return fallback;
-  const obj = json as { message?: string; fields?: Record<string, string> };
-  const fields = obj.fields;
-  if (fields && typeof fields === "object") {
-    const parts = Object.entries(fields)
-      .filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim() !== "")
-      .map(([key, value]) => `${key}: ${value}`);
-    if (parts.length > 0) {
-      const message = typeof obj.message === "string" ? obj.message.trim() : "";
-      if (message && message !== "one or more fields failed validation") {
-        return `${message} (${parts.join("; ")})`;
-      }
-      return parts.join("; ");
-    }
-  }
-  if (typeof obj.message === "string" && obj.message.trim()) return obj.message;
+  const problem = json as ProblemDetails;
+  const detail = typeof problem.detail === "string" ? problem.detail.trim() : "";
+  const parts = Object.entries(problem.errors ?? {})
+    .map(([key, messages]) => [key, (messages ?? []).filter((m) => m.trim()).join(" ")] as const)
+    .filter(([, message]) => message)
+    .map(([key, message]) => `${key}: ${message}`);
+  if (parts.length > 0) return detail ? `${detail} (${parts.join("; ")})` : parts.join("; ");
+  if (detail) return detail;
+  if (typeof problem.title === "string" && problem.title.trim()) return problem.title;
   return fallback;
 }

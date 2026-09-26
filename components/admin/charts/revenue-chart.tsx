@@ -26,15 +26,14 @@ import { CHART_COLORS, ChartFrame, type SeriesSpec } from "./chart-frame";
 import { ChartTooltipBody } from "./chart-tooltip";
 
 /**
- * Gross revenue and platform commission over time, from the `revenue_daily`
- * materialized view.
+ * Captured revenue and platform commission over time.
  *
  * Two series on **one** axis. Commission is a component of gross, measured in
  * the same unit, so a second y-scale would be both unnecessary and misleading —
  * it would let the two lines cross at a point that means nothing.
  */
 const SERIES: SeriesSpec[] = [
-  { key: "gross", label: "Gross revenue", color: CHART_COLORS.slot1 },
+  { key: "gross", label: "Captured", color: CHART_COLORS.slot1 },
   { key: "commission", label: "Platform commission", color: CHART_COLORS.slot2 },
 ];
 
@@ -54,11 +53,11 @@ export function RevenueChart({
   const rows = React.useMemo<Row[]>(
     () =>
       [...points]
-        .sort((a, b) => a.day.localeCompare(b.day))
+        .sort((a, b) => a.period.localeCompare(b.period))
         .map((point) => ({
-          day: point.day,
-          gross: point.gross_cents,
-          commission: point.commission_cents,
+          day: point.period,
+          gross: point.capturedCents,
+          commission: point.commissionCents,
         })),
     [points],
   );
@@ -66,14 +65,14 @@ export function RevenueChart({
   return (
     <ChartFrame
       title="Revenue"
-      description={`Gross takings and platform commission per day, in ${currency}.`}
+      description={`Captured payments and platform commission per day, in ${currency}.`}
       series={SERIES}
       table={
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Day</TableHead>
-              <TableHead className="text-right">Gross</TableHead>
+              <TableHead className="text-right">Captured</TableHead>
               <TableHead className="text-right">Commission</TableHead>
             </TableRow>
           </TableHeader>

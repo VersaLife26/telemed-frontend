@@ -13,7 +13,8 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { Tabs } from "@/components/consumer/ui/Tabs";
 import { AppointmentsSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, Doctor, EarlyJoinOffer, RescheduleRequest } from "@/lib/consumer/api/types";
+import { ApiError } from "@/lib/consumer/api/errors";
+import type { Appointment, Doctor, EarlyJoinOffer, Paged, RescheduleRequest } from "@/lib/consumer/api/types";
 import { earlyJoinPath } from "@/lib/consumer/features/consult";
 import {
   appointmentReschedulePath,
@@ -39,8 +40,7 @@ async function pendingByAppointment(
     confirmed.map(async (a) => {
       try {
         const items = await browserApi<RescheduleRequest[]>(appointmentReschedulePath(a.id));
-        const pending =
-          (Array.isArray(items) ? items : []).find((r) => r.status === "pending") ?? null;
+        const pending = items.find((r) => r.status === "pending") ?? null;
         return [a.id, pending] as const;
       } catch {
         return [a.id, null] as const;
@@ -81,7 +81,7 @@ function AppointmentRow({
   onChanged: () => void;
 }) {
   const action = appointmentAction(appointment.id, appointment.status);
-  const when = appointment.start_at_local || appointment.start_at;
+  const when = appointment.startAt;
 
   return (
     <Card as="li" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -132,14 +132,15 @@ export default function AppointmentsPage() {
   const [pending, setPending] = useState<Record<string, RescheduleRequest | null>>({});
   const [earlyJoin, setEarlyJoin] = useState<Record<string, EarlyJoinOffer | null>>({});
   const [error, setError] = useState<string | null>(null);
+  const [signedOut, setSignedOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pane, setPane] = useState<Pane>("upcoming");
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await browserApi<Appointment[]>(appointmentsListPath());
-      const list = Array.isArray(data) ? data : [];
+      const page = await browserApi<Paged<Appointment>>(appointmentsListPath(100));
+      const list = page.items;
       setAppointments(list);
       const [reschedule, offers, names] = await Promise.all([
         pendingByAppointment(list),
@@ -154,6 +155,7 @@ export default function AppointmentsPage() {
       setDoctorNames({});
       setPending({});
       setEarlyJoin({});
+      setSignedOut(e instanceof ApiError && e.status === 401);
       setError(e instanceof Error ? e.message : "Could not load visits");
     } finally {
       setLoading(false);
@@ -173,7 +175,7 @@ export default function AppointmentsPage() {
     );
   }
 
-  if (error && appointments.length === 0 && /sign in|unauthorized|unauthorised|401/i.test(error)) {
+  if (signedOut) {
     return (
       <EmptyState
         title="Sign in to view visits"

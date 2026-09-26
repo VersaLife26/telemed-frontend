@@ -3,22 +3,23 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import type { Slot } from "@/lib/consumer/api/types";
 import { cx } from "@/lib/consumer/cx";
 import { dayKeyLabel, dayKeyWeekday } from "@/lib/consumer/features/calendar";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
-import { firstOpenDay } from "@/lib/consumer/features/slots";
-
-export type SlotDay = { date: string; slots: Slot[] };
+import { intakePath } from "@/lib/consumer/features/booking";
+import { firstOpenDay, type SlotDay } from "@/lib/consumer/features/slots";
 
 export function DoctorSlotPicker({
   doctorId,
   today,
   days,
+  timeZone,
 }: {
   doctorId: string;
   today: string;
   days: SlotDay[];
+  /** The doctor's zone from the slots response; every time here is shown in it. */
+  timeZone: string;
 }) {
   const [selected, setSelected] = useState(() => firstOpenDay(days) ?? today);
   const day = days.find((entry) => entry.date === selected) ?? days[0];
@@ -55,19 +56,15 @@ export function DoctorSlotPicker({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {open.map((slot) => {
-          const when = slot.start_at_local || slot.start_at;
-          const clock = formatVisitClock(when);
-          return (
-            <Link
-              key={slot.id}
-              href={`/doctors/${doctorId}/intake?slot_id=${slot.id}&start=${encodeURIComponent(when || "")}`}
-              className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-pill border border-border-default bg-surface px-4 text-label text-ink tabular-time transition-[background-color,border-color,color,transform] duration-[160ms] ease-out active:scale-[0.97] can-hover:hover:border-brand can-hover:hover:bg-brand can-hover:hover:text-on-brand"
-            >
-              {clock !== "—" ? clock : slot.id.slice(0, 8)}
-            </Link>
-          );
-        })}
+        {open.map((slot) => (
+          <Link
+            key={slot.startAt}
+            href={intakePath(doctorId, slot.startAt, timeZone)}
+            className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-pill border border-border-default bg-surface px-4 text-label text-ink tabular-time transition-[background-color,border-color,color,transform] duration-[160ms] ease-out active:scale-[0.97] can-hover:hover:border-brand can-hover:hover:bg-brand can-hover:hover:text-on-brand"
+          >
+            {formatVisitClock(slot.startAt, timeZone)}
+          </Link>
+        ))}
         {open.length === 0 ? (
           <p className="text-body-sm text-muted">
             {selected === today ? "No open slots for today." : "No open slots on this day."}

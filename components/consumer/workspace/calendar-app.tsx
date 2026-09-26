@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 
 import { WeekGrid } from "@/components/consumer/calendar/week-grid";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, WorkingHour } from "@/lib/consumer/api/types";
+import type { Appointment, Paged, Schedule, WorkingHour } from "@/lib/consumer/api/types";
 import {
   colomboDayKey,
   eventsByDay,
   gridWindow,
+  shiftDay,
   weekDayKeys,
   weekStart,
 } from "@/lib/consumer/features/calendar";
@@ -21,18 +22,22 @@ export function CalendarApp() {
 
   useEffect(() => {
     let cancelled = false;
+    const from = shiftDay(mondayKey, -1);
+    const to = shiftDay(mondayKey, 8);
     Promise.all([
-      browserApi<Appointment[]>("/appointments?per_page=200"),
-      browserApi<WorkingHour[]>("/doctors/me/availability"),
-    ]).then(([list, hours]) => {
+      browserApi<Paged<Appointment>>(
+        `/appointments?from=${from}T00:00:00Z&to=${to}T00:00:00Z&pageSize=100`,
+      ),
+      browserApi<Schedule>("/doctors/me/schedule"),
+    ]).then(([list, schedule]) => {
       if (cancelled) return;
-      setAppointments(Array.isArray(list) ? list : []);
-      setWorkingHours(Array.isArray(hours) ? hours : []);
+      setAppointments(list.items);
+      setWorkingHours(schedule.workingHours ?? []);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mondayKey]);
 
   const dayKeys = weekDayKeys(mondayKey);
   const byDay = eventsByDay(appointments, dayKeys);

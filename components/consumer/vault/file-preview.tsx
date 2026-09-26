@@ -8,24 +8,24 @@ import { PointerLayer } from "@/components/consumer/call/pointer-layer";
 import type { VaultDocument, VaultDownload } from "@/lib/consumer/api/types";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { CallPointerBind } from "@/lib/consumer/features/pointer";
-import { formatBytes, previewKind, recordContentPath, recordDownloadPath } from "@/lib/consumer/features/vault";
+import { documentDownloadPath, formatBytes, previewKind, proxiedFileUrl } from "@/lib/consumer/features/vault";
 import { cx } from "@/lib/consumer/cx";
 
-export async function presignedUrl(id: string, attachment = false): Promise<string> {
-  const link = await browserApi<VaultDownload>(recordDownloadPath(id, attachment));
-  if (!link.download_url) throw new Error("No download URL");
-  return link.download_url;
+/** A short-lived signed link to the file, reachable through the same-origin BFF. */
+export async function presignedUrl(id: string): Promise<string> {
+  const link = await browserApi<VaultDownload>(documentDownloadPath(id));
+  return proxiedFileUrl(link.url);
 }
 
 /**
  * Fetches the file through the same-origin BFF and returns a blob: URL.
  *
- * Presigned API URLs cannot be put in an <iframe>: the gateway sends
+ * Signed API URLs cannot be put in an <iframe>: the gateway sends
  * X-Frame-Options: DENY and frame-ancestors 'none', so the browser shows
  * "refused to connect" instead of the PDF.
  */
 export async function previewObjectUrl(id: string): Promise<string> {
-  const res = await fetch(`/api/proxy${recordContentPath(id)}`, { cache: "no-store" });
+  const res = await fetch(await presignedUrl(id), { cache: "no-store" });
   if (!res.ok) {
     throw new Error("Could not load the file preview.");
   }
@@ -48,7 +48,7 @@ export function FilePreview({
   dark?: boolean;
   pointer?: CallPointerBind | null;
 }) {
-  const kind = previewKind(doc.content_type);
+  const kind = previewKind(doc.contentType);
   const [zoom, setZoom] = useState(1);
   const ghost = dark
     ? "text-white/80 can-hover:hover:bg-white/10 can-hover:hover:text-white"
@@ -63,9 +63,9 @@ export function FilePreview({
         )}
       >
         <div className="min-w-0">
-          <p className="truncate text-label">{doc.filename}</p>
+          <p className="truncate text-label">{doc.fileName}</p>
           <p className={cx("text-caption", dark ? "text-white/60" : "text-muted")}>
-            {[doc.content_type, formatBytes(doc.size_bytes)].filter(Boolean).join(" · ")}
+            {[doc.contentType, formatBytes(doc.sizeBytes)].filter(Boolean).join(" · ")}
           </p>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -117,7 +117,7 @@ export function FilePreview({
           <p className={cx("p-6 text-body", dark ? "text-white/70" : "text-muted")}>Loading preview…</p>
         ) : kind === "pdf" ? (
           <iframe
-            title={doc.filename}
+            title={doc.fileName}
             src={url}
             className={cx("h-full min-h-[24rem] w-full border-0", pointer?.pointing && "pointer-events-none")}
           />
@@ -126,7 +126,7 @@ export function FilePreview({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
-              alt={doc.filename}
+              alt={doc.fileName}
               className="max-h-full max-w-full object-contain transition-transform duration-200"
               style={{ transform: `scale(${zoom})` }}
             />

@@ -30,12 +30,8 @@ export function VisitTicket({
   doctorPhoto?: string | null;
 }) {
   const action = appointmentAction(appointment.id, appointment.status);
-  const when = appointment.start_at_local || appointment.start_at;
-  const title = doctorName || appointment.specialty || "Consultation";
-  const specialty =
-    doctorName && appointment.specialty && appointment.specialty !== doctorName
-      ? appointment.specialty
-      : null;
+  const when = appointment.startAt;
+  const title = doctorName || "Consultation";
 
   return (
     <article className="relative overflow-hidden rounded-xl bg-surface shadow-lg">
@@ -58,7 +54,6 @@ export function VisitTicket({
               <p className="truncate text-h5 text-ink">{title}</p>
               <p className="truncate text-body-sm text-muted">
                 {formatVisitDate(when)}
-                {specialty ? ` · ${specialty}` : ""}
               </p>
             </div>
           </div>

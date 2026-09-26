@@ -3,9 +3,9 @@ import { Alert } from "@/components/consumer/ui/Alert";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { WorkingHour } from "@/lib/consumer/api/types";
+import type { Holiday, Schedule } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
-import type { ScheduleSettings } from "@/lib/consumer/features/practice";
+import { colomboDayKey } from "@/lib/consumer/features/calendar";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
@@ -20,24 +20,19 @@ export default async function AvailabilityPage() {
     );
   }
 
-  let hours: WorkingHour[] = [];
-  let settings: ScheduleSettings | null = null;
+  let schedule: Schedule | null = null;
+  let holidays: Holiday[] = [];
   let error: string | null = null;
   try {
-    const data = await apiFetch<WorkingHour[]>("/api/v1/doctors/me/availability", { token });
-    hours = Array.isArray(data) ? data : [];
+    [schedule, holidays] = await Promise.all([
+      apiFetch<Schedule>("/api/v1/doctors/me/schedule", { token }),
+      apiFetch<Holiday[]>(`/api/v1/doctors/me/holidays?from=${colomboDayKey(new Date())}`, { token }),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load availability";
   }
-  try {
-    settings = await apiFetch<ScheduleSettings>("/api/v1/doctors/me/schedule-settings", {
-      token,
-    });
-  } catch {
-    settings = null;
-  }
 
-  if (error) {
+  if (error || !schedule) {
     return (
       <div className="flex flex-col gap-6">
         <PageHero {...HEROES.availability} />
@@ -48,5 +43,5 @@ export default async function AvailabilityPage() {
     );
   }
 
-  return <AvailabilityEditor initialHours={hours} initialSettings={settings} />;
+  return <AvailabilityEditor initialSchedule={schedule} initialHolidays={holidays} />;
 }

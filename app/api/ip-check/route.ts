@@ -11,7 +11,7 @@ import { ipAllowlistRejects } from "@/lib/admin/api/gateway";
  * reconnects, rather than reloading and guessing.
  *
  * It leaks nothing an unauthenticated caller could not already learn by
- * calling the gateway themselves and reading the status code.
+ * calling the API themselves and reading the problem code.
  */
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<NextResponse> {
   const blocked = await ipAllowlistRejects(request);
   return NextResponse.json(
-    { data: { allowed: !blocked } },
+    { allowed: !blocked },
     { status: 200, headers: { "Cache-Control": "no-store" } },
   );
 }

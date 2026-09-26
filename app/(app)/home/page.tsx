@@ -21,7 +21,7 @@ import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { EmptyVisitTicket, VisitTicket } from "@/components/consumer/ui/VisitTicket";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Appointment, Doctor, TelemedUser } from "@/lib/consumer/api/types";
+import type { Appointment, Doctor, Paged, Specialty, TelemedUser } from "@/lib/consumer/api/types";
 import { assets } from "@/lib/consumer/assets";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { HEROES } from "@/lib/consumer/heroes";
@@ -36,6 +36,7 @@ import {
   pickNextAppointment,
   uniqueDoctorIds,
 } from "@/lib/consumer/features/patient-appointment";
+import { buildDoctorsApiQuery } from "@/lib/consumer/features/doctor-search";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 
 const SPECIALTY_TILES = [
@@ -79,8 +80,8 @@ function SectionHead({
 
 async function loadDoctors() {
   try {
-    const doctors = await apiFetch<Doctor[]>("/api/v1/doctors?per_page=6&sort=rating");
-    return { doctors: Array.isArray(doctors) ? doctors : [], error: null as string | null };
+    const page = await apiFetch<Paged<Doctor>>(`/api/v1/doctors?${buildDoctorsApiQuery({}, 6)}`);
+    return { doctors: page.items, error: null as string | null };
   } catch (e) {
     return {
       doctors: [] as Doctor[],
@@ -92,8 +93,8 @@ async function loadDoctors() {
 async function loadAppointments(token: string | undefined) {
   if (!token) return { appointments: [] as Appointment[], error: null as string | null };
   try {
-    const data = await apiFetch<Appointment[]>("/api/v1/appointments?per_page=5", { token });
-    return { appointments: Array.isArray(data) ? data : [], error: null as string | null };
+    const page = await apiFetch<Paged<Appointment>>("/api/v1/appointments?pageSize=20", { token });
+    return { appointments: page.items, error: null as string | null };
   } catch (e) {
     return {
       appointments: [] as Appointment[],
@@ -105,7 +106,7 @@ async function loadAppointments(token: string | undefined) {
 async function loadMe(token: string | undefined) {
   if (!token) return null;
   try {
-    return await apiFetch<TelemedUser>("/api/v1/users/me", { token });
+    return await apiFetch<TelemedUser>("/api/v1/me", { token });
   } catch {
     return null;
   }
@@ -128,7 +129,7 @@ async function loadVisitDoctors(appointments: Appointment[]) {
   for (const entry of entries) {
     if (!entry) continue;
     byId[entry[0]] = entry[1];
-    const display = entry[1].display_name?.trim();
+    const display = entry[1].displayName?.trim();
     if (display) names[entry[0]] = display;
   }
   return { byId, names };
@@ -136,15 +137,20 @@ async function loadVisitDoctors(appointments: Appointment[]) {
 
 export default async function HomePage() {
   const token = await getAccessToken();
-  const [{ doctors, error: doctorsError }, { appointments, error: appointmentsError }, me] =
-    await Promise.all([loadDoctors(), loadAppointments(token), loadMe(token)]);
+  const [{ doctors, error: doctorsError }, { appointments, error: appointmentsError }, me, specialties] =
+    await Promise.all([
+      loadDoctors(),
+      loadAppointments(token),
+      loadMe(token),
+      apiFetch<Specialty[]>("/api/v1/specialties").catch(() => [] as Specialty[]),
+    ]);
 
   const next = pickNextAppointment(appointments);
   const { byId: visitDoctors, names: doctorNames } = await loadVisitDoctors(appointments);
   const nextDoctor =
-    (next?.doctor_id ? visitDoctors[next.doctor_id] : undefined) ||
-    (next?.doctor_id ? doctors.find((d) => d.id === next.doctor_id) : undefined);
-  const name = firstName(me?.name);
+    (next ? visitDoctors[next.doctorId] : undefined) ||
+    (next ? doctors.find((d) => d.id === next.doctorId) : undefined);
+  const name = firstName(me?.fullName);
   const hello = greetingForHour(colomboHour());
   const later = appointments.filter((a) => a.id !== next?.id).slice(0, 4);
 
@@ -175,7 +181,7 @@ export default async function HomePage() {
                 <VisitTicket
                   appointment={next}
                   doctorName={appointmentDoctorName(next, doctorNames)}
-                  doctorPhoto={profilePhotoSrc(nextDoctor?.photo_url)}
+                  doctorPhoto={profilePhotoSrc(nextDoctor?.photoUrl)}
                 />
               ) : (
                 <EmptyVisitTicket />
@@ -236,7 +242,7 @@ export default async function HomePage() {
         ) : (
           <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {doctors.map((d) => (
-              <DoctorCard key={d.id} doctor={d} />
+              <DoctorCard key={d.id} doctor={d} specialties={specialties} />
             ))}
           </div>
         )}
@@ -270,7 +276,7 @@ export default async function HomePage() {
           <ul className="stagger grid gap-3">
             {later.map((a) => {
               const action = appointmentAction(a.id, a.status);
-              const when = a.start_at_local || a.start_at;
+              const when = a.startAt;
               const inner = (
                 <>
                   <span

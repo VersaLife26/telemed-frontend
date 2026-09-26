@@ -10,49 +10,61 @@ import { Input } from "@/components/consumer/ui/Input";
 import { Select } from "@/components/consumer/ui/Select";
 import { Switch } from "@/components/consumer/ui/Switch";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { WorkingHour } from "@/lib/consumer/api/types";
+import { ApiError } from "@/lib/consumer/api/errors";
+import type { Holiday, Schedule, ScheduleUpdated } from "@/lib/consumer/api/types";
 import { weekdayLabel } from "@/lib/consumer/features/availability";
 import {
   DEFAULT_SLOT_MINUTES,
-  availabilityPutBody,
   flattenWorkingHours,
   groupWorkingHours,
-  type ScheduleSettings,
+  schedulePutBody,
   type TimeWindow,
 } from "@/lib/consumer/features/practice";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
-export function AvailabilityEditor({
-  initialHours,
-  initialSettings,
-}: {
-  initialHours: WorkingHour[];
-  initialSettings: ScheduleSettings | null;
-}) {
-  const grouped = useMemo(() => groupWorkingHours(initialHours), [initialHours]);
+const SLOT_OPTIONS = [15, 20, 30];
+const BUFFER_OPTIONS = [0, 5, 10, 15];
 
+function withCurrent(options: number[], current: number): number[] {
+  return options.includes(current) ? options : [...options, current].sort((a, b) => a - b);
+}
+
+export function AvailabilityEditor({
+  initialSchedule,
+  initialHolidays,
+}: {
+  initialSchedule: Schedule;
+  initialHolidays: Holiday[];
+}) {
+  const grouped = useMemo(
+    () => groupWorkingHours(initialSchedule.workingHours ?? []),
+    [initialSchedule],
+  );
+
+  const [schedule, setSchedule] = useState<Schedule>(initialSchedule);
   const [windows, setWindows] = useState<Record<number, TimeWindow[]>>(grouped.windows);
   const [available, setAvailable] = useState<Record<number, boolean>>(grouped.available);
-  const [slot, setSlot] = useState(
-    initialSettings?.slot_duration_minutes || DEFAULT_SLOT_MINUTES,
-  );
-  const [buffer, setBuffer] = useState<string>(
-    initialSettings?.buffer_minutes == null ? "" : String(initialSettings.buffer_minutes),
-  );
-  const [maxPerDay, setMaxPerDay] = useState(initialSettings?.max_per_day ?? 0);
-  const [holidayDate, setHolidayDate] = useState("");
-  const [holidayReason, setHolidayReason] = useState("");
-  const [holidays, setHolidays] = useState<Array<{ date: string; reason: string }>>([]);
+  const [slot, setSlot] = useState(initialSchedule.slotDurationMinutes || DEFAULT_SLOT_MINUTES);
+  const [buffer, setBuffer] = useState(initialSchedule.bufferMinutes ?? 0);
+  const [maxPerDay, setMaxPerDay] = useState(initialSchedule.maxPerDay ?? 1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [outsideHours, setOutsideHours] = useState(0);
+
+  const [holidays, setHolidays] = useState<Holiday[]>(initialHolidays);
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayReason, setHolidayReason] = useState("");
+  const [holidayBusy, setHolidayBusy] = useState(false);
+  const [holidayError, setHolidayError] = useState<string | null>(null);
+  const [affected, setAffected] = useState<number | null>(null);
 
   function toggleDay(day: number, isAvailable: boolean) {
     setAvailable((prev) => ({ ...prev, [day]: isAvailable }));
   }
 
-  function updateWindow(day: number, index: number, field: "start_time" | "end_time", value: string) {
+  function updateWindow(day: number, index: number, field: "start" | "end", value: string) {
     setWindows((prev) => ({
       ...prev,
       [day]: (prev[day] ?? []).map((w, i) => (i === index ? { ...w, [field]: value } : w)),
@@ -67,7 +79,7 @@ export function AvailabilityEditor({
       let nextEnd = "21:00";
 
       if (lastWin) {
-        const [lastH] = lastWin.end_time.split(":").map(Number);
+        const [lastH] = lastWin.end.split(":").map(Number);
         if (lastH != null && !Number.isNaN(lastH)) {
           const startH = Math.min(22, Math.max(lastH + 1, 14));
           const endH = Math.min(23, startH + 3);
@@ -78,7 +90,7 @@ export function AvailabilityEditor({
 
       return {
         ...prev,
-        [day]: [...dayWins, { start_time: nextStart, end_time: nextEnd }],
+        [day]: [...dayWins, { start: nextStart, end: nextEnd }],
       };
     });
   }
@@ -102,23 +114,20 @@ export function AvailabilityEditor({
         return `Please add at least one shift for ${weekdayLabel(day)}, or mark it unavailable.`;
       }
       for (const w of dayWins) {
-        if (!w.start_time || !w.end_time) {
+        if (!w.start || !w.end) {
           return `Please specify both start and end time for all shifts on ${weekdayLabel(day)}.`;
         }
-        if (w.start_time >= w.end_time) {
-          return `${weekdayLabel(day)}: End time (${w.end_time}) must be after start time (${w.start_time}).`;
+        if (w.start >= w.end) {
+          return `${weekdayLabel(day)}: End time (${w.end}) must be after start time (${w.start}).`;
         }
       }
-      const sorted = [...dayWins].sort((a, b) => a.start_time.localeCompare(b.start_time));
+      const sorted = [...dayWins].sort((a, b) => a.start.localeCompare(b.start));
       for (let i = 0; i < sorted.length - 1; i++) {
         const current = sorted[i];
         const next = sorted[i + 1];
         if (!current || !next) continue;
-        if (next.start_time < current.end_time) {
-          return `${weekdayLabel(day)} has overlapping shifts: ${current.start_time}–${current.end_time} and ${next.start_time}–${next.end_time}.`;
-        }
-        if (next.start_time === current.start_time) {
-          return `${weekdayLabel(day)} has shifts with duplicate start times (${current.start_time}).`;
+        if (next.start < current.end) {
+          return `${weekdayLabel(day)} has overlapping shifts: ${current.start}–${current.end} and ${next.start}–${next.end}.`;
         }
       }
     }
@@ -128,6 +137,7 @@ export function AvailabilityEditor({
   async function save() {
     setError(null);
     setNotice(null);
+    setOutsideHours(0);
 
     const validationError = validateSchedule();
     if (validationError) {
@@ -137,23 +147,57 @@ export function AvailabilityEditor({
 
     setSaving(true);
     try {
-      const flattenedHours = flattenWorkingHours(windows, available);
-      await browserApi("/doctors/me/availability", {
+      const updated = await browserApi<ScheduleUpdated>("/doctors/me/schedule", {
         method: "PUT",
-        body: availabilityPutBody({
-          hours: flattenedHours,
+        body: schedulePutBody(schedule, {
+          hours: flattenWorkingHours(windows, available),
           slotMinutes: slot,
-          buffer,
+          bufferMinutes: buffer,
           maxPerDay,
-          holidays,
         }),
       });
-      setNotice("Schedule saved. New slots generate from these hours.");
-      setHolidays([]);
+      setSchedule(updated);
+      setOutsideHours(updated.appointmentsOutsideNewHours ?? 0);
+      setNotice("Schedule saved. Patients see the new slots straight away.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save availability");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function addHoliday(cancelBooked: boolean) {
+    if (!holidayDate) return;
+    setHolidayBusy(true);
+    setHolidayError(null);
+    try {
+      const created = await browserApi<Holiday>("/doctors/me/holidays", {
+        method: "POST",
+        body: { date: holidayDate, reason: holidayReason.trim() || "Leave", cancelBooked },
+      });
+      setHolidays((prev) => [...prev, created].sort((a, b) => a.date.localeCompare(b.date)));
+      setHolidayDate("");
+      setHolidayReason("");
+      setAffected(null);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "appointments_affected") {
+        const count = err.body.affectedAppointments;
+        setAffected(typeof count === "number" ? count : 1);
+      } else {
+        setHolidayError(err instanceof Error ? err.message : "Could not add leave day");
+      }
+    } finally {
+      setHolidayBusy(false);
+    }
+  }
+
+  async function removeHoliday(id: string) {
+    setHolidayError(null);
+    try {
+      await browserApi(`/doctors/me/holidays/${id}`, { method: "DELETE" });
+      setHolidays((prev) => prev.filter((h) => h.id !== id));
+    } catch (err) {
+      setHolidayError(err instanceof Error ? err.message : "Could not remove leave day");
     }
   }
 
@@ -168,31 +212,32 @@ export function AvailabilityEditor({
           value={slot}
           onChange={(e) => setSlot(Number(e.target.value))}
         >
-          <option value={15}>15 minutes</option>
-          <option value={20}>20 minutes</option>
-          <option value={30}>30 minutes</option>
+          {withCurrent(SLOT_OPTIONS, slot).map((m) => (
+            <option key={m} value={m}>
+              {m} minutes
+            </option>
+          ))}
         </Select>
         <Select
           id="slot-buffer"
           label="Buffer between slots"
           value={buffer}
-          onChange={(e) => setBuffer(e.target.value)}
+          onChange={(e) => setBuffer(Number(e.target.value))}
         >
-          <option value="">Platform default</option>
-          <option value="0">None (back to back)</option>
-          <option value="5">5 minutes</option>
-          <option value="10">10 minutes</option>
-          <option value="15">15 minutes</option>
+          {withCurrent(BUFFER_OPTIONS, buffer).map((m) => (
+            <option key={m} value={m}>
+              {m === 0 ? "None (back to back)" : `${m} minutes`}
+            </option>
+          ))}
         </Select>
         <Input
           id="daily-cap"
           label="Daily appointment cap"
-          hint="0 means no cap."
           type="number"
-          min={0}
-          max={100}
+          min={1}
+          max={200}
           value={maxPerDay}
-          onChange={(e) => setMaxPerDay(Number(e.target.value) || 0)}
+          onChange={(e) => setMaxPerDay(Math.max(1, Number(e.target.value) || 1))}
         />
       </Card>
 
@@ -222,15 +267,15 @@ export function AvailabilityEditor({
                     <div className="flex flex-1 items-center gap-2">
                       <Input
                         type="time"
-                        value={win.start_time}
-                        onChange={(e) => updateWindow(day, winIndex, "start_time", e.target.value)}
+                        value={win.start}
+                        onChange={(e) => updateWindow(day, winIndex, "start", e.target.value)}
                         className="flex-1"
                       />
                       <span className="shrink-0 text-body-sm text-muted">to</span>
                       <Input
                         type="time"
-                        value={win.end_time}
-                        onChange={(e) => updateWindow(day, winIndex, "end_time", e.target.value)}
+                        value={win.end}
+                        onChange={(e) => updateWindow(day, winIndex, "end", e.target.value)}
                         className="flex-1"
                       />
                     </div>
@@ -264,11 +309,24 @@ export function AvailabilityEditor({
         );
       })}
 
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
+      {outsideHours > 0 ? (
+        <Alert tone="warning">
+          {outsideHours} booked {outsideHours === 1 ? "appointment falls" : "appointments fall"} outside
+          your new hours. They are still booked; reschedule or cancel them from the queue if needed.
+        </Alert>
+      ) : null}
+
+      <Button size="lg" className="self-start" busy={saving} onClick={() => void save()}>
+        Save schedule
+      </Button>
+
       <Card className="flex flex-col gap-4">
         <h2 className="text-h4 text-ink">Leave days</h2>
         <p className="max-w-prose text-body-sm text-muted">
-          Adds blackout dates. If patients are already booked, save is refused unless you
-          cancel those bookings separately.
+          No slots are offered on a leave day. If patients are already booked, you are asked
+          before their appointments are cancelled and refunded.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Input
@@ -277,12 +335,16 @@ export function AvailabilityEditor({
             type="date"
             fieldClassName="sm:flex-1"
             value={holidayDate}
-            onChange={(e) => setHolidayDate(e.target.value)}
+            onChange={(e) => {
+              setHolidayDate(e.target.value);
+              setAffected(null);
+            }}
           />
           <Input
             id="leave-reason"
             label="Reason"
-            placeholder="Optional"
+            placeholder="Leave"
+            maxLength={500}
             fieldClassName="sm:flex-1"
             value={holidayReason}
             onChange={(e) => setHolidayReason(e.target.value)}
@@ -290,40 +352,52 @@ export function AvailabilityEditor({
           <Button
             type="button"
             variant="outline"
-            onClick={() => {
-              if (!holidayDate) return;
-              setHolidays((prev) =>
-                prev.some((h) => h.date === holidayDate)
-                  ? prev
-                  : [...prev, { date: holidayDate, reason: holidayReason.trim() }],
-              );
-              setHolidayDate("");
-              setHolidayReason("");
-            }}
+            busy={holidayBusy && affected === null}
+            disabled={!holidayDate || holidayBusy || affected !== null}
+            onClick={() => void addHoliday(false)}
           >
             Add date
           </Button>
         </div>
+        {affected !== null ? (
+          <Alert tone="warning" title={`${affected} booked ${affected === 1 ? "appointment" : "appointments"} on ${holidayDate}`}>
+            <p>Adding this leave day cancels them and refunds the patients in full.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" busy={holidayBusy} onClick={() => void addHoliday(true)}>
+                Cancel bookings and add leave
+              </Button>
+              <Button size="sm" variant="ghost" disabled={holidayBusy} onClick={() => setAffected(null)}>
+                Keep bookings
+              </Button>
+            </div>
+          </Alert>
+        ) : null}
+        {holidayError ? <Alert tone="danger">{holidayError}</Alert> : null}
         {holidays.length ? (
           <ul className="flex flex-wrap gap-2">
             {holidays.map((h) => (
-              <li key={h.date}>
+              <li key={h.id} className="inline-flex items-center gap-1">
                 <Badge tone="warning">
                   {h.date}
                   {h.reason ? ` · ${h.reason}` : ""}
+                  {h.doctorId ? "" : " · platform"}
                 </Badge>
+                {h.doctorId ? (
+                  <button
+                    type="button"
+                    onClick={() => void removeHoliday(h.id)}
+                    className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-[160ms] ease-out active:scale-[0.94] can-hover:hover:bg-danger-tint can-hover:hover:text-danger"
+                    title="Remove leave day"
+                    aria-label={`Remove leave on ${h.date}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
         ) : null}
       </Card>
-
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-      {notice ? <Alert tone="success">{notice}</Alert> : null}
-
-      <Button size="lg" className="self-start" busy={saving} onClick={() => void save()}>
-        Save schedule
-      </Button>
     </div>
   );
 }

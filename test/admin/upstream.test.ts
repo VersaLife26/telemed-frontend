@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   adminUpstreamPath,
   clientAddress,
+  fileUpstreamPath,
   forwardingHeaders,
   safeContentType,
   sameOriginRequest,
@@ -17,11 +18,11 @@ import { safeNextPath } from "@/lib/admin/auth/redirect";
 
 test("adminUpstreamPath accepts the real admin surface", () => {
   const accepted = [
-    ["api", "v1", "admin", "doctors", "pending"],
-    ["api", "v1", "admin", "finance", "commission-rules"],
-    ["api", "v1", "admin", "doctors", "3f8d1c2e-0a4b-4c5d-8e9f-0a1b2c3d4e5f", "verify"],
-    ["api", "v1", "admin", "finance", "reports", "payments.csv"],
-    ["api", "v1", "admin", "config", "commission_rules"],
+    ["api", "v1", "admin", "doctor-applications"],
+    ["api", "v1", "admin", "finance", "commission"],
+    ["api", "v1", "admin", "doctor-applications", "3f8d1c2e-0a4b-4c5d-8e9f-0a1b2c3d4e5f", "approve"],
+    ["api", "v1", "admin", "finance", "ledger.csv"],
+    ["api", "v1", "admin", "audit.csv"],
     ["api", "v1", "admin", "me"],
   ];
   for (const segments of accepted) {
@@ -68,35 +69,39 @@ test("adminUpstreamPath refuses everything that is not the admin surface", () =>
 // RBAC on the API surface
 // ---------------------------------------------------------------------------
 
-test("canCallApi mirrors the Go rbac.Matrix, group for group", () => {
+test("canCallApi mirrors the API's PermissionMatrix, permission for permission", () => {
   const cases: Array<[string[], string, boolean]> = [
-    // finance: {finance, super_admin}
-    [["support"], "/api/v1/admin/finance/commission-rules", false],
-    [["ops"], "/api/v1/admin/finance/commission-rules", false],
+    // finance: {finance, superAdmin}
+    [["support"], "/api/v1/admin/finance/commission", false],
+    [["ops"], "/api/v1/admin/finance/refunds/r-1/approve", false],
     [["admin"], "/api/v1/admin/finance/payout-batches", false],
-    [["finance"], "/api/v1/admin/finance/commission-rules", true],
-    [["super_admin"], "/api/v1/admin/finance/payout-batches", true],
-    // admin_users: {super_admin}
+    [["admin"], "/api/v1/admin/payments/p-1/refunds", false],
+    [["finance"], "/api/v1/admin/finance/commission", true],
+    [["finance"], "/api/v1/admin/payments/p-1/refunds", true],
+    [["superAdmin"], "/api/v1/admin/finance/payout-batches", true],
+    // adminUsers: {superAdmin}
     [["admin"], "/api/v1/admin/admin-users", false],
     [["finance"], "/api/v1/admin/admin-users", false],
-    [["super_admin"], "/api/v1/admin/admin-users", true],
-    // config: {super_admin, ops, finance}
-    [["support"], "/api/v1/admin/config/fee_caps", false],
-    [["ops"], "/api/v1/admin/config/fee_caps", true],
-    // audit vs audit_export
+    [["superAdmin"], "/api/v1/admin/admin-users", true],
+    // audit vs auditExport
     [["support"], "/api/v1/admin/audit", true],
-    [["support"], "/api/v1/admin/audit/export", false],
-    [["admin"], "/api/v1/admin/audit/export", false],
-    [["finance"], "/api/v1/admin/audit/export", true],
+    [["support"], "/api/v1/admin/audit.csv", false],
+    [["admin"], "/api/v1/admin/audit.csv", false],
+    [["finance"], "/api/v1/admin/audit.csv", true],
     // open to all five
-    [["support"], "/api/v1/admin/doctors/pending", true],
-    [["support"], "/api/v1/admin/notifications/unread-count", true],
-    [["support"], "/api/v1/admin/disputes", true],
-    [["support"], "/api/v1/admin/reschedule-requests", true],
-    [["support"], "/api/v1/admin/reschedule-requests/req-1/accept", true],
+    [["support"], "/api/v1/admin/doctor-applications", true],
+    [["support"], "/api/v1/admin/doctors/d-1/schedule", true],
+    [["support"], "/api/v1/admin/slot-blocks/b-1", true],
     [["support"], "/api/v1/admin/holidays", true],
-    [["support"], "/api/v1/admin/slots/slot-1/block", true],
+    [["support"], "/api/v1/admin/specialties/cardiology", true],
+    [["support"], "/api/v1/admin/drugs", true],
+    [["support"], "/api/v1/admin/disputes", true],
+    [["support"], "/api/v1/admin/reschedule-requests/req-1/accept", true],
+    [["support"], "/api/v1/admin/analytics/top-doctors", true],
+    // any admin, no permission
     [["support"], "/api/v1/admin/me", true],
+    [["support"], "/api/v1/admin/permissions", true],
+    [["support"], "/api/v1/admin/notifications/unread-count", true],
   ];
   for (const [roles, path, want] of cases) {
     assert.equal(
@@ -108,47 +113,37 @@ test("canCallApi mirrors the Go rbac.Matrix, group for group", () => {
 });
 
 test("canCallApi fails closed on a path the matrix does not name", () => {
-  assert.equal(canCallApi(["super_admin"], "/api/v1/admin/impersonate/1"), false);
-  assert.equal(canCallApi(["super_admin"], "/api/v1/admin/anything-new"), false);
-  assert.equal(canCallApi(["super_admin"], "/api/v1/admin/records/x"), false);
+  assert.equal(canCallApi(["superAdmin"], "/api/v1/admin/impersonate/1"), false);
+  assert.equal(canCallApi(["superAdmin"], "/api/v1/admin/anything-new"), false);
+  assert.equal(canCallApi(["superAdmin"], "/api/v1/admin/configs/feature_flags"), false);
   assert.equal(canCallApi([], "/api/v1/admin/me"), false);
+  assert.equal(canCallApi([], "/api/v1/admin/notifications"), false);
   assert.equal(groupForApiPath("/api/v1/admin/not-a-real-group"), null);
 });
 
-test("the F18 escape hatch is closed at this console: ops cannot reach commission rules by any spelling", () => {
-  // admin-service's GroupConfig includes `ops`, and commission_rules is stored
-  // as a sysconfig key, so an ops admin refused on /finance/commission-rules
-  // gets the same row through the config endpoint. Longest prefix wins, so the
-  // commission key is bound to the finance group here whichever route the
-  // console ends up calling.
-  for (const path of [
-    "/api/v1/admin/configs/commission_rules",
-    "/api/v1/admin/config/commission_rules",
-    "/api/v1/admin/finance/commission-rules",
-  ]) {
-    assert.equal(canCallApi(["ops"], path), false, `ops must not reach ${path}`);
-    assert.equal(canCallApi(["support"], path), false, `support must not reach ${path}`);
-    assert.equal(canCallApi(["finance"], path), true, `finance must reach ${path}`);
-    assert.equal(canCallApi(["super_admin"], path), true, `super_admin must reach ${path}`);
-  }
-  // Every other config key is still ops-editable, as the backend matrix says.
-  assert.equal(canCallApi(["ops"], "/api/v1/admin/configs/feature_flags"), true);
-  assert.equal(canCallApi(["ops"], "/api/v1/admin/config/fee_caps"), true);
-  assert.equal(canCallApi(["support"], "/api/v1/admin/configs/feature_flags"), false);
-});
-
-test("both spellings of the drifted routes carry the same role check", () => {
-  assert.equal(groupForApiPath("/api/v1/admin/admin-users"), "admin_users");
-  assert.equal(groupForApiPath("/api/v1/admin/admins/abc"), "admin_users");
-  assert.equal(groupForApiPath("/api/v1/admin/config/fee_caps"), "config");
-  assert.equal(groupForApiPath("/api/v1/admin/configs/fee_caps"), "config");
-  assert.equal(canCallApi(["finance"], "/api/v1/admin/admins"), false);
+test("a prefix is a path boundary, not a string prefix", () => {
+  assert.equal(groupForApiPath("/api/v1/admin/audit.csv"), "auditExport");
+  assert.equal(groupForApiPath("/api/v1/admin/audit"), "audit");
+  assert.equal(groupForApiPath("/api/v1/admin/doctor-applications/x"), "credentialing");
+  assert.equal(groupForApiPath("/api/v1/admin/doctors/x"), "doctors");
+  assert.equal(groupForApiPath("/api/v1/admin/admin-users/x"), "adminUsers");
+  assert.equal(groupForApiPath("/api/v1/admin/users/x"), "users");
+  assert.equal(canCallApi(["support"], "/api/v1/admin/mess"), false);
 });
 
 test("the query string cannot smuggle a caller past the group check", () => {
   assert.equal(canCallApi(["support"], "/api/v1/admin/finance/ledger?x=/audit"), false);
-  assert.equal(canCallApi(["support"], "/api/v1/admin/audit/export?from=2020-01-01"), false);
-  assert.equal(canCallApi(["finance"], "/api/v1/admin/audit/export?from=2020-01-01"), true);
+  assert.equal(canCallApi(["support"], "/api/v1/admin/audit.csv?from=2020-01-01"), false);
+  assert.equal(canCallApi(["finance"], "/api/v1/admin/audit.csv?from=2020-01-01"), true);
+});
+
+test("fileUpstreamPath accepts only a single signed-token segment under /api/v1/files", () => {
+  assert.equal(fileUpstreamPath(["api", "v1", "files", "eyJhIjoxfQ.c2ln"]), "api/v1/files/eyJhIjoxfQ.c2ln");
+  assert.equal(fileUpstreamPath(["api", "v1", "files"]), null);
+  assert.equal(fileUpstreamPath(["api", "v1", "files", "a", "b"]), null);
+  assert.equal(fileUpstreamPath(["api", "v1", "files", ".."]), null);
+  assert.equal(fileUpstreamPath(["api", "v1", "files", "a/../../admin"]), null);
+  assert.equal(fileUpstreamPath(["api", "v1", "records", "abc"]), null);
 });
 
 test("canVisit still passes unguarded PAGE paths — and that is why the BFF needs its own check", () => {
@@ -156,8 +151,8 @@ test("canVisit still passes unguarded PAGE paths — and that is why the BFF nee
   // suite rather than a comment. `proxy.ts` uses canVisit; it returns true for
   // every /api/gateway path, which is precisely the fail-open the route
   // handler's own canCallApi call closes.
-  assert.equal(canVisit(["support"], "/api/gateway/api/v1/admin/finance/commission-rules"), true);
-  assert.equal(canCallApi(["support"], "/api/v1/admin/finance/commission-rules"), false);
+  assert.equal(canVisit(["support"], "/api/gateway/api/v1/admin/finance/commission"), true);
+  assert.equal(canCallApi(["support"], "/api/v1/admin/finance/commission"), false);
 });
 
 // ---------------------------------------------------------------------------
@@ -253,6 +248,7 @@ test("safeContentType relabels anything a browser would render as a document", (
     contentType: "text/csv; charset=utf-8",
     attachment: false,
   });
+  assert.deepEqual(safeContentType("image/png"), { contentType: "image/png", attachment: false });
   for (const hostile of [
     "text/html",
     "text/html; charset=utf-8",

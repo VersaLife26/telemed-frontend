@@ -1,14 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { VaultFolder } from "@/lib/consumer/api/types";
 import {
+  childFolders,
+  documentDownloadPath,
+  documentsListPath,
   folderCrumbs,
-  isCapturedRecordId,
+  foldersListPath,
   previewKind,
-  recordsListPath,
-  recordContentPath,
-  recordDownloadPath,
+  proxiedFileUrl,
 } from "@/lib/consumer/features/vault";
+
+function folder(id: string, name: string, parentId: string | null): VaultFolder {
+  return { id, ownerId: "u", parentId, name, createdAt: "", updatedAt: "" };
+}
+
+const folders = [folder("a", "Labs", null), folder("b", "2026", "a"), folder("c", "Scans", null)];
 
 test("previewKind maps content types", () => {
   assert.equal(previewKind("application/pdf"), "pdf");
@@ -19,30 +27,32 @@ test("previewKind maps content types", () => {
   assert.equal(previewKind(), "other");
 });
 
-test("folderCrumbs always starts at the vault root", () => {
-  assert.deepEqual(folderCrumbs([]), [{ id: null, name: "Vault" }]);
-  assert.deepEqual(
-    folderCrumbs([
-      { id: "a", owner_user_id: "u", name: "Labs" },
-      { id: "b", owner_user_id: "u", name: "2026" },
-    ]),
-    [
-      { id: null, name: "Vault" },
-      { id: "a", name: "Labs" },
-      { id: "b", name: "2026" },
-    ],
+test("folderCrumbs walks parentId up to the vault root", () => {
+  assert.deepEqual(folderCrumbs(folders, null), [{ id: null, name: "Vault" }]);
+  assert.deepEqual(folderCrumbs(folders, "b"), [
+    { id: null, name: "Vault" },
+    { id: "a", name: "Labs" },
+    { id: "b", name: "2026" },
+  ]);
+  assert.deepEqual(folderCrumbs(folders, "missing"), [{ id: null, name: "Vault" }]);
+});
+
+test("childFolders picks one level of the flat list", () => {
+  assert.deepEqual(childFolders(folders, null).map((f) => f.id), ["a", "c"]);
+  assert.deepEqual(childFolders(folders, "a").map((f) => f.id), ["b"]);
+});
+
+test("documentsListPath scopes a folder (root by default), a type and a patient", () => {
+  assert.equal(documentsListPath(), "/vault/documents?folderId=root&pageSize=100");
+  assert.equal(
+    documentsListPath("scan", "f1", "user-1"),
+    "/vault/documents?folderId=f1&pageSize=100&documentType=scan&patientId=user-1",
   );
+  assert.equal(foldersListPath(), "/vault/folders");
+  assert.equal(foldersListPath("user-1"), "/vault/folders?patientId=user-1");
+  assert.equal(documentDownloadPath("doc-1"), "/vault/documents/doc-1/download");
 });
 
-test("recordsListPath scopes a folder and an owner", () => {
-  assert.equal(recordsListPath(), "/records");
-  assert.equal(recordsListPath("scan", null, "user-1"), "/records?document_type=scan&folder_id=root&owner_user_id=user-1");
-  assert.equal(recordDownloadPath("doc-1", true), "/records/doc-1/download?disposition=attachment");
-  assert.equal(recordDownloadPath("doc-1"), "/records/doc-1/download");
-  assert.equal(recordContentPath("doc-1"), "/records/doc-1/content");
-});
-
-test("isCapturedRecordId is the old /records/{id} collision", () => {
-  assert.equal(isCapturedRecordId(new Error("id must be a valid UUID")), true);
-  assert.equal(isCapturedRecordId(new Error("folder_id must be a valid UUID")), false);
+test("proxiedFileUrl sends signed file links through the BFF", () => {
+  assert.equal(proxiedFileUrl("/api/v1/files/abc.def"), "/api/proxy/files/abc.def");
 });

@@ -15,24 +15,21 @@ import { Label } from "@/components/admin/ui/label";
 import { Textarea } from "@/components/admin/ui/textarea";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import type { AdminUserRecord } from "@/lib/admin/api/types";
+import type { PlatformUser } from "@/lib/admin/api/types";
 
 const MINIMUM_REASON = 15;
 
 /**
  * Suspend or reinstate.
  *
- * Both directions require a reason. Reinstating without one is how a suspension
- * gets quietly undone and nobody can later say why — and this console publishes
- * `admin.user_suspend_requested` / `admin.user_reinstate_requested` to
- * user-service, so the reason travels with the command rather than being an
- * afterthought in a ticket.
+ * Suspending requires a reason, which the API records in the audit log.
+ * Reinstating takes no body.
  */
 export function SuspensionDialog({
   user,
   onClose,
 }: {
-  user: AdminUserRecord | null;
+  user: PlatformUser | null;
   onClose: () => void;
 }) {
   const [reason, setReason] = React.useState("");
@@ -41,10 +38,10 @@ export function SuspensionDialog({
   React.useEffect(() => {
     setReason("");
     setTouched(false);
-  }, [user?.user_id]);
+  }, [user?.id]);
 
   const suspending = user?.status !== "suspended";
-  const tooShort = reason.trim().length < MINIMUM_REASON;
+  const tooShort = suspending && reason.trim().length < MINIMUM_REASON;
 
   const mutation = useApiMutation<unknown, { userId: string; suspend: boolean }>({
     method: "POST",
@@ -52,11 +49,9 @@ export function SuspensionDialog({
       variables.suspend
         ? endpoints.users.suspend(variables.userId)
         : endpoints.users.reinstate(variables.userId),
-    body: () => ({ reason: reason.trim() }),
+    body: (variables) => (variables.suspend ? { reason: reason.trim() } : undefined),
     successMessage: (_result, variables) =>
-      variables.suspend
-        ? "Suspension requested. user-service applies it and publishes user.suspended."
-        : "Reinstatement requested. user-service applies it and publishes user.reinstated.",
+      variables.suspend ? "Account suspended." : "Account reinstated.",
     onSuccess: onClose,
   });
 
@@ -70,15 +65,18 @@ export function SuspensionDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {suspending ? "Suspend" : "Reinstate"} {user?.full_name ?? "this user"}
+            {suspending ? "Suspend" : "Reinstate"} {user?.fullName || "this user"}
           </DialogTitle>
           <DialogDescription>
             {suspending
-              ? "A suspended account cannot sign in or book. Any confirmed appointments are left alone — cancel those separately if that is what you mean to do."
+              ? user?.role === "doctor"
+                ? "A suspended account cannot sign in. Suspending a doctor's account also suspends their doctor profile."
+                : "A suspended account cannot sign in or book. Their upcoming bookings are cancelled with a full refund."
               : "The account will be able to sign in and book again immediately."}
           </DialogDescription>
         </DialogHeader>
 
+        {suspending ? (
         <div className="space-y-2">
           <Label htmlFor="suspension-reason">
             Reason <span aria-hidden="true">*</span>
@@ -92,11 +90,7 @@ export function SuspensionDialog({
             onBlur={() => setTouched(true)}
             aria-invalid={touched && tooShort}
             aria-describedby="suspension-reason-help"
-            placeholder={
-              suspending
-                ? "e.g. Repeated no-shows after three warnings; ticket SUP-4021."
-                : "e.g. Payment dispute resolved in the patient's favour; ticket SUP-4021."
-            }
+            placeholder="e.g. Repeated no-shows after three warnings; ticket SUP-4021."
           />
           <p
             id="suspension-reason-help"
@@ -106,9 +100,10 @@ export function SuspensionDialog({
           >
             {touched && tooShort
               ? `At least ${MINIMUM_REASON} characters.`
-              : "Recorded in the audit log and sent with the command to user-service."}
+              : "Recorded in the audit log."}
           </p>
         </div>
+        ) : null}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>
@@ -120,7 +115,7 @@ export function SuspensionDialog({
             onClick={() => {
               setTouched(true);
               if (tooShort || !user) return;
-              mutation.mutate({ userId: user.user_id, suspend: suspending });
+              mutation.mutate({ userId: user.id, suspend: suspending });
             }}
           >
             {mutation.isPending

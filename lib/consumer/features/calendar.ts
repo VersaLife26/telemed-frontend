@@ -1,5 +1,4 @@
 import type { Appointment, WorkingHour } from "@/lib/consumer/api/types";
-import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 
 const COLOMBO = "Asia/Colombo";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -19,9 +18,7 @@ export const WEEK_DAY_LABELS = [
  *
  * Everything below therefore converts through Intl with an explicit time zone
  * rather than the runtime's local one: the server renders this page, and the
- * server is not in Colombo. `start_at_local` is not used for positioning —
- * it is a display string, and parsing it would make the grid depend on a
- * format the API does not promise.
+ * server is not in Colombo.
  *
  * Day arithmetic runs on yyyy-mm-dd keys held at UTC noon. Colombo has no
  * daylight saving, so noon can never cross a date boundary under any offset.
@@ -138,20 +135,11 @@ export function minuteLabel(minute: number): string {
   return `${hour12}:${String(mins).padStart(2, "0")} ${suffix}`;
 }
 
-/** "09:00" or "09:00:00" from the availability API to minutes. */
-export function parseClock(value: string): number {
-  const [hh, mm] = value.split(":");
-  const hours = Number(hh);
-  const minutes = Number(mm);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
-  return hours * 60 + minutes;
-}
-
 /**
  * Statuses that no longer occupy the doctor's time. A cancelled visit is not
  * on the schedule, and drawing it would make a free afternoon look booked.
  */
-const OFF_SCHEDULE = new Set(["cancelled", "canceled", "refunded", "expired", "no_show"]);
+const OFF_SCHEDULE = new Set<string>(["cancelled", "noShow"]);
 
 export type CalendarEvent = {
   id: string;
@@ -177,9 +165,9 @@ const DEFAULT_DURATION_MIN = 30;
 export function toCalendarEvent(
   appointment: Appointment,
 ): { dayKey: string; event: CalendarEvent } | null {
-  const start = appointment.start_at;
+  const start = appointment.startAt;
   if (!start) return null;
-  if (OFF_SCHEDULE.has((appointment.status || "").toLowerCase())) return null;
+  if (OFF_SCHEDULE.has(appointment.status)) return null;
 
   const dayKey = colomboDayKey(start);
   if (!dayKey) return null;
@@ -187,8 +175,8 @@ export function toCalendarEvent(
   const startMinute = colomboMinutes(start);
   // An end that is missing, unparseable, or before the start would draw a
   // zero- or negative-height block, so fall back to a nominal slot length.
-  let endMinute = appointment.end_at ? colomboMinutes(appointment.end_at) : 0;
-  if (!appointment.end_at || endMinute <= startMinute) {
+  let endMinute = appointment.endAt ? colomboMinutes(appointment.endAt) : 0;
+  if (!appointment.endAt || endMinute <= startMinute) {
     endMinute = startMinute + DEFAULT_DURATION_MIN;
   }
 
@@ -196,11 +184,7 @@ export function toCalendarEvent(
     dayKey,
     event: {
       id: appointment.id,
-      title:
-        appointment.visit_patient_name ||
-        appointment.counterpart_name ||
-        appointment.patient_name ||
-        (appointment.specialty ? specialtyLabel(appointment.specialty) : "Consultation"),
+      title: appointment.visitPatient?.name || "Consultation",
       status: appointment.status,
       startMinute,
       endMinute: Math.min(endMinute, 1440),
@@ -283,7 +267,7 @@ const FALLBACK_END = 18 * 60;
 /**
  * The visible band of the day, on whole hours.
  *
- * Widened to cover every event and every available working hour, so nothing
+ * Widened to cover every event and every working hour, so nothing
  * is ever drawn outside the grid it is positioned against.
  */
 export function gridWindow(
@@ -294,9 +278,8 @@ export function gridWindow(
   let end = FALLBACK_END;
 
   for (const hour of workingHours) {
-    if (!hour.is_available) continue;
-    start = Math.min(start, parseClock(hour.start_time));
-    end = Math.max(end, parseClock(hour.end_time));
+    start = Math.min(start, hour.startMinute);
+    end = Math.max(end, hour.endMinute);
   }
   for (const event of events) {
     start = Math.min(start, event.startMinute);
@@ -311,15 +294,14 @@ export function gridWindow(
   return { startMinute, endMinute, hours };
 }
 
-/** The available working hours for a weekday, as minute ranges. */
+/** The working hours for a weekday, as minute ranges. */
 export function workingBands(
   workingHours: WorkingHour[],
   dayOfWeek: number,
 ): Array<{ startMinute: number; endMinute: number }> {
   return workingHours
-    .filter((h) => h.day_of_week === dayOfWeek && h.is_available)
-    .map((h) => ({ startMinute: parseClock(h.start_time), endMinute: parseClock(h.end_time) }))
-    .filter((band) => band.endMinute > band.startMinute);
+    .filter((h) => h.dayOfWeek === dayOfWeek && h.endMinute > h.startMinute)
+    .map((h) => ({ startMinute: h.startMinute, endMinute: h.endMinute }));
 }
 
 /** getUTCDay-compatible weekday index (0 = Sunday) for a yyyy-mm-dd key. */

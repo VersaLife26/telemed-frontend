@@ -5,27 +5,30 @@ import { useRouter } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert";
 import { Button } from "@/components/admin/ui/button";
-import { endpoints } from "@/lib/admin/api/endpoints";
-import { useApiQuery } from "@/lib/admin/api/hooks";
-import type { AdminNotificationUnreadCount } from "@/lib/admin/api/types";
+import { endpoints, query } from "@/lib/admin/api/endpoints";
+import { useApiList } from "@/lib/admin/api/hooks";
+import type { AdminNotification } from "@/lib/admin/api/types";
 
 /**
  * Banner on the verification queue when the admin inbox has unread
- * doctor-application notifications. Refresh re-runs the server render so new
- * rows appear without a full navigation.
+ * doctor-application notifications. The inbox carries other kinds too, so the
+ * unread page is filtered here rather than trusting the global unread count.
+ * Refresh re-runs the server render so new rows appear without a full
+ * navigation.
  */
 export function NewApplicationsAlert() {
   const router = useRouter();
-  const { data } = useApiQuery<AdminNotificationUnreadCount>(
-    ["admin-notifications", "unread-count"],
-    endpoints.notifications.unreadCount(),
+  const { data } = useApiList<AdminNotification>(
+    ["admin-notifications", "unread"],
+    endpoints.notifications.list(query({ unreadOnly: true, pageSize: 100 })),
     {
       refetchInterval: 60_000,
       refetchOnWindowFocus: true,
     },
   );
 
-  if (!data || data.count < 1) return null;
+  const count = data?.items.filter((n) => n.kind === "doctorApplicationSubmitted").length ?? 0;
+  if (count < 1) return null;
 
   return (
     <Alert variant="info" className="mb-4">
@@ -33,9 +36,9 @@ export function NewApplicationsAlert() {
       <AlertTitle>New applications waiting for review</AlertTitle>
       <AlertDescription className="flex flex-wrap items-center gap-3">
         <span>
-          {data.count === 1
+          {count === 1
             ? "There is 1 unread application notification."
-            : `There are ${data.count} unread application notifications.`}
+            : `There are ${count} unread application notifications.`}
         </span>
         <Button
           type="button"

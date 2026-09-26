@@ -11,14 +11,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { get, list, send } from "./browser";
-import type { ListEnvelope } from "./envelope";
 import { type ApiError, describeForToast, toApiError } from "./errors";
+import type { Paged } from "./types";
 
 /**
  * TanStack Query wrappers that make the two things every screen needs
  * automatic rather than remembered:
  *
- *  - **Errors become toasts that carry the request id.** Every failure path
+ *  - **Errors become toasts that carry the trace id.** Every failure path
  *    goes through `describeForToast`, so no call site can accidentally ship an
  *    error message a support engineer cannot trace.
  *  - **A successful mutation refreshes the server components.**
@@ -50,9 +50,9 @@ export function useApiQuery<T>(
 export function useApiList<T>(
   key: readonly unknown[],
   path: string,
-  options?: Omit<UseQueryOptions<ListEnvelope<T>, ApiError>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<Paged<T>, ApiError>, "queryKey" | "queryFn">,
 ) {
-  return useQuery<ListEnvelope<T>, ApiError>({
+  return useQuery<Paged<T>, ApiError>({
     queryKey: key,
     queryFn: async () => {
       try {

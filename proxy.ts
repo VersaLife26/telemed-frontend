@@ -63,11 +63,11 @@ async function attachRefreshedSession(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set(
     "cookie",
-    cookieHeaderWithAuth(request.headers.get("cookie") ?? "", result.tokens.access_token, result.tokens.refresh_token),
+    cookieHeaderWithAuth(request.headers.get("cookie") ?? "", result.tokens.accessToken, result.tokens.refreshToken),
   );
   const res = NextResponse.next({ request: { headers } });
-  res.cookies.set(ACCESS_COOKIE, result.tokens.access_token, authCookieOptions(ACCESS_MAX_AGE));
-  res.cookies.set(REFRESH_COOKIE, result.tokens.refresh_token, authCookieOptions(REFRESH_MAX_AGE));
+  res.cookies.set(ACCESS_COOKIE, result.tokens.accessToken, authCookieOptions(ACCESS_MAX_AGE));
+  res.cookies.set(REFRESH_COOKIE, result.tokens.refreshToken, authCookieOptions(REFRESH_MAX_AGE));
   return res;
 }
 

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { ApiError } from "@/lib/consumer/api/errors";
 import {
   admitDisabled,
   admitPath,
   afterEndPath,
   callPath,
+  consultationPath,
   canAdmit,
   canMarkNoShow,
   consultJoinError,
@@ -14,6 +16,8 @@ import {
   earlyJoinRespondPath,
   endConsultBody,
   endPath,
+  hubUrlFor,
+  isConsultTerminal,
   isPastLateJoinCutoff,
   isWaiting,
   isWithinLateJoinGrace,
@@ -21,6 +25,7 @@ import {
   LATE_JOIN_CUTOFF_MS,
   minutesLate,
   noShowPath,
+  qualityPath,
   readyForNextPath,
   shouldConnectMedia,
   shouldEnterCall,
@@ -28,21 +33,46 @@ import {
   waitingRoomPollPath,
 } from "@/lib/consumer/features/consult";
 
-test("join, ready-for-next, and early-join are keyed by appointment id", () => {
-  assert.equal(joinPath("appt-1"), "/consultations/appt-1/join");
+test("every consultation endpoint is keyed by appointment id", () => {
+  assert.equal(joinPath("appt-1"), "/appointments/appt-1/consultation/join");
+  assert.equal(consultationPath("appt-1"), "/appointments/appt-1/consultation");
+  assert.equal(readyForNextPath("appt-1"), "/appointments/appt-1/consultation/ready-for-next");
+  assert.equal(earlyJoinPath("appt-1"), "/appointments/appt-1/consultation/early-join");
+  assert.equal(
+    earlyJoinRespondPath("appt-1", "accept"),
+    "/appointments/appt-1/consultation/early-join/accept",
+  );
+  assert.equal(
+    earlyJoinRespondPath("appt-1", "decline"),
+    "/appointments/appt-1/consultation/early-join/decline",
+  );
+  assert.equal(waitingRoomPollPath("appt-1"), "/appointments/appt-1/consultation/waiting-room");
+  assert.equal(admitPath("appt-1"), "/appointments/appt-1/consultation/admit");
+  assert.equal(endPath("appt-1"), "/appointments/appt-1/consultation/end");
+  assert.equal(qualityPath("appt-1"), "/appointments/appt-1/consultation/quality");
+});
+
+test("app routes for the call and the waiting room", () => {
   assert.equal(callPath("appt-1"), "/appointments/appt-1/call");
-  assert.equal(readyForNextPath("appt-1"), "/consultations/appt-1/ready-for-next");
-  assert.equal(readyForNextPath(), "/consultations/ready-for-next");
-  assert.equal(earlyJoinPath("appt-1"), "/consultations/appt-1/early-join");
-  assert.equal(earlyJoinRespondPath("appt-1", "accept"), "/consultations/appt-1/early-join/accept");
-  assert.equal(earlyJoinRespondPath("appt-1", "decline"), "/consultations/appt-1/early-join/decline");
   assert.equal(waitingRoomPath("appt-1"), "/appointments/appt-1/waiting-room");
 });
 
-test("waiting-room poll, admit, and end are keyed by consultation id", () => {
-  assert.equal(waitingRoomPollPath("c-9"), "/consultations/c-9/waiting-room");
-  assert.equal(admitPath("c-9"), "/consultations/c-9/admit");
-  assert.equal(endPath("c-9"), "/consultations/c-9/end");
+test("the hub URL is absolutised against the API origin and carries the room token", () => {
+  assert.equal(
+    hubUrlFor({ hubUrl: "/hubs/consultation", roomToken: "a b+c" }, "https://api.example.lk"),
+    "https://api.example.lk/hubs/consultation?roomToken=a+b%2Bc",
+  );
+  assert.equal(
+    hubUrlFor({ hubUrl: "https://rt.example.lk/hubs/consultation", roomToken: "t" }, "https://api.example.lk"),
+    "https://rt.example.lk/hubs/consultation?roomToken=t",
+  );
+});
+
+test("ended and abandoned are terminal", () => {
+  assert.equal(isConsultTerminal("ended"), true);
+  assert.equal(isConsultTerminal("abandoned"), true);
+  assert.equal(isConsultTerminal("active"), false);
+  assert.equal(isConsultTerminal("waiting"), false);
 });
 
 test("the doctor enters the call once join or consult is active", () => {
@@ -71,8 +101,8 @@ test("the doctor lobby does not treat a failed join as a waiting patient", () =>
     "Waiting for the patient to join. The booked slot is the visit window.",
   );
   assert.equal(
-    consultJoinError("consultation is not in a state that allows this action", "doctor"),
-    "This visit isn’t open. The patient hasn’t joined yet, or it has already ended.",
+    consultJoinError(new ApiError(409, { status: 409, code: "join_window_closed" }), "doctor"),
+    "This visit isn’t open yet, or it has already ended.",
   );
 });
 

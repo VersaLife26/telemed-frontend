@@ -6,10 +6,10 @@ import { Button } from "@/components/admin/ui/button";
 import { EmptyState } from "@/components/admin/ui/empty-state";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import type { AdminRescheduleRequest } from "@/lib/admin/api/types";
+import type { RescheduleRequest } from "@/lib/admin/api/types";
 import { formatDateTime, shortId } from "@/lib/admin/format";
 
-export function RescheduleQueue({ requests }: { requests: AdminRescheduleRequest[] }) {
+export function RescheduleQueue({ requests }: { requests: RescheduleRequest[] }) {
   if (requests.length === 0) {
     return (
       <EmptyState
@@ -28,7 +28,7 @@ export function RescheduleQueue({ requests }: { requests: AdminRescheduleRequest
   );
 }
 
-function RescheduleRow({ request }: { request: AdminRescheduleRequest }) {
+function RescheduleRow({ request }: { request: RescheduleRequest }) {
   const accept = useApiMutation<unknown, void>({
     method: "POST",
     path: () => endpoints.appointments.acceptReschedule(request.id),
@@ -46,12 +46,12 @@ function RescheduleRow({ request }: { request: AdminRescheduleRequest }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <p className="text-sm font-medium">
-            {formatDateTime(request.original_start_at)} →{" "}
-            {formatDateTime(request.proposed_start_at)}
+            {formatDateTime(request.originalStartAt)} →{" "}
+            {formatDateTime(request.proposedStartAt)}
           </p>
           <p className="font-mono text-xs text-muted-foreground">
-            Appointment {shortId(request.appointment_id)} · patient {shortId(request.patient_id)} ·
-            doctor {shortId(request.doctor_id)}
+            Appointment {shortId(request.appointmentId)} · patient {shortId(request.patientId)} ·
+            doctor {shortId(request.doctorId)}
           </p>
           {request.reason ? (
             <p className="text-sm text-muted-foreground">Doctor’s reason: {request.reason}</p>

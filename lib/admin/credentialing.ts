@@ -1,11 +1,16 @@
-import type { ChecklistItemKey, PendingDoctor, VerificationChecklist } from "@/lib/admin/api/types";
+import type {
+  Checklist,
+  ChecklistItemKey,
+  DoctorDocumentType,
+  UpdateChecklistRequest,
+} from "@/lib/admin/api/types";
 
 /**
  * Credentialing rules the console can check for itself.
  *
  * Everything here is advisory. The authoritative decision is the admin's, and
- * the authoritative record is `verification_checklists` in
- * telemed-admin-service. What this module does is stop an admin approving a
+ * the authoritative record is the application's checklist in the API. What
+ * this module does is stop an admin approving a
  * doctor whose SLMC number is not even shaped like an SLMC number — a check
  * that costs nothing and catches transcription errors before they become an
  * unlicensed practitioner taking consultations.
@@ -77,35 +82,35 @@ export interface ChecklistItemDefinition {
  */
 export const CHECKLIST_ITEMS: readonly ChecklistItemDefinition[] = [
   {
-    key: "slmc_format_valid",
+    key: "slmcFormat",
     label: "SLMC number format",
     question:
       "Is the submitted SLMC registration number in a valid format, and does it match the number printed on the certificate?",
     evidence: "SLMC certificate",
   },
   {
-    key: "slmc_registry_checked",
+    key: "slmcRegistry",
     label: "SLMC register checked",
     question:
       "Have you looked this number up in the Sri Lanka Medical Council register and confirmed the registration is current and in this doctor's name?",
     evidence: "SLMC register (external lookup)",
   },
   {
-    key: "experience_verified",
+    key: "experience",
     label: "Five or more years of experience",
     question:
       "Do the qualification documents support at least five years of post-registration practice?",
     evidence: "Degree certificate",
   },
   {
-    key: "nic_matches",
+    key: "nicMatch",
     label: "NIC matches the name",
     question:
       "Does the name on the National Identity Card match the name on the SLMC certificate and the registration?",
     evidence: "NIC document",
   },
   {
-    key: "photo_clear",
+    key: "photoClarity",
     label: "Photograph is clear and usable",
     question:
       "Is the profile photograph clear, recent, of this person, and suitable to show to patients?",
@@ -113,36 +118,38 @@ export const CHECKLIST_ITEMS: readonly ChecklistItemDefinition[] = [
   },
 ];
 
+/** The recorded answer for one item: true, false, or null when unanswered. */
+export function itemValue(checklist: Checklist | null | undefined, key: ChecklistItemKey): boolean | null {
+  return checklist?.[key]?.ok ?? null;
+}
+
 /** True when every one of the five checks has been answered yes. */
-export function allChecksPassed(checklist: VerificationChecklist | null): boolean {
-  if (!checklist) return false;
-  return CHECKLIST_ITEMS.every((item) => checklist.items[item.key]?.value === true);
+export function allChecksPassed(checklist: Checklist | null | undefined): boolean {
+  return CHECKLIST_ITEMS.every((item) => itemValue(checklist, item.key) === true);
 }
 
 /** How many of the five have been answered, either way. */
-export function answeredCount(checklist: VerificationChecklist | null): number {
-  if (!checklist) return 0;
-  return CHECKLIST_ITEMS.filter((item) => checklist.items[item.key]?.value !== null &&
-    checklist.items[item.key]?.value !== undefined).length;
+export function answeredCount(checklist: Checklist | null | undefined): number {
+  return CHECKLIST_ITEMS.filter((item) => itemValue(checklist, item.key) !== null).length;
 }
 
 /** Items still unanswered — named, so the UI can say which. */
-export function outstandingItems(
-  checklist: VerificationChecklist | null,
-): ChecklistItemDefinition[] {
-  if (!checklist) return [...CHECKLIST_ITEMS];
-  return CHECKLIST_ITEMS.filter((item) => {
-    const state = checklist.items[item.key];
-    return state === undefined || state.value === null || state.value === undefined;
-  });
+export function outstandingItems(checklist: Checklist | null | undefined): ChecklistItemDefinition[] {
+  return CHECKLIST_ITEMS.filter((item) => itemValue(checklist, item.key) === null);
 }
 
 /** Items explicitly answered "no". These block approval outright. */
-export function failedItems(
-  checklist: VerificationChecklist | null,
-): ChecklistItemDefinition[] {
-  if (!checklist) return [];
-  return CHECKLIST_ITEMS.filter((item) => checklist.items[item.key]?.value === false);
+export function failedItems(checklist: Checklist | null | undefined): ChecklistItemDefinition[] {
+  return CHECKLIST_ITEMS.filter((item) => itemValue(checklist, item.key) === false);
+}
+
+/**
+ * Body for PUT doctor-applications/{id}/checklist. Every field is optional on
+ * the wire, so only the one being answered is sent and the others are left as
+ * they are.
+ */
+export function checklistBody(item: ChecklistItemKey, value: boolean): Partial<UpdateChecklistRequest> {
+  return { [item]: value };
 }
 
 /** A minimum that forces a sentence rather than "ok" or "no". */
@@ -157,20 +164,22 @@ export function reasonProblem(reason: string): string | null {
   return null;
 }
 
-/** Human label for a document kind. */
-export function documentLabel(kind: PendingDoctor["documents"][number]["kind"]): string {
-  switch (kind) {
-    case "slmc_certificate":
+/** Human label for a document type. */
+export function documentLabel(type: DoctorDocumentType): string {
+  switch (type) {
+    case "slmcCertificate":
       return "SLMC certificate";
-    case "nic_document":
+    case "nic":
       return "National Identity Card";
-    case "degree_certificate":
+    case "degreeCertificate":
       return "Degree certificate";
-    case "photo":
-      return "Profile photograph";
+    case "specialtyBoardCertificate":
+      return "Specialty board certificate";
     case "signature":
       return "Signature";
     case "seal":
       return "Seal";
+    case "other":
+      return "Other document";
   }
 }

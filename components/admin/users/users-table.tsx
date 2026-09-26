@@ -8,7 +8,7 @@ import { DataTable } from "@/components/admin/data-table/data-table";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { EmptyState } from "@/components/admin/ui/empty-state";
-import type { AdminUserRecord } from "@/lib/admin/api/types";
+import type { PlatformUser } from "@/lib/admin/api/types";
 import { formatDate, shortId } from "@/lib/admin/format";
 
 import { SuspensionDialog } from "./suspension-dialog";
@@ -18,42 +18,38 @@ import { UserDetailDialog } from "./user-detail-dialog";
 /**
  * User search results.
  *
- * What is *not* here is as deliberate as what is. The V2 docs list
- * "impersonate for support (audit logged)" among this screen's capabilities.
- * No impersonation route, table, event subject or RBAC group exists anywhere
- * in telemed-admin-service or telemed-user-service, so there is no button —
- * a control that reliably produces a 404 is worse than an absent one, because
- * it teaches support staff that the console is broken rather than that the
- * feature is unbuilt. It is recorded in the README instead.
+ * There is deliberately no impersonation button: the API has no route for it,
+ * and a control that reliably fails teaches support staff that the console is
+ * broken rather than that the feature is unbuilt.
  */
 export function UsersTable({
   users,
   filtered,
 }: {
-  users: AdminUserRecord[];
+  users: PlatformUser[];
   filtered: boolean;
 }) {
-  const [suspendTarget, setSuspendTarget] = React.useState<AdminUserRecord | null>(null);
-  const [activityTarget, setActivityTarget] = React.useState<AdminUserRecord | null>(null);
+  const [suspendTarget, setSuspendTarget] = React.useState<PlatformUser | null>(null);
+  const [activityTarget, setActivityTarget] = React.useState<PlatformUser | null>(null);
   const [detailId, setDetailId] = React.useState<string | null>(null);
 
-  const columns = React.useMemo<ColumnDef<AdminUserRecord, unknown>[]>(
+  const columns = React.useMemo<ColumnDef<PlatformUser, unknown>[]>(
     () => [
       {
-        accessorKey: "full_name",
+        accessorKey: "fullName",
         header: "Name",
         cell: ({ row }) => (
           <button
             type="button"
             className="min-w-0 text-left"
-            onClick={() => setDetailId(row.original.user_id)}
+            onClick={() => setDetailId(row.original.id)}
           >
-            <p className="truncate font-medium">{row.original.full_name ?? "Unnamed"}</p>
+            <p className="truncate font-medium">{row.original.fullName || "Unnamed"}</p>
             <p
               className="truncate font-mono text-xs text-muted-foreground"
-              title={row.original.user_id}
+              title={row.original.id}
             >
-              {shortId(row.original.user_id)}
+              {shortId(row.original.id)}
             </p>
           </button>
         ),
@@ -75,15 +71,15 @@ export function UsersTable({
           <div className="min-w-0 text-sm">
             <p className="truncate">{row.original.email ?? "—"}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {row.original.phone ?? "—"}
+              {row.original.phoneNumber ?? "—"}
             </p>
           </div>
         ),
       },
       {
-        accessorKey: "registered_at",
+        accessorKey: "createdAt",
         header: "Registered",
-        cell: ({ row }) => formatDate(row.original.registered_at),
+        cell: ({ row }) => formatDate(row.original.createdAt),
       },
       {
         accessorKey: "status",
@@ -94,6 +90,8 @@ export function UsersTable({
               <CircleSlash className="size-3" aria-hidden="true" />
               Suspended
             </Badge>
+          ) : row.original.status === "deleted" ? (
+            <Badge variant="outline">Deleted</Badge>
           ) : (
             <Badge variant="success">Active</Badge>
           ),
@@ -108,11 +106,12 @@ export function UsersTable({
               variant="ghost"
               size="sm"
               onClick={() => setActivityTarget(row.original)}
-              aria-label={`View activity for ${row.original.full_name ?? row.original.user_id}`}
+              aria-label={`View activity for ${row.original.fullName || row.original.id}`}
             >
               <Activity className="size-4" aria-hidden="true" />
               Activity
             </Button>
+            {row.original.status === "deleted" ? null : (
             <Button
               variant={row.original.status === "suspended" ? "outline" : "destructive"}
               size="sm"
@@ -130,6 +129,7 @@ export function UsersTable({
                 </>
               )}
             </Button>
+            )}
           </div>
         ),
       },
@@ -142,8 +142,8 @@ export function UsersTable({
       <DataTable
         columns={columns}
         data={users}
-        getRowId={(row) => row.user_id}
-        caption="Patients and doctors known to the admin console, projected from user-service events. Sorting applies to this page only."
+        getRowId={(row) => row.id}
+        caption="Patients and doctors registered on the platform. Sorting applies to this page only."
         emptyState={
           filtered ? (
             <EmptyState

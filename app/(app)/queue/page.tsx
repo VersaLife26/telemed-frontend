@@ -1,19 +1,16 @@
 import { CalendarDays, FileText, ListOrdered, Pill, User, Video } from "lucide-react";
 
 import { EndConsultationButton } from "@/components/consumer/end-consultation-button";
-import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
 import { Alert } from "@/components/consumer/ui/Alert";
-import { Badge } from "@/components/consumer/ui/Badge";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Appointment, RescheduleRequest } from "@/lib/consumer/api/types";
+import type { Appointment, Paged, RescheduleRequest } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { afterEndPath } from "@/lib/consumer/features/consult";
-import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { formatMoney } from "@/lib/consumer/money";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
@@ -31,8 +28,7 @@ async function pendingByAppointment(
           `/api/v1/appointments/${a.id}/reschedule-requests`,
           { token },
         );
-        const pending =
-          (Array.isArray(items) ? items : []).find((r) => r.status === "pending") ?? null;
+        const pending = items.find((r) => r.status === "pending") ?? null;
         return [a.id, pending] as const;
       } catch {
         return [a.id, null] as const;
@@ -57,11 +53,11 @@ export default async function QueuePage() {
   let pending: Record<string, RescheduleRequest | null> = {};
   let error: string | null = null;
   try {
-    const data = await apiFetch<Appointment[]>(
-      "/api/v1/appointments?per_page=50&status=confirmed",
+    const data = await apiFetch<Paged<Appointment>>(
+      "/api/v1/appointments?pageSize=50&status=confirmed",
       { token },
     );
-    appointments = Array.isArray(data) ? data : [];
+    appointments = data.items;
     pending = await pendingByAppointment(token, appointments);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load queue";
@@ -80,22 +76,11 @@ export default async function QueuePage() {
             />
           )
         }
-        overlap={
-          <Card className="flex flex-col items-start gap-3 shadow-lg">
-            <h2 className="text-h5 text-ink">Finished early?</h2>
-            <p className="max-w-prose text-body-sm text-muted">
-              After you end a call you can ask only the next patient whether they can join now.
-              Later slots stay where they are.
-            </p>
-            <ReadyForNextButton />
-          </Card>
-        }
       />
 
       {error ? (
         <Alert tone="danger" title="Couldn’t load the queue">
-          {error} Doctor appointment lists need a JWT carrying <code>telemed_doctor_id</code>; if
-          you see a claim error, that claim may be missing on this account.
+          {error}
         </Alert>
       ) : null}
 
@@ -108,7 +93,7 @@ export default async function QueuePage() {
       ) : (
         <ul className="stagger flex flex-col gap-3">
           {appointments.map((a) => {
-            const when = a.start_at_local || a.start_at;
+            const when = a.startAt;
             return (
               <Card
                 as="li"
@@ -125,22 +110,19 @@ export default async function QueuePage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-body font-semibold text-ink">
-                        {a.counterpart_name || a.patient_name || "Patient"}
+                        {a.visitPatient?.name || "Patient"}
                       </p>
                       <StatusBadge status={a.status} />
-                      {a.specialty ? (
-                        <Badge tone="brand">{specialtyLabel(a.specialty)}</Badge>
-                      ) : null}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-muted">
                       <span className="tabular-time">
                         {formatVisitDate(when)} · {formatVisitClock(when)}
                       </span>
-                      {a.amount_cents != null && a.amount_cents > 0 ? (
+                      {a.feeCents > 0 ? (
                         <>
                           <span aria-hidden="true">·</span>
                           <span className="font-medium text-ink">
-                            {formatMoney(a.amount_cents, a.currency || "LKR")}
+                            {formatMoney(a.feeCents, a.currency || "LKR")}
                           </span>
                         </>
                       ) : null}
@@ -189,7 +171,7 @@ export default async function QueuePage() {
                   <RescheduleRequestForm
                     appointmentId={a.id}
                     pending={pending[a.id] ?? null}
-                    startAt={a.start_at}
+                    startAt={a.startAt}
                   />
                 </div>
               </Card>

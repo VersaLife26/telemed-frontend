@@ -12,7 +12,7 @@ import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
-import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
+import { hasCode, isNotFound } from "@/lib/consumer/api/errors";
 import type { ClinicalNote, ClinicalNoteDiagnosis, Icd10Code } from "@/lib/consumer/api/types";
 import { ReadyForNextButton } from "@/components/consumer/ready-for-next-button";
 import {
@@ -23,6 +23,7 @@ import {
   amendReasonError,
   applyNote,
   canSearchReference,
+  clinicalNotePath,
   emptyDraft,
   finalisePayload,
   hasSoapContent,
@@ -44,8 +45,8 @@ export function ClinicalNotesClient({
 }) {
   const [draft, setDraft] = useState<SoapDraft>(emptyDraft);
   const [diagnoses, setDiagnoses] = useState<ClinicalNoteDiagnosis[]>([]);
-  const [version, setVersion] = useState(0);
-  const [status, setStatus] = useState<string>("draft");
+  const [version, setVersion] = useState<number | null>(null);
+  const [status, setStatus] = useState<ClinicalNote["status"]>("draft");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +58,7 @@ export function ClinicalNotesClient({
   const [baseline, setBaseline] = useState<SoapDraft>(emptyDraft);
   const [baselineDx, setBaselineDx] = useState<ClinicalNoteDiagnosis[]>([]);
 
-  const versionRef = useRef(0);
+  const versionRef = useRef<number | null>(null);
   const draftRef = useRef(draft);
   const diagnosesRef = useRef(diagnoses);
   const saveTimer = useRef<number | null>(null);
@@ -76,7 +77,7 @@ export function ClinicalNotesClient({
     setBaselineDx(nextDx);
     setVersion(note.version);
     versionRef.current = note.version;
-    setStatus(note.status || "draft");
+    setStatus(note.status);
   }, []);
 
   const save = useCallback(
@@ -86,20 +87,24 @@ export function ClinicalNotesClient({
       setSaveState("saving");
       setError(null);
       try {
-        const note = await browserApi<ClinicalNote>(`/clinical-notes/${appointmentId}`, {
+        const note = await browserApi<ClinicalNote>(clinicalNotePath(appointmentId), {
           method: "PUT",
-          body: savePayload(appointmentId, bodyDraft, bodyDx, versionRef.current),
+          body: savePayload(bodyDraft, bodyDx, versionRef.current),
         });
         applyServer(note);
         setSaveState("saved");
       } catch (e) {
-        if (e instanceof ApiError && e.status === 409) {
+        if (hasCode(e, "concurrency_conflict") || hasCode(e, "note_finalised")) {
           try {
-            const latest = await browserApi<ClinicalNote>(`/clinical-notes/${appointmentId}`);
+            const latest = await browserApi<ClinicalNote>(clinicalNotePath(appointmentId));
             applyServer(latest);
-            setError("Saved on another device — reloaded the latest note.");
+            setError(
+              hasCode(e, "note_finalised")
+                ? "This note was signed elsewhere — reloaded it. Use an amendment to change it."
+                : "Saved on another device — reloaded the latest note.",
+            );
           } catch {
-            setError(e.message);
+            setError(e instanceof Error ? e.message : "Could not save note");
           }
         } else {
           setError(e instanceof Error ? e.message : "Could not save note");
@@ -125,7 +130,7 @@ export function ClinicalNotesClient({
     let cancelled = false;
     (async () => {
       try {
-        const note = await browserApi<ClinicalNote>(`/clinical-notes/${appointmentId}`);
+        const note = await browserApi<ClinicalNote>(clinicalNotePath(appointmentId));
         if (!cancelled) applyServer(note);
       } catch (e) {
         if (!cancelled && !isNotFound(e)) {
@@ -150,8 +155,7 @@ export function ClinicalNotesClient({
     }
     icdTimer.current = window.setTimeout(async () => {
       try {
-        const hits = await browserApi<Icd10Code[]>(`/icd10?q=${encodeURIComponent(q)}`);
-        setIcdHits(Array.isArray(hits) ? hits : []);
+        setIcdHits(await browserApi<Icd10Code[]>(`/icd10?q=${encodeURIComponent(q)}`));
       } catch {
         setIcdHits([]);
       }
@@ -193,7 +197,7 @@ export function ClinicalNotesClient({
     setError(null);
     try {
       await save();
-      const note = await browserApi<ClinicalNote>(`/clinical-notes/${appointmentId}/finalise`, {
+      const note = await browserApi<ClinicalNote>(clinicalNotePath(appointmentId, "finalise"), {
         method: "POST",
         body: finalisePayload(versionRef.current),
       });
@@ -219,7 +223,7 @@ export function ClinicalNotesClient({
     setAmending(true);
     setError(null);
     try {
-      const note = await browserApi<ClinicalNote>(`/clinical-notes/${appointmentId}/amend`, {
+      const note = await browserApi<ClinicalNote>(clinicalNotePath(appointmentId, "amend"), {
         method: "POST",
         body: amendPayload(draft, diagnoses, amendReason, version),
       });
@@ -227,10 +231,8 @@ export function ClinicalNotesClient({
       setAmendReason("");
       setSaveState("saved");
     } catch (e) {
-      const raw = e instanceof Error ? e.message : "Could not amend note";
-      setError(
-        /does not change|reason alone/i.test(raw) ? AMEND_NO_CHANGE : raw,
-      );
+      if (hasCode(e, "no_change")) setError(AMEND_NO_CHANGE);
+      else setError(e instanceof Error ? e.message : "Could not amend note");
     } finally {
       setAmending(false);
     }
@@ -314,7 +316,7 @@ export function ClinicalNotesClient({
                     className="w-full cursor-pointer rounded-sm px-3 py-2 text-left text-body-sm text-ink transition-colors duration-[160ms] ease-out can-hover:hover:bg-tint"
                     onClick={() => addDiagnosis(hit)}
                   >
-                    <span className="font-semibold">{hit.code}</span> {hit.description}
+                    <span className="font-semibold">{hit.code}</span> {hit.display}
                   </button>
                 </li>
               ))}
@@ -330,15 +332,15 @@ export function ClinicalNotesClient({
                 className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-tint px-4 py-3"
               >
                 <p className="text-body-sm text-ink">
-                  <span className="font-semibold">{d.code}</span> {d.description || ""}
-                  {d.is_primary ? (
+                  <span className="font-semibold">{d.code}</span> {d.display}
+                  {d.isPrimary ? (
                     <Badge tone="brand" className="ml-2">
                       primary
                     </Badge>
                   ) : null}
                 </p>
                 <div className="flex gap-1">
-                  {!d.is_primary ? (
+                  {!d.isPrimary ? (
                     <Button size="sm" variant="ghost" onClick={() => setPrimary(d.code)}>
                       Make primary
                     </Button>

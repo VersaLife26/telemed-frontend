@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/admin/ui/table";
-import type { BookingsPoint } from "@/lib/admin/api/types";
+import type { BookingsDay } from "@/lib/admin/api/types";
 import { formatCount, formatDate, formatShortDay } from "@/lib/admin/format";
 
 import { ChartFrame, type SeriesSpec } from "./chart-frame";
@@ -40,43 +40,25 @@ const SERIES: SeriesSpec[] = [
   { key: "completed", label: "Completed", color: "var(--success)" },
   { key: "confirmed", label: "Confirmed / upcoming", color: "var(--chart-1)" },
   { key: "cancelled", label: "Cancelled", color: "var(--muted-foreground)" },
-  { key: "no_show", label: "No-show", color: "var(--warning)" },
+  { key: "noShow", label: "No-show", color: "var(--warning)" },
 ];
 
-interface Row {
-  day: string;
-  completed: number;
-  confirmed: number;
-  cancelled: number;
-  no_show: number;
-}
+type Row = Pick<BookingsDay, "completed" | "confirmed" | "cancelled" | "noShow"> & { day: string };
 
-export function BookingsChart({ points }: { points: BookingsPoint[] }) {
-  const rows = React.useMemo<Row[]>(() => {
-    const byDay = new Map<string, Row>();
-    for (const point of points) {
-      const existing =
-        byDay.get(point.day) ??
-        { day: point.day, completed: 0, confirmed: 0, cancelled: 0, no_show: 0 };
-      switch (point.status) {
-        case "completed":
-          existing.completed += point.booking_count;
-          break;
-        case "no_show":
-          existing.no_show += point.booking_count;
-          break;
-        case "cancelled":
-          existing.cancelled += point.booking_count;
-          break;
-        case "created":
-        case "confirmed":
-          existing.confirmed += point.booking_count;
-          break;
-      }
-      byDay.set(point.day, existing);
-    }
-    return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
-  }, [points]);
+export function BookingsChart({ points }: { points: BookingsDay[] }) {
+  const rows = React.useMemo<Row[]>(
+    () =>
+      [...points]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((point) => ({
+          day: point.date,
+          completed: point.completed,
+          confirmed: point.confirmed,
+          cancelled: point.cancelled,
+          noShow: point.noShow,
+        })),
+    [points],
+  );
 
   return (
     <ChartFrame
@@ -102,7 +84,7 @@ export function BookingsChart({ points }: { points: BookingsPoint[] }) {
                 <TableCell className="text-right tabular-nums">{formatCount(row.completed)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCount(row.confirmed)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCount(row.cancelled)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(row.no_show)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(row.noShow)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

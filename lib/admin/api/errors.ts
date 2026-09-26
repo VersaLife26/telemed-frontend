@@ -1,95 +1,118 @@
-import {
-  type ApiErrorCode,
-  type ErrorEnvelope,
-  isKnownErrorCode,
-} from "./envelope";
+import type { components } from "@/lib/api/schema";
+
+/** RFC 9457 problem body. Conflicts may carry extension members such as `refundableCents`. */
+export type ProblemDetails = components["schemas"]["ProblemDetails"] & Record<string, unknown>;
+
+/**
+ * Codes this console synthesises client-side for failures that never produced
+ * a problem body. Every other `code` is the API's own lowercase snake_case one.
+ */
+export type ClientErrorCode = "network_error" | "timeout";
 
 /**
  * One error type for the whole console.
  *
  * Anything that can fail — a server component fetch, a BFF proxy hop, a
- * TanStack Query mutation — rejects with this. Screens never inspect HTTP
- * status codes or parse error strings; they switch on `code`, and they render
- * `userMessage` plus `requestId`.
+ * TanStack Query mutation — rejects with this. Screens branch on `code` (the
+ * problem's stable reason) or `status`, never on message text, and render
+ * `userMessage` plus `traceId`.
  */
 export class ApiError extends Error {
-  readonly code: ApiErrorCode;
   /** HTTP status, or 0 when the request never reached a server. */
   readonly status: number;
-  /** Field-level validation detail, keyed by the JSON field name. */
-  readonly fields: Readonly<Record<string, string>>;
-  /** The `request_id` from the error envelope. Surfaced in every toast. */
-  readonly requestId: string | undefined;
-  /** Raw backend message, kept for the details disclosure and for logging. */
-  readonly serverMessage: string;
+  /** The problem `code`, e.g. `ip_not_allowed`. Absent on plain 401/403/404 and on validation errors. */
+  readonly code: string | undefined;
+  /** The problem `detail`: a human sentence written by the API. */
+  readonly detail: string;
+  /** Validation messages keyed by camelCase field path. */
+  readonly errors: Readonly<Record<string, string[]>>;
+  /** The `traceId` from the problem body. Surfaced in every toast. */
+  readonly traceId: string | undefined;
+  readonly body: ProblemDetails;
 
-  constructor(init: {
-    code: ApiErrorCode;
-    status: number;
-    serverMessage: string;
-    fields?: Record<string, string>;
-    requestId?: string;
-    cause?: unknown;
-  }) {
-    super(`${init.code}: ${init.serverMessage}`, { cause: init.cause });
+  constructor(status: number, body: ProblemDetails, cause?: unknown) {
+    super(problemMessage(body, `Request failed (${status})`), { cause });
     this.name = "ApiError";
-    this.code = init.code;
-    this.status = init.status;
-    this.serverMessage = init.serverMessage;
-    this.fields = Object.freeze({ ...(init.fields ?? {}) });
-    this.requestId = init.requestId;
+    this.status = status;
+    this.body = body;
+    this.code = typeof body.code === "string" ? body.code : undefined;
+    this.detail = typeof body.detail === "string" ? body.detail : "";
+    this.errors = Object.freeze({ ...(body.errors ?? {}) });
+    this.traceId = typeof body.traceId === "string" ? body.traceId : undefined;
   }
 
   /** The sentence a human should read. */
   get userMessage(): string {
-    return USER_MESSAGES[this.code];
+    if (this.code === "ip_not_allowed") return "This network is not on the admin IP allowlist.";
+    if (this.code === "network_error") return "Could not reach the API.";
+    if (this.code === "timeout") return "The API did not respond in time.";
+    if (this.status >= 500) return "The backend failed while handling this request.";
+    const message = problemMessage(this.body, "");
+    if (message) return message;
+    return STATUS_MESSAGES[this.status] ?? "The request could not be completed.";
   }
 
   /** What, if anything, the admin can do about it. */
   get remedy(): string | undefined {
-    return REMEDIES[this.code];
+    if (this.code === "ip_not_allowed") return "Connect to the office network or the VPN, then reload.";
+    if (this.code === "network_error") return "Check your connection, then reload.";
+    if (this.code === "timeout") return "Try again. If it keeps timing out, quote the trace ID to support.";
+    if (this.code === "concurrency_conflict") return "Reload the record and re-apply your change.";
+    if (Object.keys(this.errors).length > 0) return "Correct the highlighted fields and try again.";
+    switch (this.status) {
+      case 401:
+        return "Sign in again to continue.";
+      case 403:
+        return "Ask a super admin if you need this permission.";
+      case 429:
+        return "Wait a few seconds and try again.";
+      case 503:
+        return "Try again shortly.";
+      default:
+        return this.status >= 500 ? "Quote the trace ID when you report this." : undefined;
+    }
   }
 
   /** True when re-issuing the same request could plausibly succeed. */
   get retryable(): boolean {
-    return RETRYABLE.has(this.code);
-  }
-
-  /** Builds an ApiError from a parsed error envelope. */
-  static fromEnvelope(body: ErrorEnvelope, status: number): ApiError {
-    const code: ApiErrorCode = isKnownErrorCode(body.code)
-      ? body.code
-      : // An unrecognised code means the backend grew one this build does not
-        // know about. Degrade to INTERNAL_ERROR rather than crash, but keep
-        // the real code in the message so the report is still actionable.
-        "INTERNAL_ERROR";
-    const init: {
-      code: ApiErrorCode;
-      status: number;
-      serverMessage: string;
-      fields?: Record<string, string>;
-      requestId?: string;
-    } = {
-      code,
-      status,
-      serverMessage: isKnownErrorCode(body.code)
-        ? body.message
-        : `${body.code}: ${body.message}`,
-    };
-    if (body.fields) init.fields = body.fields;
-    if (body.request_id) init.requestId = body.request_id;
-    return new ApiError(init);
+    return this.status === 0 || this.status === 429 || this.status >= 500;
   }
 
   /** fetch() rejected: offline, DNS, TLS, connection refused. */
   static network(cause: unknown): ApiError {
-    return new ApiError({
-      code: "NETWORK_ERROR",
-      status: 0,
-      serverMessage: cause instanceof Error ? cause.message : String(cause),
+    return new ApiError(
+      0,
+      { detail: cause instanceof Error ? cause.message : String(cause), code: "network_error" },
       cause,
-    });
+    );
   }
+
+  static timeout(timeoutMs: number, cause: unknown): ApiError {
+    return new ApiError(0, { detail: `no response within ${timeoutMs}ms`, code: "timeout" }, cause);
+  }
+}
+
+const STATUS_MESSAGES: Record<number, string> = {
+  400: "Some fields need attention before this can be saved.",
+  401: "Your session has ended.",
+  403: "Your admin role does not permit this action.",
+  404: "That record no longer exists.",
+  409: "Someone else changed this record while you had it open.",
+  429: "Too many requests. Slow down and try again.",
+};
+
+/** The human-readable text of a problem body: `detail`, else the first validation message, else `title`. */
+export function problemMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const p = body as ProblemDetails;
+  if (typeof p.detail === "string" && p.detail.trim()) return p.detail;
+  if (p.errors) {
+    for (const messages of Object.values(p.errors)) {
+      if (messages?.[0]) return messages[0];
+    }
+  }
+  if (typeof p.title === "string" && p.title.trim()) return p.title;
+  return fallback;
 }
 
 /** Type guard usable in `catch` blocks and TanStack Query error renderers. */
@@ -97,54 +120,13 @@ export function isApiError(value: unknown): value is ApiError {
   return value instanceof ApiError;
 }
 
-/**
- * The central code → message map the brief calls for.
- *
- * Rules these messages follow: say what happened from the admin's point of
- * view, never leak backend vocabulary ("pgx", "JWKS", "outbox"), and never
- * blame the user for something the system did.
- */
-const USER_MESSAGES: Record<ApiErrorCode, string> = {
-  BAD_REQUEST: "The console sent something this endpoint could not read.",
-  VALIDATION_FAILED: "Some fields need attention before this can be saved.",
-  UNAUTHORIZED: "Your session has ended.",
-  FORBIDDEN: "Your admin role does not permit this action.",
-  NOT_FOUND: "That record no longer exists.",
-  CONFLICT: "Someone else changed this record while you had it open.",
-  SLOT_UNAVAILABLE: "That appointment slot is no longer available.",
-  SLOT_LOCKED: "Another booking is being processed for that slot right now.",
-  RATE_LIMITED: "Too many requests. The gateway is throttling this client.",
-  PAYMENT_REQUIRED: "This action requires a completed payment on the appointment.",
-  UNPROCESSABLE: "The request was understood but cannot be applied in this state.",
-  INTERNAL_ERROR: "The backend failed while handling this request.",
-  SERVICE_UNAVAILABLE: "That backend service is not accepting requests right now.",
-  TIMEOUT: "The backend did not respond in time.",
-  IP_NOT_ALLOWLISTED: "This network is not on the admin IP allowlist.",
-  NETWORK_ERROR: "Could not reach the API gateway.",
-  MALFORMED_RESPONSE: "The backend returned a response this console cannot read.",
-};
+export function isNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
+}
 
-const REMEDIES: Partial<Record<ApiErrorCode, string>> = {
-  UNAUTHORIZED: "Sign in again to continue.",
-  FORBIDDEN: "Ask a super_admin if you need this permission.",
-  CONFLICT: "Reload the record and re-apply your change.",
-  VALIDATION_FAILED: "Correct the highlighted fields and try again.",
-  RATE_LIMITED: "Wait a few seconds and try again.",
-  SERVICE_UNAVAILABLE: "Try again shortly; if it persists, check the service health dashboard.",
-  TIMEOUT: "Try again. If it keeps timing out, quote the request ID to support.",
-  IP_NOT_ALLOWLISTED: "Connect to the office network or the VPN, then reload.",
-  NETWORK_ERROR: "Check your connection, then reload.",
-  INTERNAL_ERROR: "Quote the request ID when you report this.",
-  MALFORMED_RESPONSE: "Quote the request ID when you report this.",
-};
-
-const RETRYABLE: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
-  "RATE_LIMITED",
-  "SERVICE_UNAVAILABLE",
-  "TIMEOUT",
-  "NETWORK_ERROR",
-  "INTERNAL_ERROR",
-]);
+export function hasCode(error: unknown, code: string): boolean {
+  return error instanceof ApiError && error.code === code;
+}
 
 /**
  * Maps a raw error of any kind into an ApiError. Used at every boundary where
@@ -152,19 +134,12 @@ const RETRYABLE: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
  */
 export function toApiError(value: unknown): ApiError {
   if (isApiError(value)) return value;
-  return new ApiError({
-    code: "INTERNAL_ERROR",
-    status: 0,
-    serverMessage: value instanceof Error ? value.message : String(value),
-    cause: value,
-  });
+  return new ApiError(0, { detail: value instanceof Error ? value.message : String(value) }, value);
 }
 
 /**
- * One-line summary suitable for a toast title, with the request id appended
- * when there is one. Toast bodies use `describeForToast` so no screen has to
- * remember to include the request id — the thing that makes a support ticket
- * actionable is not left to whoever wrote that particular call site.
+ * One-line summary suitable for a toast title, with the trace id appended
+ * when there is one, so no screen has to remember to include it.
  */
 export function describeForToast(error: unknown): {
   title: string;
@@ -173,8 +148,8 @@ export function describeForToast(error: unknown): {
   const err = toApiError(error);
   const bits: string[] = [];
   if (err.remedy) bits.push(err.remedy);
-  if (err.requestId) bits.push(`Request ID ${err.requestId}`);
-  const fieldNames = Object.keys(err.fields);
+  if (err.traceId) bits.push(`Trace ID ${err.traceId}`);
+  const fieldNames = Object.keys(err.errors);
   if (fieldNames.length > 0) {
     bits.push(`Fields: ${fieldNames.join(", ")}`);
   }

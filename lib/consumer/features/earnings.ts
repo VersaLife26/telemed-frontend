@@ -1,4 +1,4 @@
-import type { Payment, Payout } from "@/lib/consumer/api/types";
+import type { DoctorEarnings, Payout } from "@/lib/consumer/api/types";
 
 export function periodLabel(start?: string, end?: string): string {
   if (!start && !end) return "—";
@@ -7,18 +7,30 @@ export function periodLabel(start?: string, end?: string): string {
   return `${a} → ${b}`;
 }
 
-export function netPayoutCents(payment: Payment): number {
-  return (payment.doctor_payout_cents || 0) - (payment.refunded_payout_cents || 0);
+export function payoutStatusLabel(status?: Payout["status"]): string {
+  switch (status) {
+    case "pending":
+      return "Awaiting transfer";
+    case "paid":
+      return "Paid";
+    case "failed":
+      return "Transfer failed";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return "—";
+  }
 }
 
-export function summarizeEarnings(payouts: Payout[], payments: Payment[]) {
-  const currency = payouts[0]?.currency || payments[0]?.currency || "LKR";
-  const paid = payouts
-    .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + (p.amount_cents || 0), 0);
-  const pending = payouts
-    .filter((p) => p.status === "pending" || p.status === "processing")
-    .reduce((sum, p) => sum + (p.amount_cents || 0), 0);
-  const earned = payments.reduce((sum, p) => sum + netPayoutCents(p), 0);
-  return { currency, paid, pending, earned };
+export function summarizeEarnings(earnings: DoctorEarnings | null) {
+  return {
+    currency: earnings?.currency || "LKR",
+    earned: earnings?.netCents ?? 0,
+    paid: earnings?.paidCents ?? 0,
+    pending: earnings?.pendingPayoutCents ?? 0,
+    gross: earnings?.grossCents ?? 0,
+    refunded: earnings?.refundedCents ?? 0,
+    commission: earnings?.commissionCents ?? 0,
+    providerFee: earnings?.providerFeeCents ?? 0,
+  };
 }

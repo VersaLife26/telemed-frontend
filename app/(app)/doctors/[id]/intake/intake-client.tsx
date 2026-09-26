@@ -13,7 +13,8 @@ import { PageHero } from "@/components/consumer/ui/PageHero";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { SexField } from "@/components/consumer/sex-field";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment, Doctor, Sex, TelemedUser } from "@/lib/consumer/api/types";
+import { hasCode } from "@/lib/consumer/api/errors";
+import type { Appointment, Doctor, LastVisitDetails, Sex, Specialty, TelemedUser } from "@/lib/consumer/api/types";
 import {
   bookingBody,
   bookingError,
@@ -43,9 +44,10 @@ const emptyVisit: VisitDraft = { name: "", dob: "", sex: "", weightKg: "", aller
 export function IntakeClient({ doctorId }: { doctorId: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const slotId = params.get("slot_id") || "";
-  const start = params.get("start") || "";
+  const start = params.get("startAt") || "";
+  const timeZone = params.get("tz") || undefined;
   const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [symptoms, setSymptoms] = useState("");
   const [subject, setSubject] = useState<VisitSubject>("self");
   const [account, setAccount] = useState<TelemedUser | null>(null);
@@ -59,13 +61,15 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
     let cancelled = false;
     Promise.all([
       browserApi<Doctor>(`/doctors/${doctorId}`),
-      browserApi<TelemedUser>("/users/me").catch(() => null),
-      browserApi<{ weight_kg?: number | null }>("/appointments/last-visit-details").catch(() => null),
+      browserApi<TelemedUser>("/me").catch(() => null),
+      browserApi<LastVisitDetails>("/appointments/last-visit-details").catch(() => null),
+      browserApi<Specialty[]>("/specialties").catch(() => []),
     ])
-      .then(([d, me, last]) => {
+      .then(([d, me, last, known]) => {
         if (cancelled) return;
-        const weight = last?.weight_kg ? String(last.weight_kg) : "";
+        const weight = last?.weightKg ? String(last.weightKg) : "";
         setDoctor(d);
+        setSpecialties(known);
         setAccount(me);
         setLastWeight(weight);
         setVisit({ ...visitPatientFromUser(me), weightKg: weight });
@@ -87,9 +91,9 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const missingSlot = bookingError(slotId);
-    if (missingSlot) {
-      setError(missingSlot);
+    const missing = bookingError(start, symptoms);
+    if (missing) {
+      setError(missing);
       return;
     }
     const visitErr =
@@ -102,20 +106,26 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
     try {
       const appt = await browserApi<Appointment>("/appointments", {
         method: "POST",
-        body: bookingBody(slotId, doctorId, symptoms, {
+        body: bookingBody(doctorId, start, symptoms, {
           ...visit,
           relation: subject === "other" ? relation : undefined,
         }),
       });
       router.push(paymentPath(appt.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Booking failed");
+      if (hasCode(err, "slot_unavailable")) {
+        setError("That time was just taken. Choose another slot on the doctor’s page.");
+      } else if (hasCode(err, "patient_overlap")) {
+        setError("You already have a visit booked at this time.");
+      } else {
+        setError(err instanceof Error ? err.message : "Booking failed");
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  if (!slotId) {
+  if (!start) {
     return (
       <EmptyState
         title="Pick a time first"
@@ -126,7 +136,7 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
     );
   }
 
-  const doctorName = doctor?.display_name || "Doctor";
+  const doctorName = doctor?.displayName || "Doctor";
 
   return (
     <div className="flex flex-col gap-10">
@@ -170,14 +180,14 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
               <Input
                 id="intake-specialty"
                 label="Specialty"
-                value={doctor?.specialty ? specialtyLabel(doctor.specialty) : "—"}
+                value={doctor?.specialtyCode ? specialtyLabel(doctor.specialtyCode, specialties) : "—"}
                 readOnly
                 icon={<Stethoscope className="size-4" />}
               />
               <Input
                 id="intake-date"
                 label="Date"
-                value={start ? formatVisitDate(start) : "Selected slot"}
+                value={formatVisitDate(start, new Date(), timeZone)}
                 readOnly
                 icon={<CalendarDays className="size-4" />}
                 className="tabular-time"
@@ -185,7 +195,7 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
               <Input
                 id="intake-time"
                 label="Time"
-                value={start ? formatVisitClock(start) : "—"}
+                value={formatVisitClock(start, timeZone)}
                 readOnly
                 icon={<Clock className="size-4" />}
                 className="tabular-time"
@@ -292,6 +302,8 @@ export function IntakeClient({ doctorId }: { doctorId: string }) {
               placeholder="What should the doctor know?"
               value={symptoms}
               onChange={(e) => setSymptoms(e.target.value)}
+              maxLength={2000}
+              required
             />
 
             {error ? <Alert tone="danger" title="Booking failed">{error}</Alert> : null}

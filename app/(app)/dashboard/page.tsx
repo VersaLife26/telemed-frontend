@@ -7,12 +7,12 @@ import { Badge } from "@/components/consumer/ui/Badge";
 import { ButtonLink } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Doctor } from "@/lib/consumer/api/types";
+import type { DoctorAnalytics, DoctorProfile, PeakHour, Specialty } from "@/lib/consumer/api/types";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
-import type { PeakHours, PracticeSummary } from "@/lib/consumer/features/practice";
+import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
+import { apiFileSrc } from "@/lib/consumer/features/practice";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { assets } from "@/lib/consumer/assets";
-import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { HEROES } from "@/lib/consumer/heroes";
 
 const SHORTCUTS = [
@@ -27,17 +27,17 @@ export default async function DashboardPage() {
     return (
       <Card className="flex max-w-xl flex-col items-start gap-4">
         <p className="text-body text-muted">
-          Sign in with a doctor OTP session to load your profile from doctor-service.
+          Sign in to load your practice dashboard.
         </p>
         <ButtonLink href="/login">Sign in</ButtonLink>
       </Card>
     );
   }
 
-  let me: Doctor | null = null;
+  let me: DoctorProfile | null = null;
   let error: string | null = null;
   try {
-    me = await apiFetch<Doctor>("/api/v1/doctors/me", { token });
+    me = await apiFetch<DoctorProfile>("/api/v1/doctors/me", { token });
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load";
   }
@@ -59,26 +59,27 @@ export default async function DashboardPage() {
     );
   }
 
-  if (me.verification_status && me.verification_status !== "approved") {
+  if (me.status === "suspended") {
     return (
       <Card variant="tint" className="flex max-w-xl flex-col items-start gap-4">
-        <Badge tone="warning">Verification: {me.verification_status}</Badge>
-        <h1 className="text-h3 text-ink">Not approved yet</h1>
+        <Badge tone="warning">Suspended</Badge>
+        <h1 className="text-h3 text-ink">Your practice is suspended</h1>
         <p className="text-body text-muted">
-          Availability and bookings open up once the admin console approves your SLMC documents.
+          {me.suspendedReason || "Patients cannot book you until the admin team reinstates your profile."}
         </p>
-        <ButtonLink href="/verification-pending">View verification</ButtonLink>
       </Card>
     );
   }
 
-  let summary: PracticeSummary | null = null;
-  let peak: PeakHours | null = null;
+  const specialties = await apiFetch<Specialty[]>("/api/v1/specialties").catch(() => [] as Specialty[]);
+
+  let summary: DoctorAnalytics | null = null;
+  let peak: PeakHour[] | null = null;
   let analyticsError: string | null = null;
   try {
     const [s, p] = await Promise.all([
-      apiFetch<PracticeSummary>("/api/v1/doctors/me/analytics", { token }),
-      apiFetch<PeakHours>("/api/v1/doctors/me/analytics/peak-hours", { token }),
+      apiFetch<DoctorAnalytics>("/api/v1/doctors/me/analytics", { token }),
+      apiFetch<PeakHour[]>("/api/v1/doctors/me/analytics/peak-hours", { token }),
     ]);
     summary = s;
     peak = p;
@@ -90,20 +91,20 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-8">
       <PageHero
         {...HEROES.dashboard}
-        title={me.display_name || "Doctor"}
-        image={profilePhotoSrc(me.photo_url) ?? assets.avatarPlaceholder}
-        imageAlt={me.display_name || "Your profile photo"}
+        title={me.displayName || "Doctor"}
+        image={apiFileSrc(me.photoUrl) ?? assets.avatarPlaceholder}
+        imageAlt={me.displayName || "Your profile photo"}
         framed
         chips={
           <>
             <HeroChip
               icon={<Stethoscope className="size-5" />}
-              value={me.specialty || "Specialty"}
+              value={me.specialtyCode ? specialtyLabel(me.specialtyCode, specialties) : "Specialty"}
               label="Specialty"
             />
             <HeroChip
               icon={<BadgeCheck className="size-5" />}
-              value={`SLMC ${me.slmc_number || "—"}`}
+              value={`SLMC ${me.slmcNumber || "—"}`}
               label="Registration"
               className="ml-10"
             />

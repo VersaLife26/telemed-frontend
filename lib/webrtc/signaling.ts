@@ -1,38 +1,42 @@
 /**
- * Client half of the platform's own signalling protocol.
+ * Client half of the consultation signalling hub (SignalR, /hubs/consultation).
  *
- * Mirrors internal/domain/consultation/signal on the Go side: same frame
- * types, same allowlist, same two-peer assumption. It carries SDP and ICE
- * between the two browsers and nothing else -- once the peer connection is up,
- * this socket is idle apart from keepalives, and losing it does not drop the
- * call. That last point is the reason reconnection here is unhurried: a
- * dropped signalling socket is only fatal if the media path also needs
- * renegotiating, which is exactly when the ICE restart in peer.ts wants it
- * back.
+ * It carries SDP and ICE between the two browsers plus the server's own
+ * frames (state changes, persisted chat, room closure). Once the peer
+ * connection is up this connection is mostly idle, and losing it does not drop
+ * the call. It is only fatal if the media path also needs renegotiating, which
+ * is exactly when the ICE restart in peer.ts wants it back.
  */
+
+import {
+  HubConnectionBuilder,
+  HubConnectionState,
+  LogLevel,
+  type HubConnection,
+} from "@microsoft/signalr";
 
 export type Envelope = {
   type: string;
-  from?: string;
+  from?: string | null;
   data?: unknown;
 };
 
 export type ICEServer = {
   urls: string[];
-  username?: string;
-  credential?: string;
+  username?: string | null;
+  credential?: string | null;
 };
 
 export type Welcome = {
-  peer_id: string;
-  room: string;
+  peerId: string;
+  role: "patient" | "doctor";
   /**
    * Which side yields when both offer at once. Assigned by the server, never
-   * negotiated between clients -- see the Go side for why.
+   * negotiated between clients.
    */
   polite: boolean;
-  peer_present: boolean;
-  ice_servers: ICEServer[];
+  peerPresent: boolean;
+  iceServers: ICEServer[];
 };
 
 export const FrameType = {
@@ -40,7 +44,6 @@ export const FrameType = {
   Answer: "answer",
   ICE: "ice",
   Bye: "bye",
-  RecordingState: "recording-state",
   Quality: "quality",
   Chat: "chat",
   Pointer: "pointer",
@@ -51,8 +54,12 @@ export const FrameType = {
   PeerJoined: "peer-joined",
   PeerLeft: "peer-left",
   RoomClosed: "room-closed",
+  StateChanged: "state-changed",
   Error: "error",
 } as const;
+
+/** room-closed reason when the same user connected again elsewhere. */
+export const ROOM_REPLACED = "replaced";
 
 export type SignalingState = "connecting" | "open" | "reconnecting" | "closed";
 
@@ -60,90 +67,100 @@ export type SignalingHandlers = {
   onWelcome?: (w: Welcome) => void;
   onPeerJoined?: () => void;
   onPeerLeft?: () => void;
-  onRoomClosed?: () => void;
+  onRoomClosed?: (reason: string) => void;
   onFrame?: (env: Envelope) => void;
   onStateChange?: (state: SignalingState) => void;
   onError?: (code: string, message: string) => void;
 };
 
-/** Milliseconds between application-level pings. */
-const PING_INTERVAL = 20_000;
-
 /**
- * Reconnect backoff, in milliseconds, indexed by consecutive attempt.
- *
- * It starts fast because the common case is a two-second mobile handover and
- * the user is mid-sentence, and it tops out rather than growing without bound
- * because a consultation that has been unreachable for half a minute needs a
- * person to decide what happens next, not a client quietly retrying for an
- * hour.
+ * Room tokens last about ten minutes and are only checked when a connection
+ * opens. Past this age a token is not trusted for a reconnect: the server
+ * rejects an expired one in a way SignalR will not retry, so a fresh one is
+ * fetched first.
  */
-const BACKOFF_MS = [250, 500, 1_000, 2_000, 4_000, 8_000];
+const TOKEN_REUSE_MS = 8 * 60_000;
+
+/** SignalR's own reconnect attempts, for short drops while the token is fresh. */
+const RECONNECT_MS = [0, 2_000, 5_000, 10_000];
+
+/** Delay between fresh-token restarts once SignalR has given up. */
+const RESTART_MS = [1_000, 2_000, 4_000, 8_000];
 
 export class SignalingClient {
-  private ws: WebSocket | null = null;
-  private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly connection: HubConnection;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempt = 0;
   private closedByUs = false;
+  private roomClosed = false;
   private state: SignalingState = "closed";
 
+  /**
+   * `url` is the absolute hub URL including `?roomToken=`. `refreshUrl`
+   * returns one with a fresh token (by joining again); `issuedAt` is when the
+   * token in `url` was issued.
+   */
   constructor(
-    private readonly url: string,
+    private url: string,
     private readonly handlers: SignalingHandlers = {},
-  ) {}
+    private readonly refreshUrl?: () => Promise<string>,
+    private issuedAt = Date.now(),
+  ) {
+    this.connection = new HubConnectionBuilder()
+      // The API's default CORS policy does not allow credentials, and the room
+      // token in the URL is the only credential the hub reads.
+      .withUrl(url, { withCredentials: false })
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: ({ previousRetryCount }) =>
+          this.stale() ? null : (RECONNECT_MS[previousRetryCount] ?? null),
+      })
+      .configureLogging(LogLevel.Warning)
+      .build();
+
+    this.connection.on("frame", (env: Envelope) => this.dispatch(env));
+    this.connection.onreconnecting(() => this.setState("reconnecting"));
+    this.connection.onreconnected(() => this.setState("open"));
+    this.connection.onclose(() => {
+      if (this.closedByUs || this.roomClosed) {
+        this.setState("closed");
+        return;
+      }
+      this.scheduleRestart();
+    });
+  }
 
   connect(): void {
     this.closedByUs = false;
-    this.open();
+    this.roomClosed = false;
+    this.setState("connecting");
+    void this.open();
   }
 
-  private open(): void {
-    this.setState(this.attempt === 0 ? "connecting" : "reconnecting");
+  private stale(): boolean {
+    return Boolean(this.refreshUrl) && Date.now() - this.issuedAt > TOKEN_REUSE_MS;
+  }
 
-    const ws = new WebSocket(this.url);
-    this.ws = ws;
-
-    ws.onopen = () => {
+  private async open(): Promise<void> {
+    try {
+      if (this.stale()) {
+        this.url = await this.refreshUrl!();
+        this.issuedAt = Date.now();
+      }
+      if (this.closedByUs) return;
+      this.connection.baseUrl = this.url;
+      await this.connection.start();
       this.attempt = 0;
       this.setState("open");
-      this.pingTimer = setInterval(() => {
-        this.send({ type: FrameType.Ping });
-      }, PING_INTERVAL);
-    };
+    } catch {
+      if (!this.closedByUs && !this.roomClosed) this.scheduleRestart();
+    }
+  }
 
-    ws.onmessage = (event) => {
-      let env: Envelope;
-      try {
-        env = JSON.parse(event.data as string) as Envelope;
-      } catch {
-        return;
-      }
-      this.dispatch(env);
-    };
-
-    ws.onclose = (event) => {
-      this.clearTimers();
-      if (this.closedByUs) {
-        this.setState("closed");
-        return;
-      }
-      // A normal close is the server saying it is finished with this peer --
-      // the room closed, or another socket took over this identity. Retrying
-      // into that would fight whatever replaced us, so only abnormal closes
-      // are retried.
-      if (event.code === 1000) {
-        this.setState("closed");
-        return;
-      }
-      this.scheduleRetry();
-    };
-
-    ws.onerror = () => {
-      // Deliberately empty. An error is always followed by a close, and the
-      // close handler owns the retry decision; acting here as well would
-      // double-schedule it.
-    };
+  private scheduleRestart(): void {
+    const delay = RESTART_MS[Math.min(this.attempt, RESTART_MS.length - 1)] ?? 8_000;
+    this.attempt += 1;
+    this.setState("reconnecting");
+    this.retryTimer = setTimeout(() => void this.open(), delay);
   }
 
   private dispatch(env: Envelope): void {
@@ -157,9 +174,14 @@ export class SignalingClient {
       case FrameType.PeerLeft:
         this.handlers.onPeerLeft?.();
         return;
-      case FrameType.RoomClosed:
-        this.handlers.onRoomClosed?.();
+      case FrameType.RoomClosed: {
+        // The server aborts the connection right after this frame. Retrying
+        // into a replaced or ended room would fight whatever replaced us.
+        this.roomClosed = true;
+        const reason = (env.data as { reason?: string } | undefined)?.reason ?? "";
+        this.handlers.onRoomClosed?.(reason);
         return;
+      }
       case FrameType.Pong:
         return;
       case FrameType.Error: {
@@ -172,24 +194,6 @@ export class SignalingClient {
     }
   }
 
-  private scheduleRetry(): void {
-    const delay = BACKOFF_MS[Math.min(this.attempt, BACKOFF_MS.length - 1)] ?? 8_000;
-    this.attempt += 1;
-    this.setState("reconnecting");
-    this.retryTimer = setTimeout(() => this.open(), delay);
-  }
-
-  private clearTimers(): void {
-    if (this.pingTimer) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
-  }
-
   private setState(next: SignalingState): void {
     if (this.state === next) return;
     this.state = next;
@@ -198,30 +202,37 @@ export class SignalingClient {
 
   /** True when a frame can be sent right now. */
   get ready(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return this.connection.state === HubConnectionState.Connected;
   }
 
   /**
-   * Sends a frame, returning false when the socket is not open.
+   * Sends a frame, returning false when the connection is not open.
    *
-   * Frames are dropped rather than queued, and that is correct for this
-   * protocol: an SDP or ICE candidate that arrives after a reconnect describes
-   * a negotiation that no longer exists, and replaying it confuses the far
-   * side rather than helping it. The recovery for a lost frame is an ICE
-   * restart, which produces fresh ones.
+   * Frames are dropped rather than queued: an SDP or ICE candidate that
+   * arrives after a reconnect describes a negotiation that no longer exists.
+   * The recovery for a lost frame is an ICE restart, which produces fresh ones.
    */
   send(env: Envelope): boolean {
     if (!this.ready) return false;
-    this.ws?.send(JSON.stringify(env));
+    void this.connection.invoke("Send", { type: env.type, data: env.data }).catch(() => undefined);
     return true;
   }
 
   close(): void {
     this.closedByUs = true;
-    this.clearTimers();
-    this.send({ type: FrameType.Bye });
-    this.ws?.close(1000, "client closed");
-    this.ws = null;
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    const stop = () => void this.connection.stop();
+    if (this.ready) {
+      void this.connection
+        .invoke("Send", { type: FrameType.Bye })
+        .catch(() => undefined)
+        .finally(stop);
+    } else {
+      stop();
+    }
     this.setState("closed");
   }
 }

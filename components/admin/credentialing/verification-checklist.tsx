@@ -14,18 +14,15 @@ import {
 } from "@/components/admin/ui/card";
 import { Progress } from "@/components/admin/ui/progress";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import { checklistFieldBody } from "@/lib/admin/api/adapters/credentialing";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import type {
-  ChecklistItemKey,
-  PendingDoctor,
-  VerificationChecklist,
-} from "@/lib/admin/api/types";
+import type { ChecklistItemKey, DoctorApplication } from "@/lib/admin/api/types";
 import {
   CHECKLIST_ITEMS,
   MINIMUM_EXPERIENCE_YEARS,
   answeredCount,
   checkSlmcFormat,
+  checklistBody,
+  itemValue,
   meetsExperienceBar,
 } from "@/lib/admin/credentialing";
 import { formatDateTime } from "@/lib/admin/format";
@@ -52,13 +49,8 @@ import { cn } from "@/lib/admin/utils";
  *    experience — it is shown *next to* the question as evidence, never used to
  *    answer it. A green tick that appeared on its own is a tick nobody made.
  */
-export function VerificationChecklistPanel({
-  doctor,
-  checklist,
-}: {
-  doctor: PendingDoctor;
-  checklist: VerificationChecklist;
-}) {
+export function VerificationChecklistPanel({ application }: { application: DoctorApplication }) {
+  const checklist = application.checklist;
   const [focusIndex, setFocusIndex] = React.useState(0);
   const [pending, setPending] = React.useState<ChecklistItemKey | null>(null);
   // The roving tab stop lives on each item's "Yes" button — a real <button>,
@@ -67,15 +59,12 @@ export function VerificationChecklistPanel({
   // replacement for them.
   const yesButtonRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
 
-  const decided = checklist.overall_status !== "pending";
+  const decided = application.status === "approved" || application.status === "rejected";
 
-  const mutation = useApiMutation<
-    VerificationChecklist,
-    { item: ChecklistItemKey; value: boolean }
-  >({
+  const mutation = useApiMutation<DoctorApplication, { item: ChecklistItemKey; value: boolean }>({
     method: "PUT",
-    path: () => endpoints.credentialing.checklist(doctor.doctor_id),
-    body: (variables) => checklistFieldBody(variables.item, variables.value),
+    path: () => endpoints.credentialing.checklist(application.id ?? ""),
+    body: (variables) => checklistBody(variables.item, variables.value),
     onSuccess: () => setPending(null),
   });
 
@@ -133,7 +122,7 @@ export function VerificationChecklistPanel({
   };
 
   const answered = answeredCount(checklist);
-  const slmc = checkSlmcFormat(doctor.slmc_number);
+  const slmc = checkSlmcFormat(application.slmcNumber);
 
   return (
     <Card>
@@ -168,8 +157,8 @@ export function VerificationChecklistPanel({
           className="divide-y divide-border rounded-lg border border-border"
         >
           {CHECKLIST_ITEMS.map((definition, index) => {
-            const state = checklist.items[definition.key];
-            const value = state?.value ?? null;
+            const state = checklist?.[definition.key] ?? null;
+            const value = itemValue(checklist, definition.key);
             const isPending = pending === definition.key && mutation.isPending;
 
             return (
@@ -227,12 +216,11 @@ export function VerificationChecklistPanel({
                   </div>
                 </div>
 
-                <Evidence definition={definition.key} doctor={doctor} slmcReason={slmc.reason} slmcValid={slmc.valid} />
+                <Evidence definition={definition.key} application={application} slmcReason={slmc.reason} slmcValid={slmc.valid} />
 
-                {state?.checked_at ? (
+                {state ? (
                   <p className="text-xs text-muted-foreground">
-                    Answered {formatDateTime(state.checked_at)}
-                    {state.checked_by ? " by another reviewer" : ""}
+                    Answered {formatDateTime(state.at)}
                   </p>
                 ) : null}
               </div>
@@ -260,16 +248,16 @@ function StateIcon({ value }: { value: boolean | null }) {
  */
 function Evidence({
   definition,
-  doctor,
+  application,
   slmcReason,
   slmcValid,
 }: {
   definition: ChecklistItemKey;
-  doctor: PendingDoctor;
+  application: DoctorApplication;
   slmcReason: string;
   slmcValid: boolean;
 }) {
-  if (definition === "slmc_format_valid") {
+  if (definition === "slmcFormat") {
     return (
       <p
         className={cn(
@@ -281,7 +269,7 @@ function Evidence({
       >
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
         <span>
-          Submitted as <span className="font-mono">{doctor.slmc_number}</span>. {slmcReason}{" "}
+          Submitted as <span className="font-mono">{application.slmcNumber}</span>. {slmcReason}{" "}
           This is a format check only — it says nothing about whether the registration
           exists or is current.
         </span>
@@ -289,8 +277,8 @@ function Evidence({
     );
   }
 
-  if (definition === "experience_verified") {
-    const years = doctor.years_experience;
+  if (definition === "experience") {
+    const years = application.experienceYears ?? null;
     const ok = meetsExperienceBar(years);
     return (
       <p

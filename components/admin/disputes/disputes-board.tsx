@@ -8,8 +8,8 @@ import { DataTable } from "@/components/admin/data-table/data-table";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { EmptyState } from "@/components/admin/ui/empty-state";
-import type { AdminIdentity, Dispute, DisputeStatus } from "@/lib/admin/api/types";
-import { formatMoney, formatRelative, humanise, shortId } from "@/lib/admin/format";
+import type { AdminAccount, Dispute, DisputeStatus } from "@/lib/admin/api/types";
+import { formatRelative, humanise, shortId } from "@/lib/admin/format";
 
 import { DisputeDrawer } from "./dispute-drawer";
 import { CreateDisputeDialog } from "./create-dispute-dialog";
@@ -37,21 +37,29 @@ export function DisputesBoard({
   filtered,
 }: {
   disputes: Dispute[];
-  admins: AdminIdentity[];
+  admins: AdminAccount[];
   filtered: boolean;
 }) {
   const [selected, setSelected] = React.useState<Dispute | null>(null);
   const [creating, setCreating] = React.useState(false);
 
+  const adminName = React.useCallback(
+    (id: string) => {
+      const admin = admins.find((a) => a.id === id);
+      return admin ? admin.displayName || admin.email : shortId(id);
+    },
+    [admins],
+  );
+
   const columns = React.useMemo<ColumnDef<Dispute, unknown>[]>(
     () => [
       {
-        accessorKey: "created_at",
+        accessorKey: "createdAt",
         header: "Age",
         cell: ({ row }) => (
           <div className="min-w-0">
             <p className="whitespace-nowrap text-sm">
-              {formatRelative(row.original.created_at)}
+              {formatRelative(row.original.createdAt)}
             </p>
             <p className="font-mono text-xs text-muted-foreground" title={row.original.id}>
               {shortId(row.original.id)}
@@ -60,44 +68,35 @@ export function DisputesBoard({
         ),
       },
       {
-        accessorKey: "category",
-        header: "Category",
-        cell: ({ row }) => <Badge variant="outline">{humanise(row.original.category)}</Badge>,
-      },
-      {
-        accessorKey: "description",
+        accessorKey: "subject",
         header: "Complaint",
         enableSorting: false,
         cell: ({ row }) => (
-          <p className="line-clamp-2 max-w-md text-sm">{row.original.description}</p>
+          <div className="max-w-md">
+            <p className="text-sm font-medium">{row.original.subject}</p>
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {row.original.description}
+            </p>
+          </div>
         ),
       },
       {
-        accessorKey: "doctor_name",
+        accessorKey: "doctorId",
         header: "Doctor",
-        cell: ({ row }) => row.original.doctor_name ?? shortId(row.original.doctor_id),
+        cell: ({ row }) => (
+          <span className="font-mono text-xs" title={row.original.doctorId}>
+            {shortId(row.original.doctorId)}
+          </span>
+        ),
       },
       {
-        id: "refund",
-        header: "Refund",
-        enableSorting: false,
-        cell: ({ row }) =>
-          row.original.refund_requested ? (
-            <span className="tabular-nums">
-              {formatMoney(row.original.refund_amount_cents, row.original.currency)}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          ),
-      },
-      {
-        accessorKey: "assigned_to_name",
+        accessorKey: "assignedAdminId",
         header: "Assigned",
         cell: ({ row }) =>
-          row.original.assigned_to_name ? (
+          row.original.assignedAdminId ? (
             <span className="flex items-center gap-1.5 text-sm">
               <UserCheck className="size-3.5 text-muted-foreground" aria-hidden="true" />
-              {row.original.assigned_to_name}
+              {adminName(row.original.assignedAdminId)}
             </span>
           ) : (
             <Badge variant="warning">Unassigned</Badge>
@@ -125,7 +124,7 @@ export function DisputesBoard({
         ),
       },
     ],
-    [],
+    [adminName],
   );
 
   return (
@@ -147,7 +146,7 @@ export function DisputesBoard({
             description={
               filtered
                 ? "Clear the status filter to see resolved and closed disputes too."
-                : "Nothing is waiting on mediation. Disputes are raised by patients through the support flow in the patient app."
+                : "Nothing is waiting on mediation. Staff open a dispute here when a patient complains."
             }
           />
         }

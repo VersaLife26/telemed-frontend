@@ -1,28 +1,21 @@
 import { apiFetch } from "@/lib/consumer/api/client";
-import { toClientError, finishAuth, requiredRole } from "@/lib/consumer/auth/session";
+import { finishAuth, problem, requiredRole, toClientError } from "@/lib/consumer/auth/session";
 import { missingTokensMessage, verifyOtpBody, verifyOtpError } from "@/lib/consumer/features/otp";
-import type { AuthTokens } from "@/lib/consumer/auth/session";
-import { NextResponse } from "next/server";
+import type { AuthResponse } from "@/lib/consumer/api/types";
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as {
-      phone?: string;
-      code?: string;
-      otp?: string;
-      purpose?: string;
-    };
-    const missing = verifyOtpError(body.phone, body.otp, body.code);
+    const body = (await req.json()) as { phone?: string; code?: string };
+    const missing = verifyOtpError(body.phone, body.code);
     if (missing) {
-      return NextResponse.json({ message: missing }, { status: 400 });
+      return problem(400, missing);
     }
-
-    const data = await apiFetch<AuthTokens>("/api/v1/auth/otp/verify", {
+    const data = await apiFetch<AuthResponse>("/api/v1/auth/otp/verify", {
       method: "POST",
-      body: verifyOtpBody(body.phone!, (body.otp || body.code || ""), body.purpose),
+      body: verifyOtpBody(body.phone!, body.code!),
     });
-    if (!data.access_token || !data.refresh_token) {
-      return NextResponse.json({ message: missingTokensMessage() }, { status: 502 });
+    if (!data.accessToken || !data.refreshToken) {
+      return problem(502, missingTokensMessage());
     }
     return await finishAuth(data, requiredRole());
   } catch (err) {

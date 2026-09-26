@@ -11,14 +11,7 @@ import { Input } from "@/components/consumer/ui/Input";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { SexField } from "@/components/consumer/sex-field";
 import type { Sex } from "@/lib/consumer/api/types";
-
-function readError(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const message = (json as { message?: string }).message;
-    if (message) return message;
-  }
-  return fallback;
-}
+import { problemMessage } from "@/lib/consumer/api/errors";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -47,10 +40,10 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/email/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, date_of_birth: dateOfBirth, sex, allergies }),
+        body: JSON.stringify({ email, password, fullName: name, dateOfBirth, sex, allergies }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Could not create account"));
+      if (!res.ok) throw new Error(problemMessage(json, "Could not create account"));
       router.replace("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create account");
@@ -66,10 +59,10 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_token: idToken }),
+        body: JSON.stringify({ idToken }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Google sign-in failed"));
+      if (!res.ok) throw new Error(problemMessage(json, "Google sign-in failed"));
       router.replace("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");

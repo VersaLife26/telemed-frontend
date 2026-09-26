@@ -6,7 +6,7 @@ import { identityFrom } from "@/lib/admin/auth/access";
 import { ADMIN_PATH_PREFIX, clientAddress, forwardingHeaders } from "./upstream";
 
 /**
- * Server-side plumbing between this console and telemed-api-gateway.
+ * Server-side plumbing between this console and the TeleMed API.
  *
  * Nothing in this module may be imported from a client component: the
  * `server-only` guard turns that mistake into a build error rather than a
@@ -29,16 +29,14 @@ export type HeaderSource = Request | { headers: Headers };
 /** The Access token to forward upstream, and the roles the platform grants. */
 export type SessionCredentials =
   | { token: string; roles: AdminRole[] }
-  | { token: null; roles: AdminRole[]; reason: "no-session" | "unreachable" };
+  | { token: null; roles: AdminRole[]; reason: "no-session" | "unreachable" | "ip-blocked" };
 
 /**
  * Reads the Cloudflare Access token and the caller's admin roles.
  *
- * Both used to come out of the encrypted Auth.js cookie: the token was
- * Keycloak's, and the roles were `realm_access.roles` copied off it on every
- * refresh. Neither exists now. Access authenticates the hostname and puts its
- * own JWT on the request, and the role comes from this platform's admin_users
- * row via `GET /api/v1/admin/me`.
+ * Access authenticates the hostname and puts its own JWT on the request, and
+ * the role comes from this platform's admin_users row via
+ * `GET /api/v1/admin/me`.
  *
  * The roles are still a server-side fact the browser cannot influence, which
  * is what makes them safe to authorise on in the BFF (see `canCallApi`) --
@@ -55,32 +53,24 @@ export async function accessTokenFor(request: HeaderSource): Promise<SessionCred
     return {
       token: null,
       roles: [],
-      reason: result.reason === "unreachable" ? "unreachable" : "no-session",
+      reason: result.reason === "no-access-token" ? "no-session" : result.reason,
     };
   }
   return { token: result.identity.token, roles: result.identity.roles };
 }
 
 /**
- * Distinguishes an IP-allowlist rejection from a role rejection.
+ * Asks the API whether the caller's network is on the admin IP allowlist.
  *
- * Both arrive as `403 FORBIDDEN` — `IPAllowlist` calls `httpx.ErrForbidden`,
- * the same error `RequireRole` uses — so the code alone cannot tell them
- * apart. What *can* tell them apart is the middleware order in the gateway's
- * `composeMiddleware`: for admin routes, `IPAllowlist` wraps `RequireAuth`,
- * so it runs first. An unauthenticated request therefore answers
- *
- *   403  → the IP was refused before authentication was even attempted
- *   401  → the IP was fine; the request simply had no token
- *
- * This probe sends exactly that: a token-free request carrying the address the
- * console resolved for the caller.
+ * The allowlist runs before authentication on every admin route and answers
+ * `403 ip_not_allowed`, so a credential-free `GET /admin/me` is enough: a
+ * refused network gets that code, an allowed one gets a plain 401.
  *
  * Two things guard the probe itself. It is an **unauthenticated** outbound call
  * that any visitor to `/ip-blocked` can cause, so the answer is memoised per
  * resolved address for `PROBE_TTL_MS`: without that, `IpAllowlistWatcher`'s
  * ten-second poll multiplied by the number of open tabs is a free amplifier
- * pointed at the gateway. And the address is resolved by `clientAddress`, never
+ * pointed at the API. And the address is resolved by `clientAddress`, never
  * copied from the caller's own `X-Forwarded-For`, so the endpoint cannot be
  * used to enumerate the allowlist by guessing addresses.
  */
@@ -96,7 +86,7 @@ export async function ipAllowlistRejects(request: HeaderSource): Promise<boolean
 
   let blocked = false;
   try {
-    const response = await fetch(`${gatewayBaseUrl()}/${ADMIN_PATH_PREFIX}/doctors/pending`, {
+    const response = await fetch(`${gatewayBaseUrl()}/${ADMIN_PATH_PREFIX}/me`, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -105,7 +95,10 @@ export async function ipAllowlistRejects(request: HeaderSource): Promise<boolean
       cache: "no-store",
       signal: AbortSignal.timeout(5_000),
     });
-    blocked = response.status === 403;
+    if (response.status === 403) {
+      const problem = (await response.json().catch(() => null)) as { code?: string } | null;
+      blocked = problem?.code === "ip_not_allowed";
+    }
   } catch {
     // The probe failing tells us nothing about the allowlist, so claim
     // nothing. The caller keeps the original error.

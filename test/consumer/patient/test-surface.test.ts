@@ -2,12 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { servedBy } from "@/lib/surface-routes";
-import { TEST_MODE } from "@/lib/consumer/env";
+import { TEST_MODE, TEST_SECRET } from "@/lib/consumer/env";
+import { otpCodeOf } from "@/lib/test/api";
 
-// These run with the default environment, where TELEMED_TEST_MODE is unset and
-// therefore on -- the same default the backend uses.
-test("the test console defaults to on, matching the backend", () => {
+// These run with the default environment, where NEXT_PUBLIC_TELEMED_TEST_MODE
+// and TEST_SECRET are unset.
+test("the test console page defaults to on", () => {
   assert.equal(TEST_MODE, true);
+});
+
+test("without TEST_SECRET the proxy sends no test secret", () => {
+  assert.equal(TEST_SECRET, "");
+});
+
+test("the OTP code is read out of a captured English message", () => {
+  assert.equal(otpCodeOf("Your VersaLife code is 482913. Valid for 5 minutes."), "482913");
+  assert.equal(otpCodeOf("Your appointment on 2026-09-26 is confirmed."), null);
 });
 
 test("the test console is published by the patient and doctor surfaces", () => {

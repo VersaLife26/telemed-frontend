@@ -7,6 +7,7 @@ import { Button } from "@/components/consumer/ui/Button";
 import { Modal } from "@/components/consumer/ui/Modal";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { RescheduleRequest } from "@/lib/consumer/api/types";
+import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 
 /**
  * Accepting a new time is ordinary, so it commits on the first click.
@@ -26,8 +27,8 @@ export function RescheduleDecision({
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  const from = request.original_start_at_local || request.original_start_at;
-  const to = request.proposed_start_at_local || request.proposed_start_at;
+  const from = `${formatVisitDate(request.originalStartAt)} ${formatVisitClock(request.originalStartAt)}`;
+  const to = `${formatVisitDate(request.proposedStartAt)} ${formatVisitClock(request.proposedStartAt)}`;
 
   async function act(kind: "accept" | "decline") {
     setError(null);

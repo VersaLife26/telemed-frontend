@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   MessageSquareWarning,
   ScrollText,
-  Settings,
   ShieldUser,
   Users,
   Wallet,
@@ -24,7 +23,7 @@ export interface NavItem {
 }
 
 /**
- * The console's page inventory, in the order the V2 docs §7.3 list them.
+ * The console's page inventory.
  *
  * Verification sits second rather than buried under a "Doctors" section: it is
  * the screen that decides whether an unlicensed practitioner can take
@@ -34,14 +33,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     href: "/",
     label: "Dashboard",
-    description: "Revenue, bookings, utilisation and district coverage",
+    description: "Revenue, bookings and top doctors",
     icon: LayoutDashboard,
     group: "analytics",
   },
   {
     href: "/doctors",
     label: "Verification queue",
-    description: "Credential review for doctors awaiting approval",
+    description: "Credential review for doctor applications",
     icon: BadgeCheck,
     group: "credentialing",
   },
@@ -55,21 +54,21 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     href: "/appointments",
     label: "Appointments",
-    description: "All bookings, force-cancel and double-booking resolution",
+    description: "All bookings, cancellations and reschedule requests",
     icon: CalendarClock,
     group: "appointments",
   },
   {
     href: "/payments",
     label: "Payments",
-    description: "Ledger, commission rules, payouts and refunds",
+    description: "Ledger, commission, payouts, refunds and promo codes",
     icon: Wallet,
     group: "finance",
   },
   {
     href: "/content",
     label: "Content",
-    description: "Specialties, symptoms, formulary and articles",
+    description: "Specialties and formulary",
     icon: FileText,
     group: "content",
   },
@@ -81,28 +80,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: "disputes",
   },
   {
-    href: "/settings",
-    label: "Settings",
-    description: "Slot defaults, policy, fee caps, flags, corporate clients",
-    icon: Settings,
-    group: "config",
-  },
-  {
-    // Nested under /settings, but guarded separately: groupForPath takes the
-    // longest matching prefix, so /settings/admins resolves to admin_users
-    // while /settings resolves to config. This entry is therefore hidden from
-    // every role except super_admin, while Settings above stays visible to ops
-    // and finance.
     href: "/settings/admins",
     label: "Admin accounts",
     description: "Who can sign in to this console, and what each of them can reach",
     icon: ShieldUser,
-    group: "admin_users",
+    group: "adminUsers",
   },
   {
     href: "/audit",
     label: "Audit logs",
-    description: "Immutable, hash-chained record of every admin action",
+    description: "Record of every admin action",
     icon: ScrollText,
     group: "audit",
   },

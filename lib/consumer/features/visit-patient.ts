@@ -1,10 +1,18 @@
 import type { Appointment, Sex, TelemedUser } from "@/lib/consumer/api/types";
 
+const visitDayFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Colombo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 /** Whole years between DOB and visit start (Asia/Colombo calendar day). */
 export function ageAtVisitDate(dob: string, visitStartIso: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || !visitStartIso) return 0;
-  const visitDay = visitStartIso.slice(0, 10);
-  const [vy, vm, vd] = visitDay.split("-").map(Number);
+  const start = new Date(visitStartIso);
+  if (Number.isNaN(start.getTime())) return 0;
+  const [vy, vm, vd] = visitDayFormat.format(start).split("-").map(Number);
   const [dy, dm, dd] = dob.split("-").map(Number);
   if (vy == null || vm == null || vd == null || dy == null || dm == null || dd == null) return 0;
   let age = vy - dy;
@@ -21,8 +29,8 @@ export function visitPatientFromUser(user: TelemedUser | null): {
   allergies: string;
 } {
   return {
-    name: (user?.name || "").trim(),
-    dob: (user?.date_of_birth || "").trim(),
+    name: (user?.fullName || "").trim(),
+    dob: (user?.dateOfBirth || "").trim(),
     sex: user?.sex || "",
     allergies: (user?.allergies || "").trim(),
   };
@@ -40,19 +48,15 @@ export type PrescriptionPatient = {
 /** Patient block for the prescription pad, from the booking snapshot. */
 export function prescriptionPatientFields(appt: Appointment | null): PrescriptionPatient {
   if (!appt) return { name: "", age: "", sex: "", weightKg: "", allergies: "", locked: false };
-  const name = (appt.visit_patient_name || appt.patient_name || "").trim();
-  const visitStart = appt.start_at_local || appt.start_at || "";
-  let age = appt.visit_patient_age;
-  if ((age == null || age <= 0) && appt.visit_patient_dob && visitStart) {
-    age = ageAtVisitDate(appt.visit_patient_dob, visitStart);
-  }
-  const locked = Boolean(name && (age != null && age > 0));
+  const visit = appt.visitPatient;
+  const name = visit.name.trim();
+  const age = ageAtVisitDate(visit.dateOfBirth, appt.startAt);
   return {
     name,
-    age: age != null && age > 0 ? String(age) : "",
-    sex: appt.visit_patient_sex || "",
-    weightKg: appt.visit_patient_weight_kg ? String(appt.visit_patient_weight_kg) : "",
-    allergies: (appt.visit_patient_allergies || "").trim(),
-    locked,
+    age: age > 0 ? String(age) : "",
+    sex: visit.sex || "",
+    weightKg: visit.weightKg ? String(visit.weightKg) : "",
+    allergies: (visit.allergies || "").trim(),
+    locked: Boolean(name && age > 0),
   };
 }

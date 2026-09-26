@@ -1,38 +1,67 @@
-import type { Doctor, FormularyDrug, PrescriptionItem } from "@/lib/consumer/api/types";
+import { browserApi } from "@/lib/consumer/api/client";
+import { isNotFound, problemMessage } from "@/lib/consumer/api/errors";
+import type {
+  FormularyDrug,
+  PrescriptionItem,
+  PrescriptionItemRequest,
+  SignedUrl,
+} from "@/lib/consumer/api/types";
+import { apiFileSrc } from "@/lib/consumer/features/practice";
 
-export type ItemDraft = PrescriptionItem & { key: string };
+export type ItemDraft = {
+  key: string;
+  drugId: string | null;
+  drugName: string;
+  strength: string;
+  form: string;
+  dosage: string;
+  frequency: string;
+  durationDays: number;
+  quantity: number;
+  instructions: string;
+  isGeneric: boolean;
+};
 
 export function blankItem(key = "item-1"): ItemDraft {
   return {
     key,
-    drug_name: "",
+    drugId: null,
+    drugName: "",
     strength: "",
     form: "",
     dosage: "",
     frequency: "",
-    duration_days: 7,
+    durationDays: 7,
     quantity: 1,
     instructions: "",
-    is_generic: false,
+    isGeneric: false,
   };
 }
 
 export function fromIssued(items: PrescriptionItem[] | undefined): ItemDraft[] {
   if (!items?.length) return [blankItem()];
-  return items.map((it, i) => ({ ...it, key: `issued-${i}` }));
+  return [...items]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((it, i) => ({
+      key: `issued-${i}`,
+      drugId: it.drugId,
+      drugName: it.drugName,
+      strength: it.strength,
+      form: it.form,
+      dosage: it.dosage,
+      frequency: it.frequency,
+      durationDays: it.durationDays,
+      quantity: it.quantity,
+      instructions: it.instructions ?? "",
+      isGeneric: it.isGeneric,
+    }));
 }
 
 export function completeLines(items: ItemDraft[]): ItemDraft[] {
-  return items.filter((it) => it.drug_name.trim() && it.dosage.trim() && it.frequency.trim());
+  return items.filter((it) => it.drugName.trim() && it.dosage.trim() && it.frequency.trim());
 }
 
-export function issueError(
-  patientName: string,
-  doctor: Doctor | null,
-  items: ItemDraft[],
-): string | null {
-  if (!patientName.trim()) return "Patient name is required on the PDF.";
-  if (!(doctor?.slmc_number || "").toUpperCase()) return "Your profile is missing an SLMC number.";
+export function issueError(items: ItemDraft[]): string | null {
   if (!completeLines(items).length) {
     return "Add at least one drug with name, dosage, and frequency.";
   }
@@ -41,10 +70,11 @@ export function issueError(
 
 export function fieldsFromDrug(drug: FormularyDrug): Partial<ItemDraft> {
   return {
-    drug_name: drug.name,
+    drugId: drug.id,
+    drugName: drug.name,
     strength: drug.strength || "",
     form: drug.form || "",
-    is_generic: Boolean(drug.is_generic),
+    isGeneric: drug.isGeneric,
   };
 }
 
@@ -52,62 +82,43 @@ export function canSearchFormulary(query: string): boolean {
   return query.trim().length >= 2;
 }
 
-/**
- * Degree line plus a "University: ..." line for the prescription pad.
- * The profile bio is deliberately not used: it is free text ("Practicing
- * locations…") and was printing in the credentials block.
- */
-export function doctorCredentialsText(doctor: Doctor | null): string {
-  const quals = doctor?.qualifications || [];
-  if (!quals.length) return "";
-  const degrees = quals.map((q) => q.degree).filter(Boolean).join(", ");
-  const universities = Array.from(new Set(quals.map((q) => q.institution).filter(Boolean))).join(", ");
-  return [degrees, universities && `University: ${universities}`].filter(Boolean).join("\n");
-}
-
-export function issuePayload(opts: {
-  appointmentId: string;
-  doctor: Doctor | null;
-  patientName: string;
-  patientAge: string;
-  patientSex?: string;
-  patientWeightKg?: string;
-  patientAllergies?: string;
-  items: ItemDraft[];
-}) {
-  const lines = completeLines(opts.items);
-  const weight = Number.parseFloat(opts.patientWeightKg || "");
+/** The server snapshots the prescriber and patient; only the drug lines are sent. */
+export function issuePayload(items: ItemDraft[]): { items: PrescriptionItemRequest[] } {
   return {
-    appointment_id: opts.appointmentId,
-    doctor_name: opts.doctor?.display_name || "Doctor",
-    doctor_slmc: (opts.doctor?.slmc_number || "").toUpperCase(),
-    doctor_qualifications: doctorCredentialsText(opts.doctor),
-    clinic_name: "VersaLife Telemedicine",
-    patient_name: opts.patientName.trim(),
-    patient_age: Number.parseInt(opts.patientAge, 10) || 0,
-    patient_nic: "",
-    ...(opts.patientSex ? { patient_sex: opts.patientSex } : {}),
-    ...(Number.isFinite(weight) && weight > 0 ? { patient_weight_kg: weight } : {}),
-    ...(opts.patientAllergies?.trim() ? { patient_allergies: opts.patientAllergies.trim() } : {}),
-    items: lines.map((it) => ({
-      drug_name: it.drug_name.trim(),
-      strength: it.strength || "",
-      form: it.form || "",
+    items: completeLines(items).map((it) => ({
+      drugId: it.drugId,
+      drugName: it.drugName.trim(),
+      strength: it.strength.trim() || null,
+      form: it.form.trim() || null,
       dosage: it.dosage.trim(),
       frequency: it.frequency.trim(),
-      duration_days: Number(it.duration_days) || 1,
+      durationDays: Number(it.durationDays) || 1,
       quantity: Number(it.quantity) || 1,
-      instructions: it.instructions || "",
-      is_generic: Boolean(it.is_generic),
+      instructions: it.instructions.trim() || null,
+      isGeneric: it.isGeneric,
     })),
   };
 }
 
-export const signatureImagePath = "/api/proxy/doctors/me/signature";
-export const sealImagePath = "/api/proxy/doctors/me/seal";
+export type StampKind = "signature" | "seal";
 
-export function lookupPath(appointmentId: string): string {
-  return `/prescriptions?appointment_id=${encodeURIComponent(appointmentId)}`;
+export function stampPath(kind: StampKind): string {
+  return `/doctors/me/${kind}`;
+}
+
+/** An image src for the doctor's uploaded signature or seal, or null when none is on file. */
+export async function loadStampSrc(kind: StampKind): Promise<string | null> {
+  try {
+    const link = await browserApi<SignedUrl>(stampPath(kind));
+    return apiFileSrc(link.url);
+  } catch (e) {
+    if (isNotFound(e)) return null;
+    throw e;
+  }
+}
+
+export function prescriptionPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/prescription`;
 }
 
 export function prescriptionPagePath(appointmentId: string): string {
@@ -130,32 +141,17 @@ export function looksLikePdf(bytes: Uint8Array): boolean {
   );
 }
 
-/**
- * Turns a non-PDF `/prescriptions/{id}/pdf` body into a doctor-facing error.
- * A stale VPS that still returns `{data:{pdf_url}}` has no `message` field,
- * which is why the UI used to show only the generic fallback.
- */
+/** Turns a non-PDF `/prescriptions/{id}/pdf` body into a doctor-facing error. */
 export function messageFromPdfDownloadFailure(status: number, contentType: string, bodyText: string): string {
+  const fallback = `Could not download the prescription PDF. (${status} ${contentType || "unknown type"})`;
   try {
-    const json = JSON.parse(bodyText) as {
-      message?: string;
-      code?: string;
-      error?: { message?: string };
-      data?: { pdf_url?: string };
-    };
-    if (json.data?.pdf_url) {
-      return "The prescription file is not being served yet. Please try Download again in a few minutes.";
-    }
-    const fromApi = json.message || json.error?.message;
-    if (fromApi) return fromApi;
+    return problemMessage(JSON.parse(bodyText), fallback);
   } catch {
-    /* not JSON */
+    return fallback;
   }
-  const type = contentType || "unknown type";
-  return `Could not download the prescription PDF. (${status} ${type})`;
 }
 
-/** Fetches the PDF through the BFF so cookies attach; a presigned /files URL 404s at the gateway. */
+/** Fetches the PDF through the BFF so cookies attach. */
 export async function downloadPrescriptionPdf(id: string): Promise<void> {
   const path = `/api/proxy${prescriptionPdfPath(id)}`;
   const send = () => fetch(path, { cache: "no-store" });
@@ -168,7 +164,7 @@ export async function downloadPrescriptionPdf(id: string): Promise<void> {
   const bytes = new Uint8Array(await res.arrayBuffer());
   // Trust the file header, not Content-Type: a correct PDF with
   // application/octet-stream (or a charset suffix) must still download, and a
-  // 200 JSON envelope must never be saved as ".pdf".
+  // JSON body must never be saved as ".pdf".
   if (res.ok && looksLikePdf(bytes)) {
     const blob = new Blob([bytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);

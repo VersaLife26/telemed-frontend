@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import { adminRoles } from "@/lib/admin/auth/current";
 import { AuditTable } from "@/components/admin/audit/audit-table";
-import { ChainVerifyCard } from "@/components/admin/audit/chain-verify";
 import { ErrorState } from "@/components/admin/common/error-state";
 import { PageHeader } from "@/components/admin/common/page-header";
 import { FilterBar } from "@/components/admin/data-table/filter-bar";
@@ -22,9 +21,7 @@ const PER_PAGE = 50;
  * The audit log.
  *
  * This is the one screen in the console that is evidence rather than
- * operations. It reads `audit_logs` — append-only at the database level, with a
- * SHA-256 hash chain over every row — and offers three things: a filtered view,
- * a CSV export, and a chain integrity check.
+ * operations. It offers two things: a filtered view and a CSV export.
  */
 export default async function AuditPage({
   searchParams,
@@ -35,49 +32,44 @@ export default async function AuditPage({
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
 
   const listQuery = query({
-    actor_id: params.actor_id,
-    action: params.action,
-    resource_type: params.resource_type,
-    resource_id: params.resource_id,
+    actorId: params.actorId,
+    entityType: params.entityType,
+    entityId: params.entityId,
     from: toRfc3339(params.from),
     to: toRfc3339(params.to, true),
-    page,
-    per_page: PER_PAGE,
   });
 
-  const result = await tryListServer<AuditEntry>(endpoints.audit.list(listQuery));
+  const result = await tryListServer<AuditEntry>(
+    endpoints.audit.list(query({ ...Object.fromEntries(listQuery), page, pageSize: PER_PAGE })),
+  );
 
   const filters = [
-    { name: "actor_id", label: "Actor (UUID)", kind: "search" as const, placeholder: "admin user id" },
-    { name: "action", label: "Action", kind: "search" as const, placeholder: "e.g. doctor.approved" },
+    { name: "actorId", label: "Actor (UUID)", kind: "search" as const, placeholder: "admin or user id" },
     {
-      name: "resource_type",
-      label: "Resource type",
+      name: "entityType",
+      label: "Entity type",
       kind: "search" as const,
       placeholder: "e.g. doctor",
     },
+    { name: "entityId", label: "Entity id", kind: "search" as const },
     { name: "from", label: "From", kind: "date" as const },
     { name: "to", label: "To", kind: "date" as const },
   ];
 
   const filtered = Boolean(
-    params.actor_id || params.action || params.resource_type || params.from || params.to,
+    params.actorId || params.entityType || params.entityId || params.from || params.to,
   );
 
   const header = (
     <PageHeader
       title="Audit logs"
-      description="Every state-changing action taken through this console. Append-only in the database, hash-chained row to row, and readable but never writable from here."
+      description="Every state-changing action on the platform. Readable but never writable from here."
     />
   );
 
   return (
     <>
       {header}
-
-      <section className="mb-6">
-        <ChainVerifyCard />
-      </section>
 
       <FilterBar
         filters={filters}
@@ -88,13 +80,13 @@ export default async function AuditPage({
       {result.ok ? (
         <>
           <AuditTable
-            entries={result.page.data}
+            entries={result.page.items}
             filtered={filtered}
             exportQuery={listQuery.toString()}
-            canExport={can(roles, "audit_export")}
+            canExport={can(roles, "auditExport")}
           />
           <Pagination
-            meta={result.page.meta}
+            meta={result.page}
             label="Audit log"
             query={pageQuery(params)}
           />
@@ -107,7 +99,7 @@ export default async function AuditPage({
 }
 
 /**
- * The filter bar sends a date; the backend's `ParseListFilter` wants RFC 3339.
+ * The filter bar sends a date; the API wants an ISO date-time.
  * `to` is pushed to the end of the day so "to 20 Aug" includes 20 August rather
  * than stopping at midnight, which is the bug every date filter has once.
  */

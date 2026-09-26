@@ -10,6 +10,7 @@ import { Modal } from "@/components/consumer/ui/Modal";
 import { Textarea } from "@/components/consumer/ui/Textarea";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { RescheduleRequest } from "@/lib/consumer/api/types";
+import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 
 function toUTCISO(local: string): string {
   return new Date(local).toISOString();
@@ -35,7 +36,7 @@ export function RescheduleRequestForm({
     return (
       <p className="text-body-sm text-muted">
         Waiting for patient or admin — proposed{" "}
-        {pending.proposed_start_at_local || pending.proposed_start_at}
+        {formatVisitDate(pending.proposedStartAt)} {formatVisitClock(pending.proposedStartAt)}
       </p>
     );
   }
@@ -53,13 +54,9 @@ export function RescheduleRequestForm({
     }
     setSaving(true);
     try {
-      const body: { proposed_start_at: string; reason?: string } = {
-        proposed_start_at: toUTCISO(when),
-      };
-      if (reason.trim()) body.reason = reason.trim();
       await browserApi<RescheduleRequest>(`/appointments/${appointmentId}/reschedule-requests`, {
         method: "POST",
-        body,
+        body: { proposedStartAt: toUTCISO(when), reason: reason.trim() || null },
       });
       setOpen(false);
       router.refresh();

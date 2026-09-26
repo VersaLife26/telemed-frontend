@@ -64,9 +64,9 @@ export function GoogleButton({
     (async () => {
       try {
         const res = await fetch("/api/auth/google/config", { cache: "no-store" });
-        const json = (await res.json()) as { data?: { enabled?: boolean; client_id?: string | null } };
-        const clientId = json.data?.client_id;
-        if (!json.data?.enabled || !clientId || cancelled) return;
+        const json = (await res.json()) as { enabled?: boolean; clientId?: string | null };
+        const clientId = json.clientId;
+        if (!json.enabled || !clientId || cancelled) return;
         await loadGis();
         if (cancelled || !slot.current || !window.google?.accounts?.id) return;
         window.google.accounts.id.initialize({

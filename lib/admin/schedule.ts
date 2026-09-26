@@ -1,6 +1,6 @@
-import type { ScheduleSettings, WorkingHour } from "@/lib/admin/api/types";
+import type { Schedule, UpdateScheduleRequest, WorkingHour } from "@/lib/admin/api/types";
 
-/** Sunday first, matching day_of_week 0..6 as the backend stores it. */
+/** Sunday first, matching dayOfWeek 0..6 as the backend stores it. */
 export const DAYS = [
   "Sunday",
   "Monday",
@@ -22,19 +22,37 @@ export function blankWeek(): DayRow[] {
   return DAYS.map(() => ({ available: false, start: "09:00", end: "17:00" }));
 }
 
-export function toRows(hours: WorkingHour[]): DayRow[] {
+/** Minutes from midnight → "HH:MM". 1440 (end of day) clamps to 23:59, the last value a time input accepts. */
+export function minutesToTime(minutes: number): string {
+  const clamped = Math.min(Math.max(0, minutes), 1439);
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** "HH:MM" → minutes from midnight. */
+export function timeToMinutes(time: string): number {
+  const [h = "0", m = "0"] = time.split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+/**
+ * One row per weekday. A day with no working-hours entry is off. The editor
+ * holds one block per day; if a day carries several, the first is shown.
+ */
+export function toRows(hours: readonly WorkingHour[]): DayRow[] {
   const rows = blankWeek();
+  const seen = new Set<number>();
   for (const h of hours) {
-    // Guarded rather than trusted: day_of_week arrives from the API, and an
-    // out-of-range value would otherwise extend the array and render a stray
-    // row for a day of the week that does not exist.
-    if (!Number.isInteger(h.day_of_week) || h.day_of_week < 0 || h.day_of_week > 6) continue;
-    rows[h.day_of_week] = {
-      available: h.is_available,
-      // Times arrive as HH:MM or HH:MM:SS depending on how the row was
-      // written; <input type="time"> only accepts the former.
-      start: h.start_time.slice(0, 5),
-      end: h.end_time.slice(0, 5),
+    // Guarded rather than trusted: an out-of-range value would otherwise
+    // extend the array and render a row for a day that does not exist.
+    if (!Number.isInteger(h.dayOfWeek) || h.dayOfWeek < 0 || h.dayOfWeek > 6) continue;
+    if (seen.has(h.dayOfWeek)) continue;
+    seen.add(h.dayOfWeek);
+    rows[h.dayOfWeek] = {
+      available: true,
+      start: minutesToTime(h.startMinute),
+      end: minutesToTime(h.endMinute),
     };
   }
   return rows;
@@ -48,45 +66,30 @@ export function dayError(row: DayRow): string | null {
   return null;
 }
 
-/**
- * The buffer field as it goes on the wire.
- *
- * "" means "leave it unset" and "0" means back-to-back consultations. Those
- * are different instructions, and the whole chain — this function, the DTO,
- * the domain type, the column and the event tag — keeps them apart. Collapsing
- * them here would hand the doctor the platform default gap forever, with
- * nothing logged to say why.
- */
-export function bufferValue(input: string): number | null {
-  const trimmed = input.trim();
-  if (trimmed === "") return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? n : null;
-}
+export type ScheduleSettings = Omit<UpdateScheduleRequest, "workingHours">;
 
-/** The request body for PUT availability. */
-export function toAvailabilityRequest(
-  rows: DayRow[],
-  slotDurationMinutes: number,
-  buffer: string,
-  maxPerDay: number,
-) {
+/** The slot settings as the editor starts with them, filling gaps with the platform's usual values. */
+export function initialSettings(schedule: Schedule): ScheduleSettings {
   return {
-    working_hours: rows.map((r, day) => ({
-      day_of_week: day,
-      start_time: r.start,
-      end_time: r.end,
-      is_available: r.available,
-    })),
-    slot_duration_minutes: slotDurationMinutes,
-    buffer_minutes: bufferValue(buffer),
-    max_per_day: maxPerDay,
+    slotDurationMinutes: schedule.slotDurationMinutes || 15,
+    bufferMinutes: schedule.bufferMinutes ?? 0,
+    maxPerDay: schedule.maxPerDay ?? 0,
+    advanceDays: schedule.advanceDays || 30,
+    timezone: schedule.timezone || "Asia/Colombo",
   };
 }
 
-/** The buffer as the editor should first display it. */
-export function initialBuffer(settings: ScheduleSettings): string {
-  return settings.buffer_minutes === null || settings.buffer_minutes === undefined
-    ? ""
-    : String(settings.buffer_minutes);
+/**
+ * The request body for PUT doctors/{id}/schedule. The API replaces the whole
+ * week, so days that are off are simply absent.
+ */
+export function toScheduleRequest(rows: DayRow[], settings: ScheduleSettings): UpdateScheduleRequest {
+  return {
+    ...settings,
+    workingHours: rows.flatMap((r, day) =>
+      r.available
+        ? [{ dayOfWeek: day, startMinute: timeToMinutes(r.start), endMinute: timeToMinutes(r.end) }]
+        : [],
+    ),
+  };
 }

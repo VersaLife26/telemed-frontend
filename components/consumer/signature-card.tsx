@@ -8,12 +8,12 @@ import { Button } from "@/components/consumer/ui/Button";
 import { Card } from "@/components/consumer/ui/Card";
 import { browserApi } from "@/lib/consumer/api/client";
 import { cx } from "@/lib/consumer/cx";
-import { sealImagePath, signatureImagePath } from "@/lib/consumer/features/prescription";
+import { loadStampSrc, stampPath, type StampKind } from "@/lib/consumer/features/prescription";
 
 const MAX_BYTES = 1024 * 1024;
 const ALLOWED = new Set(["image/png", "image/jpeg"]);
 
-type Kind = "signature" | "seal";
+type Kind = StampKind;
 
 function credentialFileError(file: File): string | null {
   if (!ALLOWED.has(file.type)) return "Use a PNG or JPEG image.";
@@ -21,26 +21,19 @@ function credentialFileError(file: File): string | null {
   return null;
 }
 
-function useStoredImage(path: string, version: number) {
+export function useStampImage(kind: Kind, version: number) {
   const [src, setSrc] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    let url: string | null = null;
     let cancelled = false;
-    fetch(`${path}?v=${version}`, { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok || !(res.headers.get("content-type") || "").startsWith("image/")) return null;
-        url = URL.createObjectURL(await res.blob());
-        return url;
-      })
+    loadStampSrc(kind)
       .catch(() => null)
       .then((next) => {
         if (!cancelled) setSrc(next);
       });
     return () => {
       cancelled = true;
-      if (url) URL.revokeObjectURL(url);
     };
-  }, [path, version]);
+  }, [kind, version]);
   return src;
 }
 
@@ -54,8 +47,8 @@ export function SignatureCard() {
   const padRef = useRef<SignaturePadHandle | null>(null);
   const signatureInput = useRef<HTMLInputElement>(null);
   const sealInput = useRef<HTMLInputElement>(null);
-  const signatureSrc = useStoredImage(signatureImagePath, version);
-  const sealSrc = useStoredImage(sealImagePath, version);
+  const signatureSrc = useStampImage("signature", version);
+  const sealSrc = useStampImage("seal", version);
 
   async function upload(kind: Kind, blob: Blob, filename: string) {
     setBusy(kind);
@@ -64,7 +57,7 @@ export function SignatureCard() {
     try {
       const form = new FormData();
       form.append("file", blob, filename);
-      await browserApi(`/doctors/me/${kind}`, { method: "PUT", body: form });
+      await browserApi(stampPath(kind), { method: "PUT", body: form });
       setVersion((v) => v + 1);
       setNotice(kind === "signature" ? "Signature saved." : "Seal saved.");
       if (kind === "signature") {
@@ -220,7 +213,7 @@ function StoredPreview({ label, src }: { label: string; src: string | null | und
         {src === undefined ? (
           <span className="h-10 w-3/4 animate-pulse rounded bg-ink-50" />
         ) : src ? (
-          // eslint-disable-next-line @next/next/no-img-element -- blob: URL
+          // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
           <img src={src} alt={label} className="max-h-full max-w-full object-contain" />
         ) : (
           <span className="text-body-sm text-faint">Not added yet</span>

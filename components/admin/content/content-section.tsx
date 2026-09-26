@@ -12,16 +12,8 @@ import { useApiMutation } from "@/lib/admin/api/hooks";
 
 import { EntityEditor, type FieldSpec, type FieldValue } from "./entity-editor";
 
-/**
- * Table plus create/edit dialog, shared by all four content types.
- *
- * `version` is sent on every update. `specialties`, `symptoms`, `drugs` and
- * `articles` all carry an optimistic-lock column (migration 000006), so two
- * admins editing the drug formulary at once produce a 409 CONFLICT for the
- * second rather than a silent overwrite — and the error map turns that into
- * "someone else changed this record while you had it open".
- */
-export function ContentSection<T extends { id: string; version: number }>({
+/** Table plus create/edit dialog, shared by the content types. */
+export function ContentSection<T>({
   title,
   description,
   rows,
@@ -29,6 +21,7 @@ export function ContentSection<T extends { id: string; version: number }>({
   fields,
   toFormValues,
   toPayload,
+  rowId,
   createPath,
   updatePath,
   singular,
@@ -40,7 +33,9 @@ export function ContentSection<T extends { id: string; version: number }>({
   columns: ColumnDef<T, unknown>[];
   fields: readonly FieldSpec[];
   toFormValues: (row: T | null) => Record<string, FieldValue>;
-  toPayload: (values: Record<string, FieldValue>) => Record<string, unknown>;
+  /** `row` is the record being edited, or null when creating. */
+  toPayload: (values: Record<string, FieldValue>, row: T | null) => Record<string, unknown>;
+  rowId: (row: T) => string;
   createPath: string;
   updatePath: (id: string) => string;
   singular: string;
@@ -60,7 +55,7 @@ export function ContentSection<T extends { id: string; version: number }>({
     {
       method: "POST",
       path: () => createPath,
-      body: (values) => toPayload(values),
+      body: (values) => toPayload(values, null),
       successMessage: () => `${singular} created.`,
       onSuccess: close,
     },
@@ -70,8 +65,8 @@ export function ContentSection<T extends { id: string; version: number }>({
   const updateMutation = useApiMutation<T, Record<string, FieldValue>>(
     {
       method: "PUT",
-      path: () => updatePath(editing?.id ?? ""),
-      body: (values) => ({ ...toPayload(values), version: editing?.version }),
+      path: () => updatePath(editing ? rowId(editing) : ""),
+      body: (values) => toPayload(values, editing),
       successMessage: () => `${singular} updated.`,
       onSuccess: close,
     },
@@ -132,23 +127,21 @@ export function ContentSection<T extends { id: string; version: number }>({
       <DataTable
         columns={columnsWithActions}
         data={rows}
-        getRowId={(row) => row.id}
-        caption={`${title}. Editing sends the row's version, so a concurrent edit fails loudly rather than overwriting.`}
+        getRowId={rowId}
+        caption={title}
         emptyState={
           <EmptyState
             icon={FileText}
             title={`No ${title.toLowerCase()} yet`}
-            description={`Create the first ${singular.toLowerCase()} with the button above. Every change publishes a content.* event so the other services can update their local copy.`}
+            description={`Create the first ${singular.toLowerCase()} with the button above.`}
           />
         }
       />
 
       <EntityEditor
         open={open}
+        editing={editing !== null}
         title={creating ? `New ${singular.toLowerCase()}` : `Edit ${singular.toLowerCase()}`}
-        {...(editing
-          ? { description: `Version ${editing.version}. Saving increments it.` }
-          : {})}
         fields={fields}
         initial={toFormValues(editing)}
         submitLabel={creating ? "Create" : "Save changes"}

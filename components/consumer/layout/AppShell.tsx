@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Doctor } from "@/lib/consumer/api/types";
+import type { DoctorProfile } from "@/lib/consumer/api/types";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { Avatar } from "@/components/consumer/ui/Avatar";
 import { NavBar, type NavItem } from "@/components/consumer/ui/NavBar";
@@ -18,11 +18,11 @@ export function AppShell({ children, className = "" }: { children: ReactNode; cl
 }
 
 function useDoctorAccount() {
-  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    browserApi<Doctor>("/doctors/me")
+    browserApi<DoctorProfile>("/doctors/me")
       .then((me) => {
         if (!cancelled) setDoctor(me);
       })
@@ -31,7 +31,7 @@ function useDoctorAccount() {
       });
 
     function onUpdated(event: Event) {
-      setDoctor((event as CustomEvent<Doctor>).detail ?? null);
+      setDoctor((event as CustomEvent<DoctorProfile>).detail ?? null);
     }
     window.addEventListener("telemed:doctor-profile-updated", onUpdated);
     return () => {
@@ -71,8 +71,8 @@ export function AppHeader({
           className="flex min-h-10 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
         >
           <Avatar
-            src={profilePhotoSrc(doctor?.photo_url)}
-            name={doctor?.display_name || title || null}
+            src={profilePhotoSrc(doctor?.photoUrl)}
+            name={doctor?.displayName || title || null}
             size={32}
             ring
             className="ring-brand/30"

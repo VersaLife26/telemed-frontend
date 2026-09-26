@@ -3,12 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Consultation, JoinResult, WaitingRoomStatus } from "@/lib/consumer/api/types";
+import type {
+  Consultation,
+  ConsultationMessage,
+  JoinResult,
+  Paged,
+  WaitingRoomStatus,
+} from "@/lib/consumer/api/types";
 import {
   admitDisabled,
   admitPath,
+  consultationPath,
+  consultJoinError,
   endConsultBody,
   endPath,
+  hubUrlFor,
   isWaiting,
   joinPath,
   qualityLabel,
@@ -17,17 +26,16 @@ import {
   QUALITY_REPORT_INTERVAL_MS,
   isConsultTerminal,
   shouldConnectMedia,
-  signalUrlFor,
   waitingRoomPollPath,
 } from "@/lib/consumer/features/consult";
 import {
   consultationMessagesPath,
   createLiveChat,
   type ChatTransport,
-  type ServerChatMessage,
 } from "@/lib/consumer/features/chat";
 import type { CallState } from "@/lib/webrtc/peer";
-import { PeerCall, SIGNAL_ERROR } from "@/lib/webrtc/peer";
+import { PeerCall } from "@/lib/webrtc/peer";
+import { ROOM_REPLACED } from "@/lib/webrtc/signaling";
 import type { PointerState } from "@/lib/consumer/features/pointer";
 
 export type ConsultationRole = "patient" | "doctor";
@@ -74,8 +82,16 @@ export type ConsultationControls = {
   leavePointer: () => void;
 };
 
+/** How often the lobby polls before the hub connection exists. */
+const LOBBY_POLL_MS = 3_000;
+
 /**
- * Join, poll, admit, connect and end for one consultation.
+ * Join, admit, connect and end for one consultation.
+ *
+ * The hub connection is only opened with media, once the consultation is
+ * active, because opening it earlier would let the two browsers negotiate
+ * before the doctor admits. So the lobby polls (status, queue position), and
+ * the live call relies on `state-changed` and `chat` frames instead.
  *
  * Both the patient call screen and the doctor workspace consume this, so the
  * call logic lives in one place. `appointmentId` null is a quiet idle state
@@ -89,7 +105,10 @@ export function useConsultation(
   const previewRef = useRef<MediaStream | null>(null);
   const leavingRef = useRef(false);
   const lastQualityReport = useRef(0);
-  const joinRef = useRef<JoinResult | null>(null);
+  const joinedAt = useRef(0);
+  // Set when this user opened the call elsewhere; blocks auto-reconnecting
+  // back into the room, which would just bounce the other window out.
+  const replacedRef = useRef(false);
 
   const [join, setJoin] = useState<JoinResult | null>(null);
   const [queue, setQueue] = useState<WaitingRoomStatus | null>(null);
@@ -113,21 +132,37 @@ export function useConsultation(
   const [localPointer, setLocalPointer] = useState<PointerState | null>(null);
   const [remotePointer, setRemotePointer] = useState<PointerState | null>(null);
   const lastPointerSent = useRef(0);
-  joinRef.current = join;
 
-  const chat = useMemo(
-    () =>
-      createLiveChat((msg) => {
-        callRef.current?.sendChat(msg);
-        const cid = joinRef.current?.consultation_id;
-        if (!cid) return;
-        void browserApi(consultationMessagesPath(cid), {
-          method: "POST",
-          body: { content: msg.body, metadata: { client_id: msg.id } },
-        }).catch(() => {});
-      }),
-    [appointmentId],
-  );
+  const chat = useMemo(() => {
+    const live = createLiveChat(role, (body) => {
+      if (!appointmentId) return;
+      void browserApi<ConsultationMessage>(consultationMessagesPath(appointmentId), {
+        method: "POST",
+        body: { body },
+      })
+        .then((message) => live.merge([message]))
+        .catch(() => setNotice("Your message wasn’t sent. Try again."));
+    });
+    return live;
+  }, [appointmentId, role]);
+
+  const loadMessages = useCallback(async () => {
+    if (!appointmentId) return;
+    try {
+      const page = await browserApi<Paged<ConsultationMessage>>(
+        `${consultationMessagesPath(appointmentId)}?page=1&pageSize=100`,
+      );
+      chat.merge(page.items);
+    } catch {
+      /* history is best effort; live messages still arrive over the hub */
+    }
+  }, [appointmentId, chat]);
+
+  const freshSignalUrl = useCallback(async () => {
+    if (!appointmentId) throw new Error("No consultation");
+    const refreshed = await browserApi<JoinResult>(joinPath(appointmentId), { method: "POST" });
+    return hubUrlFor(refreshed);
+  }, [appointmentId]);
 
   const stopPreview = useCallback(() => {
     const preview = previewRef.current;
@@ -165,17 +200,26 @@ export function useConsultation(
     }
   }, [attachLocal, cameraOff, muted, status]);
 
+  const endLocally = useCallback(() => {
+    leavingRef.current = true;
+    stopPreview();
+    callRef.current?.hangUp("consultation ended");
+    callRef.current = null;
+    setConnected(false);
+    setConnecting(false);
+  }, [stopPreview]);
+
+  const applyConsultation = useCallback(
+    (consult: Consultation) => {
+      setStatus(consult.status);
+      if (isConsultTerminal(consult.status)) endLocally();
+    },
+    [endLocally],
+  );
+
   const connectMedia = useCallback(
     async (info: JoinResult) => {
-      const url = signalUrlFor(info);
-      if (!url) {
-        setError(
-          "This deployment is not configured for video calls. Nobody can join until " +
-            "the signalling address is set.",
-        );
-        return;
-      }
-
+      if (!appointmentId) return;
       setConnecting(true);
       setError(null);
       setNotice(null);
@@ -183,7 +227,7 @@ export function useConsultation(
       try {
         callRef.current?.hangUp("reconnecting");
 
-        const call = new PeerCall(url, {
+        const call = new PeerCall(hubUrlFor(info), {
           onRemoteStream: (stream) => setRemoteStream(stream),
           onScreenShareEnded: () => {
             setSharing(false);
@@ -206,40 +250,40 @@ export function useConsultation(
               );
               setConnecting(false);
             }
-            if (state === "ended" && !leavingRef.current) {
-              setNotice("This call was opened in another window.");
-            }
           },
-          onChat: (msg) => chat.receive(msg),
-          onPointer: (pointer) => setRemotePointer(pointer),
-          onError: (code, message) => {
-            if (code === SIGNAL_ERROR.roomFull) {
-              setConnecting(false);
-              setError(
-                "This consultation already has two participants. If you have it open in " +
-                  "another tab or on another device, close that one first.",
-              );
+          onWelcome: () => void loadMessages(),
+          onConsultation: applyConsultation,
+          onMessage: (message) => chat.merge([message]),
+          onRoomClosed: (reason) => {
+            setConnected(false);
+            setConnecting(false);
+            if (reason === ROOM_REPLACED) {
+              replacedRef.current = true;
+              setHasLocalMedia(false);
+              if (!leavingRef.current) setError("This call was opened in another window.");
               return;
             }
-            setNotice(message);
+            void browserApi<Consultation>(consultationPath(appointmentId))
+              .then(applyConsultation)
+              .catch(() => {});
           },
+          onPointer: (pointer) => setRemotePointer(pointer),
+          onError: (_code, message) => setNotice(message),
           onQuality: (q) => {
             setQuality(qualityLabel(q));
-            const id = info.consultation_id;
-            if (!id) return;
             const now = Date.now();
             if (now - lastQualityReport.current < QUALITY_REPORT_INTERVAL_MS) return;
             lastQualityReport.current = now;
-            void browserApi(qualityPath(id), {
+            void browserApi(qualityPath(appointmentId), {
               method: "POST",
               body: {
                 quality: qualityLabel(q),
-                packet_loss_pct: Math.round(q.packetLoss * 1000) / 10,
-                bitrate_kbps: Math.round(q.outboundKbps),
+                packetLossPct: Math.round(q.packetLoss * 1000) / 10,
+                bitrateKbps: Math.round(q.outboundKbps),
               },
             }).catch(() => {});
           },
-        });
+        }, freshSignalUrl, joinedAt.current);
         callRef.current = call;
         leavingRef.current = false;
 
@@ -252,7 +296,17 @@ export function useConsultation(
         setError(e instanceof Error ? cameraMessage(e) : "Could not start the call.");
       }
     },
-    [attachLocal, cameraOff, chat, muted, stopPreview],
+    [
+      applyConsultation,
+      appointmentId,
+      attachLocal,
+      cameraOff,
+      chat,
+      freshSignalUrl,
+      loadMessages,
+      muted,
+      stopPreview,
+    ],
   );
 
   useEffect(() => {
@@ -276,16 +330,19 @@ export function useConsultation(
       chat.reset();
       return;
     }
+    replacedRef.current = false;
     let cancelled = false;
     (async () => {
       try {
         const result = await browserApi<JoinResult>(joinPath(appointmentId), { method: "POST" });
         if (!cancelled) {
+          joinedAt.current = Date.now();
           setJoin(result);
           setStatus(result.status);
+          void loadMessages();
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Join failed");
+        if (!cancelled) setError(consultJoinError(e, role));
       }
     })();
     return () => {
@@ -295,11 +352,11 @@ export function useConsultation(
       callRef.current?.hangUp("left the page");
       callRef.current = null;
     };
-  }, [appointmentId, chat, stopPreview]);
+  }, [appointmentId, chat, loadMessages, role, stopPreview]);
 
   useEffect(() => {
     if (isConsultTerminal(status)) return;
-    if (!join || connected || connecting) return;
+    if (!join || connected || connecting || replacedRef.current) return;
     if (shouldConnectMedia(join.status, status)) {
       void connectMedia(join);
     } else if (role === "patient" && isWaiting(status, join.status)) {
@@ -308,57 +365,37 @@ export function useConsultation(
   }, [join, status, connected, connecting, connectMedia, role, startPreview]);
 
   useEffect(() => {
-    if (!join?.consultation_id || isConsultTerminal(status)) return;
+    if (!appointmentId || !join || connected || isConsultTerminal(status)) return;
     let cancelled = false;
     async function tick() {
       try {
-        const consult = await browserApi<Consultation>(`/consultations/${join!.consultation_id}`);
+        const consult = await browserApi<Consultation>(consultationPath(appointmentId!));
         if (cancelled) return;
-        if (consult.status) {
-          setStatus(consult.status);
-          if (isConsultTerminal(consult.status)) {
-            leavingRef.current = true;
-            stopPreview();
-            callRef.current?.hangUp("consultation ended");
-            callRef.current = null;
-            setConnected(false);
-            setConnecting(false);
-            return;
-          }
-        }
-        if (!connected && (role === "patient" || consult.status === "waiting")) {
-          const room = await browserApi<WaitingRoomStatus>(waitingRoomPollPath(join!.consultation_id));
+        applyConsultation(consult);
+        if (isConsultTerminal(consult.status)) return;
+        if (role === "patient") {
+          const room = await browserApi<WaitingRoomStatus>(waitingRoomPollPath(appointmentId!));
           if (!cancelled) setQueue(room);
         }
-        if (consult.status === "active" && join && !connected && !connecting) {
-          void connectMedia(join);
-        }
-        const rows = await browserApi<ServerChatMessage[]>(
-          `${consultationMessagesPath(join!.consultation_id)}?limit=100`,
-        );
-        if (!cancelled && Array.isArray(rows)) chat.mergeFromServer(rows, role);
       } catch {
         /* keep polling */
       }
     }
     void tick();
-    const timer = window.setInterval(() => void tick(), 2500);
+    const timer = window.setInterval(() => void tick(), LOBBY_POLL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [chat, connectMedia, connected, connecting, join, role, status, stopPreview]);
+  }, [applyConsultation, appointmentId, connected, join, role, status]);
 
   const admit = useCallback(async () => {
-    if (!join?.consultation_id || !appointmentId) return;
+    if (!appointmentId) return;
     setAdmitting(true);
     setError(null);
     try {
-      await browserApi(admitPath(join.consultation_id), { method: "POST", body: {} });
-      const refreshed = await browserApi<JoinResult>(joinPath(appointmentId), { method: "POST" });
-      setJoin(refreshed);
-      setStatus(refreshed.status);
-      await connectMedia(refreshed);
+      const consult = await browserApi<Consultation>(admitPath(appointmentId), { method: "POST" });
+      applyConsultation(consult);
     } catch (e) {
       setError(
         e instanceof Error
@@ -368,7 +405,7 @@ export function useConsultation(
     } finally {
       setAdmitting(false);
     }
-  }, [appointmentId, connectMedia, join]);
+  }, [appointmentId, applyConsultation]);
 
   const toggleMute = useCallback(() => {
     const next = !muted;
@@ -412,21 +449,17 @@ export function useConsultation(
   }, []);
 
   const end = useCallback(async () => {
-    if (!join?.consultation_id) return;
+    if (!appointmentId) return;
     setEnding(true);
     leavingRef.current = true;
     try {
       stopPreview();
       callRef.current?.hangUp("ended by this participant");
-      await browserApi(endPath(join.consultation_id), {
+      // The server completes the appointment itself when the doctor ends.
+      await browserApi(endPath(appointmentId), {
         method: "POST",
         body: endConsultBody(),
       });
-      if (appointmentId) {
-        await browserApi(`/appointments/${appointmentId}/complete`, {
-          method: "POST",
-        }).catch(() => {});
-      }
     } catch {
       /* still leave the UI */
     } finally {
@@ -436,7 +469,7 @@ export function useConsultation(
       setScreenStream(null);
       setStatus("ended");
     }
-  }, [join, stopPreview]);
+  }, [appointmentId, stopPreview]);
 
   const leave = useCallback(() => {
     leavingRef.current = true;
@@ -451,6 +484,7 @@ export function useConsultation(
   }, [stopPreview]);
 
   const retryMedia = useCallback(async () => {
+    replacedRef.current = false;
     setError(null);
     if (join && shouldConnectMedia(join.status, status) && !connected) {
       await connectMedia(join);
@@ -512,9 +546,8 @@ export function useConsultation(
   const waiting = isWaiting(status, join?.status);
   const live = connected || status === "active";
   const noRelay =
-    join?.provider === "inhouse" &&
-    Array.isArray(join.ice_servers) &&
-    !join.ice_servers.some((s) => s.urls?.some((u) => u.startsWith("turn")));
+    Array.isArray(join?.iceServers) &&
+    !join.iceServers.some((s) => s.urls?.some((u) => u.startsWith("turn")));
 
   return {
     join,
@@ -532,7 +565,7 @@ export function useConsultation(
     waiting,
     live,
     noRelay,
-    counterpartName: join?.counterpart_name || "",
+    counterpartName: join?.counterpartName || "",
     localStream,
     remoteStream,
     screenStream,

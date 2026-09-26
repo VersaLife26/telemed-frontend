@@ -23,26 +23,22 @@ import {
 } from "@/components/admin/ui/select";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import {
-  ASSIGNABLE_ADMIN_ROLES,
-  type AdminAccount,
-  type AssignableAdminRole,
-} from "@/lib/admin/api/types";
+import { ASSIGNABLE_ADMIN_ROLES, type AdminAccount, type AdminRole } from "@/lib/admin/api/types";
 
-const ROLE_LABELS: Record<AssignableAdminRole, string> = {
+const ROLE_LABELS: Record<AdminRole, string> = {
   support: "Support",
   ops: "Ops",
   finance: "Finance",
   admin: "Admin",
-  super_admin: "Super admin",
+  superAdmin: "Super admin",
 };
 
-const ROLE_HINTS: Record<AssignableAdminRole, string> = {
+const ROLE_HINTS: Record<AdminRole, string> = {
   support: "Patient support and disputes. Cannot move money or change settings.",
-  ops: "Day-to-day operations, plus platform settings.",
-  finance: "Refunds, payouts, the ledger and commission rules.",
+  ops: "Day-to-day operations. No finance, no admin accounts.",
+  finance: "Refunds, payouts, the ledger and the audit export.",
   admin: "General administration. No finance, no admin accounts.",
-  super_admin: "Everything, including creating and re-roling admins. Grant sparingly.",
+  superAdmin: "Everything, including creating and re-roling admins. Grant sparingly.",
 };
 
 /**
@@ -57,21 +53,21 @@ const ROLE_HINTS: Record<AssignableAdminRole, string> = {
  * what the person may do. The AUTHENTICATION half lives in the Access policy
  * for admin.versalifehealth.com and cannot be set from here, so a new admin
  * cannot reach the console until their address is added there. The dialog says
- * so rather than leaving a super_admin to discover it from a colleague who
+ * so rather than leaving a super admin to discover it from a colleague who
  * cannot sign in.
  */
 export function CreateAdminDialog() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState<AssignableAdminRole>("support");
+  const [role, setRole] = useState<AdminRole>("support");
 
   const mutation = useApiMutation<AdminAccount, void>({
     method: "POST",
     path: () => endpoints.adminUsers.create(),
-    body: () => ({ email: email.trim(), display_name: displayName.trim(), role }),
+    body: () => ({ email: email.trim(), displayName: displayName.trim(), role }),
     successMessage: (created) =>
-      `${created.display_name || created.email} can now be given access. Add their email to the Cloudflare Access policy for the admin console — until then they cannot sign in.`,
+      `${created.displayName || created.email} can now be given access. Add their email to the Cloudflare Access policy for the admin console — until then they cannot sign in.`,
     invalidate: [["admin-users"]],
   });
 
@@ -134,7 +130,7 @@ export function CreateAdminDialog() {
 
           <div className="space-y-2">
             <Label htmlFor="admin-role">Role</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as AssignableAdminRole)}>
+            <Select value={role} onValueChange={(v) => setRole(v as AdminRole)}>
               <SelectTrigger id="admin-role">
                 <SelectValue />
               </SelectTrigger>

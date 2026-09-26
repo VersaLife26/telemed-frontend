@@ -7,14 +7,12 @@ import type { ApiError } from "@/lib/admin/api/errors";
  * How a failed fetch looks on a page.
  *
  * Three things are always present: what happened in the admin's own terms,
- * what to do about it, and the request id. The request id is what turns
+ * what to do about it, and the trace id. The trace id is what turns
  * "payments is broken" into a ticket someone can actually trace through the
- * gateway log, the service log and the OTel span.
+ * API's logs.
  *
- * NOT_FOUND gets its own wording. Several admin endpoints in this console are
- * defined by the V2 docs and by telemed-admin-service's schema but are not
- * mounted in that service's router yet; saying "not deployed yet" is honest,
- * and it is very different information from "this record was deleted".
+ * A 404 gets its own wording, because "this endpoint is not deployed" is very
+ * different information from "this record was deleted".
  */
 export function ErrorState({
   error,
@@ -27,12 +25,12 @@ export function ErrorState({
   what: string;
   missingRecord?: boolean;
 }) {
-  const notFound = error.code === "NOT_FOUND";
+  const notFound = error.status === 404;
   const notDeployed = notFound && !missingRecord;
   const Icon =
-    error.code === "IP_NOT_ALLOWLISTED"
+    error.code === "ip_not_allowed"
       ? ShieldOff
-      : error.code === "NETWORK_ERROR"
+      : error.code === "network_error"
         ? WifiOff
         : notDeployed
           ? PlugZap
@@ -51,17 +49,17 @@ export function ErrorState({
       <AlertDescription className="space-y-1">
         <p>
           {notDeployed
-            ? "The backend returned 404 for this endpoint. It is defined in the admin service's schema but its route is not mounted yet."
+            ? "The backend returned 404 for this endpoint."
             : notFound
-              ? "No version exists for this configuration key yet. Save a first version from the editor below, or ask ops to seed platform defaults."
+              ? "Nothing has been saved here yet."
               : error.userMessage}
         </p>
         {error.remedy && !notDeployed && !notFound ? (
           <p className="text-muted-foreground">{error.remedy}</p>
         ) : null}
-        {error.requestId ? (
+        {error.traceId ? (
           <p className="font-mono text-xs text-muted-foreground">
-            Request ID: {error.requestId}
+            Trace ID: {error.traceId}
           </p>
         ) : null}
       </AlertDescription>

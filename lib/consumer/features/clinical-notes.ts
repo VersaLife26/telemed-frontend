@@ -1,4 +1,4 @@
-import type { ClinicalNote, ClinicalNoteDiagnosis, Icd10Code } from "@/lib/consumer/api/types";
+import type { ClinicalNote, ClinicalNoteDiagnosis, DiagnosisInput, Icd10Code } from "@/lib/consumer/api/types";
 
 export const SOAP_SECTIONS = [
   { key: "subjective", label: "Subjective", hint: "What the patient reports" },
@@ -29,7 +29,7 @@ export function hasSoapContent(draft: SoapDraft, diagnoses: ClinicalNoteDiagnosi
   return SOAP_SECTIONS.some((s) => draft[s.key].trim()) || diagnoses.length > 0;
 }
 
-export function shouldAutosave(status: string): boolean {
+export function shouldAutosave(status: ClinicalNote["status"]): boolean {
   return status !== "finalised";
 }
 
@@ -44,38 +44,41 @@ export function addDiagnosis(
   if (current.some((d) => d.code === code.code) || current.length >= MAX_DIAGNOSES) return current;
   return [
     ...current,
-    { code: code.code, description: code.description, is_primary: current.length === 0 },
+    { code: code.code, display: code.display, isPrimary: current.length === 0 },
   ];
 }
 
 export function removeDiagnosis(current: ClinicalNoteDiagnosis[], code: string): ClinicalNoteDiagnosis[] {
   const next = current.filter((d) => d.code !== code);
-  if (next.length && !next.some((d) => d.is_primary)) {
-    const first = next[0];
-    if (first) first.is_primary = true;
+  if (next.length && !next.some((d) => d.isPrimary)) {
+    return next.map((d, i) => ({ ...d, isPrimary: i === 0 }));
   }
   return next;
 }
 
 export function setPrimary(current: ClinicalNoteDiagnosis[], code: string): ClinicalNoteDiagnosis[] {
-  return current.map((d) => ({ ...d, is_primary: d.code === code }));
+  return current.map((d) => ({ ...d, isPrimary: d.code === code }));
 }
 
-export function savePayload(
-  appointmentId: string,
-  draft: SoapDraft,
-  diagnoses: ClinicalNoteDiagnosis[],
-  version: number,
-) {
+export function clinicalNotePath(appointmentId: string, action?: "finalise" | "amend" | "revisions"): string {
+  const base = `/appointments/${appointmentId}/clinical-note`;
+  return action ? `${base}/${action}` : base;
+}
+
+function diagnosisInputs(diagnoses: ClinicalNoteDiagnosis[]): DiagnosisInput[] {
+  return diagnoses.map((d) => ({ code: d.code, isPrimary: d.isPrimary }));
+}
+
+/** `version` is null until the note exists; the first save creates it. */
+export function savePayload(draft: SoapDraft, diagnoses: ClinicalNoteDiagnosis[], version: number | null) {
   return {
-    appointment_id: appointmentId,
     ...draft,
-    diagnoses: diagnoses.map((d) => ({ code: d.code, is_primary: Boolean(d.is_primary) })),
+    diagnoses: diagnosisInputs(diagnoses),
     version,
   };
 }
 
-export function finalisePayload(version: number) {
+export function finalisePayload(version: number | null) {
   return { version };
 }
 
@@ -83,12 +86,12 @@ export function amendPayload(
   draft: SoapDraft,
   diagnoses: ClinicalNoteDiagnosis[],
   reason: string,
-  version: number,
+  version: number | null,
 ) {
   return {
+    reason: reason.trim(),
     ...draft,
-    diagnoses: diagnoses.map((d) => ({ code: d.code, is_primary: Boolean(d.is_primary) })),
-    amendment_reason: reason.trim(),
+    diagnoses: diagnosisInputs(diagnoses),
     version,
   };
 }
@@ -110,6 +113,6 @@ export function soapUnchanged(
   if (SOAP_SECTIONS.some((s) => a[s.key] !== b[s.key])) return false;
   if (dxA.length !== dxB.length) return false;
   return dxA.every(
-    (d, i) => d.code === dxB[i]?.code && Boolean(d.is_primary) === Boolean(dxB[i]?.is_primary),
+    (d, i) => d.code === dxB[i]?.code && d.isPrimary === dxB[i]?.isPrimary,
   );
 }

@@ -1,10 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck, Star } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 
 import { fallbackPortrait } from "@/lib/consumer/assets";
 import { cx } from "@/lib/consumer/cx";
-import type { Doctor } from "@/lib/consumer/api/types";
+import type { Doctor, Specialty } from "@/lib/consumer/api/types";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { formatMoney } from "@/lib/consumer/money";
@@ -15,9 +15,17 @@ import { formatMoney } from "@/lib/consumer/money";
  * ends up. A doctor with no uploaded photo gets a stable stand-in rather than
  * a grey box -- the same one on every render, keyed off the id.
  */
-export function DoctorCard({ doctor, className }: { doctor: Doctor; className?: string }) {
-  const name = doctor.display_name || "Doctor";
-  const photo = profilePhotoSrc(doctor.photo_url) ?? fallbackPortrait(doctor.id);
+export function DoctorCard({
+  doctor,
+  specialties,
+  className,
+}: {
+  doctor: Doctor;
+  specialties: Specialty[];
+  className?: string;
+}) {
+  const name = doctor.displayName || "Doctor";
+  const photo = profilePhotoSrc(doctor.photoUrl) ?? fallbackPortrait(doctor.id ?? "");
 
   return (
     <Link
@@ -50,7 +58,7 @@ export function DoctorCard({ doctor, className }: { doctor: Doctor; className?: 
           cards, so the face and the field read as one label. */}
       <div className="relative z-10 -mt-3.5 flex justify-center px-4">
         <span className="max-w-full truncate rounded-pill bg-brand px-3.5 py-1.5 text-caption text-on-brand shadow-brand">
-          {specialtyLabel(doctor.specialty)}
+          {specialtyLabel(doctor.specialtyCode, specialties)}
         </span>
       </div>
 
@@ -59,15 +67,8 @@ export function DoctorCard({ doctor, className }: { doctor: Doctor; className?: 
 
         <div className="mt-auto flex w-full items-center justify-between gap-2 border-t border-border-subtle pt-3">
           <span className="text-label text-brand tabular-time">
-            {formatMoney(doctor.fee_cents, doctor.currency)}
+            {formatMoney(doctor.feeCents, doctor.currency)}
           </span>
-          {doctor.rating != null ? (
-            <span className="inline-flex items-center gap-1 text-caption text-muted">
-              <Star aria-hidden="true" className="size-3.5 fill-current text-warning" />
-              {doctor.rating.toFixed(1)}
-              <span className="text-faint">({doctor.review_count ?? 0})</span>
-            </span>
-          ) : null}
         </div>
       </div>
     </Link>

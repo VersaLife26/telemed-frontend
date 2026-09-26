@@ -9,8 +9,9 @@ import { Card } from "@/components/consumer/ui/Card";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
-import { isNotFound } from "@/lib/consumer/api/envelope";
-import type { Appointment, ClinicalNote, Prescription } from "@/lib/consumer/api/types";
+import { isNotFound } from "@/lib/consumer/api/errors";
+import type { Appointment, ClinicalNote, Doctor, Prescription } from "@/lib/consumer/api/types";
+import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import {
   clinicalNotePath,
   noteVisibleToPatient,
@@ -21,6 +22,7 @@ import { downloadPrescriptionPdf } from "@/lib/consumer/features/prescription";
 
 export function VisitSummaryClient({ appointmentId }: { appointmentId: string }) {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [doctorName, setDoctorName] = useState<string | null>(null);
   const [note, setNote] = useState<ClinicalNote | null>(null);
   const [rx, setRx] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +41,11 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
         if (!haveAppointment) {
           jobs.push(
             browserApi<Appointment>(`/appointments/${appointmentId}`)
-              .then((a) => {
+              .then(async (a) => {
                 haveAppointment = true;
                 if (!cancelled) setAppointment(a);
+                const doctor = await browserApi<Doctor>(`/doctors/${a.doctorId}`).catch(() => null);
+                if (!cancelled && doctor?.displayName) setDoctorName(doctor.displayName);
               })
               .catch(() => undefined),
           );
@@ -115,10 +119,12 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
 
       <Card variant="tint" className="flex items-start justify-between gap-3 p-5">
         <div className="min-w-0">
-          <p className="text-h5 text-ink">{appointment?.specialty || "Consultation"}</p>
-          <p className="mt-1 text-body-sm text-muted tabular-time">
-            {appointment?.start_at_local || appointment?.start_at || appointmentId}
-          </p>
+          <p className="text-h5 text-ink">{doctorName || "Consultation"}</p>
+          {appointment ? (
+            <p className="mt-1 text-body-sm text-muted tabular-time">
+              {formatVisitDate(appointment.startAt)} · {formatVisitClock(appointment.startAt)}
+            </p>
+          ) : null}
         </div>
         {appointment?.status ? <StatusBadge status={appointment.status} /> : null}
       </Card>
@@ -133,7 +139,7 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
               <ul className="flex flex-col gap-1 text-body-sm text-muted">
                 {note.diagnoses.map((d) => (
                   <li key={d.code}>
-                    <span className="font-semibold text-ink">{d.code}</span> {d.description || ""}
+                    <span className="font-semibold text-ink">{d.code}</span> {d.display}
                   </li>
                 ))}
               </ul>
@@ -153,8 +159,8 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
         {rx ? (
           <>
             <ul className="flex flex-col gap-2">
-              {(rx.items || []).map((it, i) => (
-                <li key={`${it.drug_name}-${i}`} className="flex gap-3">
+              {rx.items.map((it, i) => (
+                <li key={`${it.drugName}-${i}`} className="flex gap-3">
                   <span
                     aria-hidden="true"
                     className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-tint text-brand"
@@ -163,7 +169,7 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
                   </span>
                   <span className="min-w-0 text-body-sm text-muted">
                     <span className="font-semibold text-ink">
-                      {it.drug_name} {it.strength || ""}
+                      {it.drugName} {it.strength}
                     </span>
                     <br />
                     {it.dosage}, {it.frequency}

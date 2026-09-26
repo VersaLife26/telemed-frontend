@@ -1,16 +1,6 @@
 /**
- * Every admin endpoint this console calls, in one place.
- *
- * All of these are proxied by telemed-api-gateway's `/api/v1/admin/*` rule
- * (auth mode "admin": IP allowlist, then RequireAuth, then
- * RequireRole(AdminRoles...)) to telemed-admin-service on port 8088.
- *
- * Endpoints marked NOT-YET-IMPLEMENTED were derived from the V2 docs §7.3/§8.8
- * and from telemed-admin-service's migrations (000003–000007), which define
- * the tables but whose handlers are not yet mounted in that service's
- * cmd/server/main.go at the time this console was written. They are listed
- * honestly rather than omitted: the console renders a specific "this endpoint
- * is not deployed yet" empty state when one 404s, instead of a generic error.
+ * Every admin endpoint this console calls, in one place. All paths are under
+ * `/api/v1/admin`; `openapi/v1.json` in telemed-api is the contract.
  */
 
 const ADMIN = "/api/v1/admin";
@@ -18,58 +8,48 @@ const ADMIN = "/api/v1/admin";
 export const endpoints = {
   /** The admin_users row for the caller Cloudflare Access authenticated. */
   me: () => `${ADMIN}/me`,
+  /** The live permission matrix, so the grid shows what the server enforces. */
+  permissions: () => `${ADMIN}/permissions`,
 
   credentialing: {
-    /** Documented in the gateway route table. */
-    pending: (q: URLSearchParams) => `${ADMIN}/doctors/pending?${q}`,
-    detail: (doctorId: string) => `${ADMIN}/doctors/${doctorId}`,
-    checklist: (doctorId: string) => `${ADMIN}/doctors/${doctorId}/checklist`,
-    /** Documented in the gateway route table. */
-    verify: (doctorId: string) => `${ADMIN}/doctors/${doctorId}/verify`,
+    list: (q: URLSearchParams) => `${ADMIN}/doctor-applications?${q}`,
+    detail: (id: string) => `${ADMIN}/doctor-applications/${id}`,
+    document: (id: string, documentId: string) =>
+      `${ADMIN}/doctor-applications/${id}/documents/${documentId}`,
+    checklist: (id: string) => `${ADMIN}/doctor-applications/${id}/checklist`,
+    startReview: (id: string) => `${ADMIN}/doctor-applications/${id}/start-review`,
+    approve: (id: string) => `${ADMIN}/doctor-applications/${id}/approve`,
+    reject: (id: string) => `${ADMIN}/doctor-applications/${id}/reject`,
   },
 
-  /**
-   * Admin in-app inbox (admin-service). Mounted under credentialing RBAC —
-   * projected kinds today are doctor_application and reschedule_request.
-   */
+  doctors: {
+    list: (q: URLSearchParams) => `${ADMIN}/doctors?${q}`,
+    detail: (id: string) => `${ADMIN}/doctors/${id}`,
+    document: (id: string, documentId: string) => `${ADMIN}/doctors/${id}/documents/${documentId}`,
+    suspend: (id: string) => `${ADMIN}/doctors/${id}/suspend`,
+    reinstate: (id: string) => `${ADMIN}/doctors/${id}/reinstate`,
+  },
+
   notifications: {
-    list: () => `${ADMIN}/notifications`,
+    list: (q: URLSearchParams) => `${ADMIN}/notifications?${q}`,
     unreadCount: () => `${ADMIN}/notifications/unread-count`,
     markRead: (id: string) => `${ADMIN}/notifications/${id}/read`,
     markAllRead: () => `${ADMIN}/notifications/read-all`,
   },
 
   users: {
-    list: (q: URLSearchParams) => {
-      const sp = new URLSearchParams(q);
-      // admin-service reads `query`; the console filter bar writes `q`.
-      if (sp.has("q") && !sp.has("query")) {
-        sp.set("query", sp.get("q") ?? "");
-        sp.delete("q");
-      }
-      return `${ADMIN}/users?${sp}`;
-    },
+    list: (q: URLSearchParams) => `${ADMIN}/users?${q}`,
     detail: (userId: string) => `${ADMIN}/users/${userId}`,
-    activity: (userId: string) =>
-      `${ADMIN}/users/${userId}/activity?per_page=100`,
+    activity: (userId: string) => `${ADMIN}/users/${userId}/activity`,
     suspend: (userId: string) => `${ADMIN}/users/${userId}/suspend`,
     reinstate: (userId: string) => `${ADMIN}/users/${userId}/reinstate`,
-    // NOTE: there is deliberately no `impersonate` entry. The V2 docs §7.3
-    // list "impersonate for support (audit logged)" as an admin capability,
-    // but no route, table, event subject or RBAC group for it exists anywhere
-    // in telemed-admin-service or telemed-user-service. Per the build brief,
-    // the button is omitted rather than wired to an endpoint that does not
-    // exist. See README "Documented but not exposed by the backend".
   },
 
   appointments: {
     list: (q: URLSearchParams) => `${ADMIN}/appointments?${q}`,
     detail: (id: string) => `${ADMIN}/appointments/${id}`,
-    forceCancel: (id: string) => `${ADMIN}/appointments/${id}/force-cancel`,
-    doubleBookings: () => `${ADMIN}/appointments/double-bookings`,
-    resolveDoubleBooking: () => `${ADMIN}/appointments/resolve-double-booking`,
-    audit: (id: string) => `${ADMIN}/appointments/${id}/audit?per_page=100`,
-    /** Named gateway routes send these to scheduling-service, not admin-service. */
+    cancel: (id: string) => `${ADMIN}/appointments/${id}/cancel`,
+    audit: (id: string) => `${ADMIN}/appointments/${id}/audit`,
     rescheduleRequests: (q: URLSearchParams) => `${ADMIN}/reschedule-requests?${q}`,
     acceptReschedule: (id: string) => `${ADMIN}/reschedule-requests/${id}/accept`,
     declineReschedule: (id: string) => `${ADMIN}/reschedule-requests/${id}/decline`,
@@ -77,30 +57,30 @@ export const endpoints = {
 
   finance: {
     ledger: (q: URLSearchParams) => `${ADMIN}/finance/ledger?${q}`,
-    ledgerExport: (q: URLSearchParams) => `${ADMIN}/finance/ledger/export?${q}`,
-    commissionRules: () => `${ADMIN}/finance/commission-rules`,
-    commissionRuleHistory: () => `${ADMIN}/finance/commission-rules/history`,
+    ledgerExport: (q: URLSearchParams) => `${ADMIN}/finance/ledger.csv?${q}`,
+    commission: () => `${ADMIN}/finance/commission`,
     payoutBatches: (q: URLSearchParams) => `${ADMIN}/finance/payout-batches?${q}`,
-    runPayoutBatch: () => `${ADMIN}/finance/payouts/run`,
+    payoutBatch: (id: string) => `${ADMIN}/finance/payout-batches/${id}`,
+    runPayouts: () => `${ADMIN}/finance/payouts/run`,
+    markPayoutPaid: (id: string) => `${ADMIN}/finance/payouts/${id}/mark-paid`,
+    markPayoutFailed: (id: string) => `${ADMIN}/finance/payouts/${id}/mark-failed`,
     refunds: (q: URLSearchParams) => `${ADMIN}/finance/refunds?${q}`,
-    decideRefund: (id: string) => `${ADMIN}/finance/refunds/${id}/decision`,
+    approveRefund: (id: string) => `${ADMIN}/finance/refunds/${id}/approve`,
+    rejectRefund: (id: string) => `${ADMIN}/finance/refunds/${id}/reject`,
+    markRefunded: (id: string) => `${ADMIN}/finance/refunds/${id}/mark-refunded`,
+    createRefund: (paymentId: string) => `${ADMIN}/payments/${paymentId}/refunds`,
     promoCodes: (q: URLSearchParams) => `${ADMIN}/finance/promo-codes?${q}`,
-    promoCode: (code?: string) =>
-      code ? `${ADMIN}/finance/promo-codes/${encodeURIComponent(code)}` : `${ADMIN}/finance/promo-codes`,
+    createPromoCode: () => `${ADMIN}/finance/promo-codes`,
+    promoCode: (id: string) => `${ADMIN}/finance/promo-codes/${id}`,
+    deactivatePromoCode: (id: string) => `${ADMIN}/finance/promo-codes/${id}/deactivate`,
   },
 
   content: {
-    specialties: (q: URLSearchParams) => `${ADMIN}/content/specialties?${q}`,
-    specialty: (id?: string) =>
-      id ? `${ADMIN}/content/specialties/${id}` : `${ADMIN}/content/specialties`,
-    symptoms: (q: URLSearchParams) => `${ADMIN}/content/symptoms?${q}`,
-    symptom: (id?: string) =>
-      id ? `${ADMIN}/content/symptoms/${id}` : `${ADMIN}/content/symptoms`,
-    drugs: (q: URLSearchParams) => `${ADMIN}/content/drugs?${q}`,
-    drug: (id?: string) => (id ? `${ADMIN}/content/drugs/${id}` : `${ADMIN}/content/drugs`),
-    articles: (q: URLSearchParams) => `${ADMIN}/content/articles?${q}`,
-    article: (id?: string) =>
-      id ? `${ADMIN}/content/articles/${id}` : `${ADMIN}/content/articles`,
+    specialties: () => `${ADMIN}/specialties`,
+    specialty: (code?: string) =>
+      code ? `${ADMIN}/specialties/${encodeURIComponent(code)}` : `${ADMIN}/specialties`,
+    drugs: (q: URLSearchParams) => `${ADMIN}/drugs?${q}`,
+    drug: (id?: string) => (id ? `${ADMIN}/drugs/${id}` : `${ADMIN}/drugs`),
   },
 
   disputes: {
@@ -110,54 +90,39 @@ export const endpoints = {
     comments: (id: string) => `${ADMIN}/disputes/${id}/comments`,
     assign: (id: string) => `${ADMIN}/disputes/${id}/assign`,
     resolve: (id: string) => `${ADMIN}/disputes/${id}/resolve`,
+    close: (id: string) => `${ADMIN}/disputes/${id}/close`,
   },
 
-  settings: {
-    config: (key: string) => `${ADMIN}/configs/${encodeURIComponent(key)}`,
-    configHistory: (key: string) => `${ADMIN}/configs/${encodeURIComponent(key)}/history`,
-    admins: (q: URLSearchParams) => `${ADMIN}/admin-users?${q}`,
-  },
-
-  /**
-   * Admin accounts. Super_admin only, enforced server-side by
-   * RequireRole(rbac.GroupAdminUsers) -- the guard in lib/rbac.ts hides the
-   * navigation, it does not protect the API.
-   */
-  /**
-   * A doctor's schedule, edited by staff. These route to doctor-service, not
-   * admin-service: the gateway matches the more specific pattern first.
-   */
-  doctorSchedule: {
-    availability: (id: string) => `${ADMIN}/doctors/${id}/availability`,
-    settings: (id: string) => `${ADMIN}/doctors/${id}/schedule-settings`,
-    application: (id: string) => `${ADMIN}/doctors/${id}/application?include=bytes`,
-    holidays: () => `${ADMIN}/holidays`,
-    blockSlot: (slotId: string) => `${ADMIN}/slots/${slotId}/block`,
-  },
-
+  /** Admin accounts. superAdmin only, enforced server-side by the adminUsers permission. */
   adminUsers: {
     list: () => `${ADMIN}/admin-users`,
     create: () => `${ADMIN}/admin-users`,
     update: (id: string) => `${ADMIN}/admin-users/${id}`,
-    /** The live matrix, so the grid shows what the server enforces. */
-    permissions: () => `${ADMIN}/admin-users/permissions`,
+    deactivate: (id: string) => `${ADMIN}/admin-users/${id}/deactivate`,
+  },
+
+  /** A doctor's schedule, edited by staff. Keyed by the approved doctor's id. */
+  doctorSchedule: {
+    schedule: (doctorId: string) => `${ADMIN}/doctors/${doctorId}/schedule`,
+    holidays: (doctorId: string, q?: URLSearchParams) =>
+      `${ADMIN}/doctors/${doctorId}/holidays${q ? `?${q}` : ""}`,
+    slotBlocks: (doctorId: string, q?: URLSearchParams) =>
+      `${ADMIN}/doctors/${doctorId}/slot-blocks${q ? `?${q}` : ""}`,
+    deleteSlotBlock: (id: string) => `${ADMIN}/slot-blocks/${id}`,
+    platformHolidays: (q?: URLSearchParams) => `${ADMIN}/holidays${q ? `?${q}` : ""}`,
+    deleteHoliday: (id: string) => `${ADMIN}/holidays/${id}`,
   },
 
   analytics: {
-    /** Documented in the gateway route table. */
+    dashboard: (q: URLSearchParams) => `${ADMIN}/analytics/dashboard?${q}`,
     revenue: (q: URLSearchParams) => `${ADMIN}/analytics/revenue?${q}`,
     bookings: (q: URLSearchParams) => `${ADMIN}/analytics/bookings?${q}`,
-    doctors: (q: URLSearchParams) => `${ADMIN}/analytics/doctors?${q}`,
-    utilization: (q: URLSearchParams) => `${ADMIN}/analytics/utilization?${q}`,
-    districts: (q: URLSearchParams) => `${ADMIN}/analytics/districts?${q}`,
-    dashboard: (q: URLSearchParams) => `${ADMIN}/analytics/dashboard?${q}`,
+    topDoctors: (q: URLSearchParams) => `${ADMIN}/analytics/top-doctors?${q}`,
   },
 
   audit: {
-    /** Implemented today in telemed-admin-service/internal/audit. */
     list: (q: URLSearchParams) => `${ADMIN}/audit?${q}`,
-    export: (q: URLSearchParams) => `${ADMIN}/audit/export?${q}`,
-    verify: () => `${ADMIN}/audit/verify`,
+    export: (q: URLSearchParams) => `${ADMIN}/audit.csv?${q}`,
   },
 } as const;
 

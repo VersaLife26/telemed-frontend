@@ -5,45 +5,49 @@ import { BellRing } from "lucide-react";
 
 import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
-import { ApiError } from "@/lib/consumer/api/envelope";
-import type { EarlyJoinOffer } from "@/lib/consumer/api/types";
+import { hasCode } from "@/lib/consumer/api/errors";
+import type { ReadyForNext } from "@/lib/consumer/api/types";
 import { readyForNextPath } from "@/lib/consumer/features/consult";
 
-function messageFor(result: EarlyJoinOffer): string {
+function messageFor(result: ReadyForNext): string {
   switch (result.status) {
     case "offered":
       return "Asked the next patient if they can join now.";
-    case "already_offered":
+    case "alreadyOffered":
       return "Already waiting on that patient's reply.";
-    case "already_waiting":
+    case "alreadyWaiting":
       return "The next patient is already in the waiting room.";
     case "declined":
       return "The next patient asked to keep their booked time.";
+    case "noNextAppointment":
+      return "No next patient waiting.";
     default:
       return "Ready for the next patient.";
   }
 }
 
+/**
+ * Ready-for-next is keyed by the consultation just finished, so the button
+ * only renders when it has one.
+ */
 export function ReadyForNextButton({ appointmentId }: { appointmentId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  if (!appointmentId) return null;
+  const id = appointmentId;
 
   async function ping() {
     setError(null);
     setNote(null);
     setBusy(true);
     try {
-      const result = await browserApi<EarlyJoinOffer>(readyForNextPath(appointmentId), {
-        method: "POST",
-        body: {},
-      });
+      const result = await browserApi<ReadyForNext>(readyForNextPath(id), { method: "POST" });
       setNote(messageFor(result));
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        setError("No next patient waiting.");
-      } else if (err instanceof ApiError && err.status === 409) {
-        setError("Finish the current call first, then ask the next patient.");
+      if (hasCode(err, "not_in_consultation")) {
+        setError("Start or finish this call first, then ask the next patient.");
       } else {
         setError(err instanceof Error ? err.message : "Could not notify the next patient");
       }

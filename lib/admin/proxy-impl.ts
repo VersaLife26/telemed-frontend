@@ -83,8 +83,8 @@ export async function adminProxy(request: NextRequest): Promise<NextResponse> {
     if (pathname.startsWith("/api/")) {
       return withSecurity(
         NextResponse.json(
-          { code: "UNAUTHORIZED", message: "authentication required" },
-          { status: 401 },
+          { status: 401, detail: "authentication required" },
+          { status: 401, headers: { "Content-Type": "application/problem+json" } },
         ),
       );
     }

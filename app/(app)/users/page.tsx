@@ -8,7 +8,7 @@ import { UsersTable } from "@/components/admin/users/users-table";
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryListServer } from "@/lib/admin/api/server";
-import type { AdminUserRecord } from "@/lib/admin/api/types";
+import type { PlatformUser } from "@/lib/admin/api/types";
 import { filterValues, pageQuery } from "@/lib/admin/url-query";
 
 export const metadata: Metadata = { title: "Users" };
@@ -47,6 +47,7 @@ export default async function UsersPage({
       options: [
         { value: "active", label: "Active" },
         { value: "suspended", label: "Suspended" },
+        { value: "deleted", label: "Deleted" },
       ],
     },
   ];
@@ -57,18 +58,18 @@ export default async function UsersPage({
   const header = (
     <PageHeader
       title="Users"
-      description="Patients and doctors, projected from user-service events. This console can suspend and reinstate an account; it cannot read anything clinical about one."
+      description="Patients and doctors. This console can suspend and reinstate an account; it cannot read anything clinical about one."
     />
   );
 
-  const result = await tryListServer<AdminUserRecord>(
+  const result = await tryListServer<PlatformUser>(
     endpoints.users.list(
       query({
         q: params.q,
         role: params.role,
         status: params.status,
         page,
-        per_page: PER_PAGE,
+        pageSize: PER_PAGE,
       }),
     ),
   );
@@ -88,8 +89,8 @@ export default async function UsersPage({
     <>
       {header}
       <FilterBar filters={filters} legend="Search for users" values={values} />
-      <UsersTable users={result.page.data} filtered={hasSearch} />
-      <Pagination meta={result.page.meta} label="Users" query={queryString} />
+      <UsersTable users={result.page.items} filtered={hasSearch} />
+      <Pagination meta={result.page} label="Users" query={queryString} />
     </>
   );
 }

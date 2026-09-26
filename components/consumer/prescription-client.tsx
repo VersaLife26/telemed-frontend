@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/consumer/ui/Card";
-import { AlertTriangle, ArrowLeft, Download, PenLine, Plus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, Plus } from "lucide-react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
@@ -11,12 +11,10 @@ import { Button } from "@/components/consumer/ui/Button";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { Input } from "@/components/consumer/ui/Input";
 import { Modal } from "@/components/consumer/ui/Modal";
-import { Textarea } from "@/components/consumer/ui/Textarea";
-import { SexField } from "@/components/consumer/sex-field";
 import { browserApi } from "@/lib/consumer/api/client";
-import { ApiError, isNotFound } from "@/lib/consumer/api/envelope";
-import type { Appointment, Doctor, FormularyDrug, Prescription, Sex } from "@/lib/consumer/api/types";
-import { prescriptionPatientFields } from "@/lib/consumer/features/visit-patient";
+import { hasCode, isNotFound } from "@/lib/consumer/api/errors";
+import type { Appointment, DoctorProfile, FormularyDrug, Prescription } from "@/lib/consumer/api/types";
+import { ageAtVisitDate } from "@/lib/consumer/features/visit-patient";
 import {
   blankItem,
   canSearchFormulary,
@@ -25,34 +23,10 @@ import {
   fromIssued,
   issueError,
   issuePayload,
-  lookupPath,
-  sealImagePath,
-  signatureImagePath,
+  prescriptionPath,
   type ItemDraft,
 } from "@/lib/consumer/features/prescription";
-
-function useCredentialImage(path: string) {
-  const [src, setSrc] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
-    let url: string | null = null;
-    let cancelled = false;
-    fetch(path, { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok || !(res.headers.get("content-type") || "").startsWith("image/")) return null;
-        url = URL.createObjectURL(await res.blob());
-        return url;
-      })
-      .catch(() => null)
-      .then((next) => {
-        if (!cancelled) setSrc(next);
-      });
-    return () => {
-      cancelled = true;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [path]);
-  return src;
-}
+import { useStampImage } from "@/components/consumer/signature-card";
 
 export function PrescriptionClient({
   appointmentId,
@@ -61,16 +35,12 @@ export function PrescriptionClient({
   appointmentId: string;
   embedded?: boolean;
 }) {
-  const [doctor, setDoctor] = useState<Doctor | null>(null);
-  const [patientName, setPatientName] = useState("");
-  const [patientAge, setPatientAge] = useState("");
-  const [patientSex, setPatientSex] = useState<Sex | "">("");
-  const [patientWeight, setPatientWeight] = useState("");
-  const [patientAllergies, setPatientAllergies] = useState("");
-  const [patientLocked, setPatientLocked] = useState(false);
+  const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const signatureSrc = useCredentialImage(signatureImagePath);
-  const sealSrc = useCredentialImage(sealImagePath);
+  const [stampVersion, setStampVersion] = useState(0);
+  const signatureSrc = useStampImage("signature", stampVersion);
+  const sealSrc = useStampImage("seal", stampVersion);
   const [items, setItems] = useState<ItemDraft[]>([blankItem()]);
   const [issued, setIssued] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +53,7 @@ export function PrescriptionClient({
 
   const loadExisting = useCallback(async () => {
     try {
-      const rx = await browserApi<Prescription>(lookupPath(appointmentId));
+      const rx = await browserApi<Prescription>(prescriptionPath(appointmentId));
       setIssued(rx);
       setItems(fromIssued(rx.items));
       return rx;
@@ -97,22 +67,14 @@ export function PrescriptionClient({
     let cancelled = false;
     (async () => {
       try {
-        const [me, appt, existing] = await Promise.all([
-          browserApi<Doctor>("/doctors/me"),
+        const [me, appt] = await Promise.all([
+          browserApi<DoctorProfile>("/doctors/me"),
           browserApi<Appointment>(`/appointments/${appointmentId}`).catch(() => null),
           loadExisting(),
         ]);
         if (cancelled) return;
         setDoctor(me);
-        if (!existing) {
-          const fields = prescriptionPatientFields(appt);
-          if (fields.name) setPatientName(fields.name);
-          if (fields.age) setPatientAge(fields.age);
-          setPatientSex(fields.sex);
-          setPatientWeight(fields.weightKg);
-          setPatientAllergies(fields.allergies);
-          setPatientLocked(fields.locked);
-        }
+        setAppointment(appt);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not load prescription");
       } finally {
@@ -122,7 +84,7 @@ export function PrescriptionClient({
     return () => {
       cancelled = true;
     };
-  }, [loadExisting]);
+  }, [appointmentId, loadExisting]);
 
   useEffect(() => {
     if (drugTimer.current) window.clearTimeout(drugTimer.current);
@@ -133,8 +95,7 @@ export function PrescriptionClient({
     }
     drugTimer.current = window.setTimeout(async () => {
       try {
-        const hits = await browserApi<FormularyDrug[]>(`/drugs?q=${encodeURIComponent(q)}`);
-        setDrugHits(Array.isArray(hits) ? hits : []);
+        setDrugHits(await browserApi<FormularyDrug[]>(`/drugs?q=${encodeURIComponent(q)}`));
       } catch {
         setDrugHits([]);
       }
@@ -166,7 +127,7 @@ export function PrescriptionClient({
 
   function requestIssue() {
     setError(null);
-    const validation = issueError(patientName, doctor, items);
+    const validation = issueError(items);
     if (validation) {
       setError(validation);
       return;
@@ -178,23 +139,19 @@ export function PrescriptionClient({
     setConfirming(false);
     setIssuing(true);
     try {
-      const created = await browserApi<Prescription>("/prescriptions", {
+      const created = await browserApi<Prescription>(prescriptionPath(appointmentId), {
         method: "POST",
-        body: issuePayload({
-          appointmentId,
-          doctor,
-          patientName,
-          patientAge,
-          patientSex,
-          patientWeightKg: patientWeight,
-          patientAllergies,
-          items,
-        }),
+        body: issuePayload(items),
       });
       setIssued(created);
       setItems(fromIssued(created.items));
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
+      if (hasCode(e, "stamps_required")) {
+        setStampVersion((v) => v + 1);
+        setError("Add your signature and seal in your profile before issuing.");
+        return;
+      }
+      if (hasCode(e, "prescription_exists")) {
         try {
           const existing = await loadExisting();
           if (existing) {
@@ -215,8 +172,10 @@ export function PrescriptionClient({
     return <FormSkeleton />;
   }
 
-  const locked = Boolean(issued) || patientLocked;
   const credentialsMissing = signatureSrc === null || sealSrc === null;
+  const patient = appointment?.visitPatient;
+  const patientAge =
+    patient?.dateOfBirth && appointment ? ageAtVisitDate(patient.dateOfBirth, appointment.startAt) : null;
 
   return (
     <div className="@container mx-auto flex w-full max-w-3xl flex-col gap-5">
@@ -225,7 +184,7 @@ export function PrescriptionClient({
           {embedded ? null : <h1 className="text-h2 text-ink">Prescription</h1>}
           <div className={embedded ? undefined : "mt-2"}>
             {issued ? (
-              <Badge tone="success">Issued {issued.issued_at || ""}</Badge>
+              <Badge tone="success">Issued {issued.issuedAt.slice(0, 10)}</Badge>
             ) : (
               <Badge tone="neutral">PDF with QR once issued</Badge>
             )}
@@ -245,84 +204,43 @@ export function PrescriptionClient({
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <Card className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-body-sm text-muted">
-            Prescriber: <span className="font-semibold text-ink">{doctor?.display_name || "Doctor"}</span>{" "}
-            · SLMC {doctor?.slmc_number || "—"}
-          </p>
-          {patientLocked && !issued ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              leading={<PenLine className="size-4" />}
-              onClick={() => setPatientLocked(false)}
-            >
-              Edit patient details
-            </Button>
-          ) : null}
-        </div>
-        {patientAllergies ? (
+        <p className="text-body-sm text-muted">
+          Prescriber:{" "}
+          <span className="font-semibold text-ink">
+            {issued?.doctorName || doctor?.displayName || "Doctor"}
+          </span>{" "}
+          · SLMC {issued?.doctorSlmc || doctor?.slmcNumber || "—"}
+        </p>
+        {patient?.allergies ? (
           <div
             role="note"
             className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-tint px-3 py-2 text-body-sm text-ink"
           >
             <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
             <span>
-              <span className="font-semibold">Allergies:</span> {patientAllergies}
+              <span className="font-semibold">Allergies:</span> {patient.allergies}
             </span>
           </div>
         ) : null}
-        <div className="grid gap-4 @md:grid-cols-2">
-          <Input
-            id="patient-name"
-            label="Patient name"
-            hint={patientLocked ? "From booking. Printed on the PDF." : "Printed on the PDF."}
-            value={patientName}
-            onChange={(e) => setPatientName(e.target.value)}
-            placeholder="Kamala Silva"
-            readOnly={patientLocked}
-            disabled={locked}
-            fieldClassName="@md:col-span-2"
-          />
-          <Input
-            id="patient-age"
-            label="Age"
-            type="number"
-            min={0}
-            max={130}
-            value={patientAge}
-            onChange={(e) => setPatientAge(e.target.value)}
-            readOnly={patientLocked}
-            disabled={locked}
-          />
-          <Input
-            id="patient-weight"
-            label="Weight (kg)"
-            type="number"
-            inputMode="decimal"
-            min={0.5}
-            max={400}
-            step={0.1}
-            value={patientWeight}
-            onChange={(e) => setPatientWeight(e.target.value)}
-            readOnly={patientLocked}
-            disabled={locked}
-          />
+        <dl className="grid gap-3 text-body-sm @md:grid-cols-2">
           <div className="@md:col-span-2">
-            <SexField id="patient-sex" value={patientSex} onChange={setPatientSex} disabled={locked} />
+            <dt className="text-muted">Patient</dt>
+            <dd className="font-semibold text-ink">{patient?.name || "—"}</dd>
           </div>
-          <Textarea
-            id="patient-allergies"
-            label="Known allergies"
-            rows={2}
-            className="min-h-16"
-            value={patientAllergies}
-            onChange={(e) => setPatientAllergies(e.target.value)}
-            readOnly={patientLocked}
-            disabled={locked}
-            fieldClassName="@md:col-span-2"
-          />
-        </div>
+          <div>
+            <dt className="text-muted">Age</dt>
+            <dd className="text-ink">{patientAge != null ? `${patientAge} years` : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Weight</dt>
+            <dd className="text-ink">{patient?.weightKg ? `${patient.weightKg} kg` : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Sex</dt>
+            <dd className="capitalize text-ink">{patient?.sex || "—"}</dd>
+          </div>
+        </dl>
+        <p className="text-body-sm text-faint">From the booking. Printed on the PDF as shown.</p>
       </Card>
 
       {items.map((item, index) => (
@@ -342,15 +260,15 @@ export function PrescriptionClient({
           </div>
           <div className="relative">
             <Input
-              value={activeItem === item.key ? drugQuery || item.drug_name : item.drug_name}
+              value={activeItem === item.key ? drugQuery || item.drugName : item.drugName}
               onChange={(e) => {
                 setActiveItem(item.key);
                 setDrugQuery(e.target.value);
-                patchItem(item.key, { drug_name: e.target.value });
+                patchItem(item.key, { drugName: e.target.value, drugId: null });
               }}
               onFocus={() => {
                 setActiveItem(item.key);
-                setDrugQuery(item.drug_name);
+                setDrugQuery(item.drugName);
               }}
               placeholder="Drug name — type to search formulary"
               disabled={Boolean(issued)}
@@ -374,13 +292,13 @@ export function PrescriptionClient({
           </div>
           <div className="grid gap-3 @md:grid-cols-2">
             <Input
-              value={item.strength || ""}
+              value={item.strength}
               onChange={(e) => patchItem(item.key, { strength: e.target.value })}
               placeholder="Strength"
               disabled={Boolean(issued)}
             />
             <Input
-              value={item.form || ""}
+              value={item.form}
               onChange={(e) => patchItem(item.key, { form: e.target.value })}
               placeholder="Form"
               disabled={Boolean(issued)}
@@ -401,8 +319,8 @@ export function PrescriptionClient({
               type="number"
               min={1}
               max={365}
-              value={item.duration_days}
-              onChange={(e) => patchItem(item.key, { duration_days: Number(e.target.value) || 1 })}
+              value={item.durationDays}
+              onChange={(e) => patchItem(item.key, { durationDays: Number(e.target.value) || 1 })}
               placeholder="Duration days"
               disabled={Boolean(issued)}
             />
@@ -416,7 +334,7 @@ export function PrescriptionClient({
             />
           </div>
           <Input
-            value={item.instructions || ""}
+            value={item.instructions}
             onChange={(e) => patchItem(item.key, { instructions: e.target.value })}
             placeholder="Instructions (after meals)"
             disabled={Boolean(issued)}
@@ -492,7 +410,7 @@ function CredentialPreview({ label, src }: { label: string; src: string | null |
         {src === undefined ? (
           <span className="h-10 w-3/4 animate-pulse rounded bg-ink-50" />
         ) : src ? (
-          // eslint-disable-next-line @next/next/no-img-element -- blob: URL
+          // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
           <img src={src} alt={`Your ${label.toLowerCase()}`} className="max-h-full max-w-full object-contain" />
         ) : (
           <span className="text-body-sm text-faint">Not added</span>

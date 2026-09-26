@@ -13,17 +13,12 @@ import { IpAllowlistWatcher } from "@/components/admin/security/ip-allowlist-wat
 export const metadata: Metadata = { title: "Network not allowlisted" };
 
 /**
- * Shown when the API gateway refuses this network address.
+ * Shown when the API refuses this network address (`403 ip_not_allowed`).
  *
  * This is a different failure from "you lack permission", and conflating the
  * two costs real time: an ops engineer whose VPN silently dropped will spend
  * ten minutes checking their admin role if the console tells them
  * "insufficient permissions".
- *
- * The gateway cannot currently distinguish the two in its response — both
- * `IPAllowlist` and `RequireRole` answer with `httpx.ErrForbidden` — so the
- * console distinguishes them itself, by exploiting the fact that `IPAllowlist`
- * runs *before* `RequireAuth` on admin routes. See `lib/api/gateway.ts`.
  */
 export default function IpBlockedPage() {
   return (
@@ -34,7 +29,7 @@ export default function IpBlockedPage() {
         </div>
         <CardTitle className="text-xl">This network is not allowlisted</CardTitle>
         <CardDescription>
-          The API gateway refused the request before it looked at who you are.
+          The API refused the request before it looked at who you are.
         </CardDescription>
       </CardHeader>
 
@@ -55,7 +50,7 @@ export default function IpBlockedPage() {
             </li>
             <li>
               If you are working from a new location, a super admin has to add your
-              address range to the gateway allowlist before you can reach the console.
+              address range to the API allowlist before you can reach the console.
             </li>
           </ol>
         </div>

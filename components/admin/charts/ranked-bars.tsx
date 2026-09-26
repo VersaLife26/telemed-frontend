@@ -23,7 +23,7 @@ export interface RankedItem {
 }
 
 /**
- * Horizontal ranked bars, for "top specialties" and "bookings by district".
+ * Horizontal ranked bars, for "top doctors".
  *
  * Deliberately not a chart library: with one measure and identity on the axis,
  * an SVG chart buys nothing over a list of divs and costs a legend, a tooltip

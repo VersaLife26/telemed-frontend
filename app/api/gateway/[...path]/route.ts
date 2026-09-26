@@ -1,43 +1,46 @@
 import { NextResponse } from "next/server";
 
-import { accessTokenFor, forwardingHeaders, gatewayBaseUrl, ipAllowlistRejects } from "@/lib/admin/api/gateway";
-import { adminUpstreamPath, safeContentType, sameOriginRequest } from "@/lib/admin/api/upstream";
+import { accessTokenFor, forwardingHeaders, gatewayBaseUrl } from "@/lib/admin/api/gateway";
+import { accessHeaders } from "@/lib/admin/auth/access";
+import {
+  adminUpstreamPath,
+  fileUpstreamPath,
+  safeContentType,
+  sameOriginRequest,
+} from "@/lib/admin/api/upstream";
 import { serverEnv } from "@/lib/admin/env";
 import { canCallApi } from "@/lib/admin/rbac";
 
 /**
  * Backend-for-frontend proxy.
  *
- * Every call the browser makes to the platform goes through here. The reason
- * is one line long: the browser never holds a token it can replay against the
- * API gateway. The Cloudflare Access JWT arrives on the request, is read
- * server-side here, and is attached to the upstream call. With
- * `connect-src 'self'` in the CSP, injected script cannot reach the gateway
+ * Every call the browser makes to the platform goes through here. The
+ * Cloudflare Access JWT arrives on the request, is read server-side here, and
+ * is attached to the upstream call in `Cf-Access-Jwt-Assertion`. With
+ * `connect-src 'self'` in the CSP, injected script cannot reach the API
  * directly either.
  *
  * (The Access cookie is necessarily present in the browser, since Access set
  * it — but it is scoped to this hostname and is the credential Access itself
  * checks at the edge, not a bearer for the API.)
  *
- * Because this handler holds a `super_admin` bearer token, every check it makes
+ * Because this handler holds a `superAdmin` Access token, every check it makes
  * has to hold *here*, in the handler. `proxy.ts` runs first and is useful, but
  * it is a matcher away from not running, and a route handler that relies on
  * middleware is a route handler with no access control. So the order below is
  * the whole control, top to bottom:
  *
  *   1. method allowlist;
- *   2. path validation, segment by segment, against `/api/v1/admin/*`;
+ *   2. path validation, segment by segment, against `/api/v1/admin/*` (or a
+ *      GET of a signed `/api/v1/files/{token}` link);
  *   3. same-origin check on anything that changes state;
  *   4. session — the token and the roles it carries;
- *   5. **role check against the same RBAC matrix admin-service enforces**,
- *      failing closed on any path the matrix does not name.
+ *   5. **role check against the same permission matrix the API enforces**,
+ *      failing closed on any path the matrix does not name. Signed file links
+ *      skip it: the token was minted for a caller who passed it already.
  *
- * Step 5 did not exist. `proxy.ts` calls `canVisit`, which maps a *page* path
- * to a group and returns `true` for anything unmapped — and no `/api/gateway/*`
- * path is a page path. The proxy was therefore an unrestricted pass-through:
- * a `support` account could `PUT /api/v1/admin/finance/commission-rules`
- * through it, and the only thing that stopped them was admin-service saying no.
- * That is one layer where the console's own documentation claims two.
+ * Errors originated here are ProblemDetails-shaped, like the API's own, so
+ * the browser client reads both the same way.
  */
 
 export const runtime = "nodejs";
@@ -46,30 +49,31 @@ export const dynamic = "force-dynamic";
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 
 /** Response headers worth passing back to the browser. */
-const PASSTHROUGH_HEADERS = ["content-disposition", "x-request-id", "retry-after"];
+const PASSTHROUGH_HEADERS = ["content-disposition", "retry-after"];
 
 async function handler(
   request: Request,
   context: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
   if (!ALLOWED_METHODS.has(request.method)) {
-    return errorResponse(405, "BAD_REQUEST", `method ${request.method} is not proxied`);
+    return problem(405, `method ${request.method} is not proxied`);
   }
 
   const { path } = await context.params;
 
   // The console must not become an open proxy to the whole platform. Only the
-  // admin surface is reachable, and no segment may be anything but a plain
-  // path element.
-  const upstreamPath = adminUpstreamPath(path);
+  // admin surface and signed file links are reachable, and no segment may be
+  // anything but a plain path element.
+  const filePath = request.method === "GET" ? fileUpstreamPath(path) : null;
+  const upstreamPath = filePath ?? adminUpstreamPath(path);
   if (upstreamPath === null) {
-    return errorResponse(403, "FORBIDDEN", "only the admin API surface is proxied");
+    return problem(403, "only the admin API surface is proxied");
   }
 
   const incoming = new URL(request.url);
 
   if (!sameOriginRequest(request.method, request.headers, incoming.origin)) {
-    return errorResponse(403, "FORBIDDEN", "cross-origin requests are not proxied");
+    return problem(403, "cross-origin requests are not proxied", "origin_not_allowed");
   }
 
   const auth = await accessTokenFor(request);
@@ -78,17 +82,16 @@ async function handler(
     // caller's Access session is fine and telling them to authenticate again
     // would send them round a loop that cannot fix anything.
     if (auth.reason === "unreachable") {
-      return errorResponse(503, "UNAVAILABLE", "could not verify your admin role; try again shortly");
+      return problem(503, "could not verify your admin role; try again shortly");
     }
-    return errorResponse(401, "UNAUTHORIZED", "authentication required");
+    if (auth.reason === "ip-blocked") {
+      return problem(403, "your network is not allowed to reach the admin API", "ip_not_allowed");
+    }
+    return problem(401, "authentication required");
   }
 
-  if (!canCallApi(auth.roles, `/${upstreamPath}`)) {
-    return errorResponse(
-      403,
-      "FORBIDDEN",
-      "your admin role does not permit this call",
-    );
+  if (filePath === null && !canCallApi(auth.roles, `/${upstreamPath}`)) {
+    return problem(403, "your admin role does not permit this call");
   }
 
   const target = new URL(`${gatewayBaseUrl()}/${upstreamPath}`);
@@ -96,10 +99,16 @@ async function handler(
 
   const headers = new Headers({
     Accept: request.headers.get("accept") ?? "application/json",
-    Authorization: `Bearer ${auth.token}`,
-    // Naming the origin lets the gateway's admin-origin check pass on the
-    // console and still refuse the patient and doctor frontends.
-    Origin: incoming.origin,
+    // A signed file link carries its own credential; the Access identity is
+    // not sent where it is not needed.
+    ...(filePath === null
+      ? {
+          ...accessHeaders(auth.token),
+          // Naming the origin lets the API's admin-origin check pass on the
+          // console and still refuse the patient and doctor frontends.
+          Origin: incoming.origin,
+        }
+      : {}),
     ...forwardingHeaders(request.headers),
   });
 
@@ -120,21 +129,9 @@ async function handler(
     });
   } catch (cause) {
     const timedOut = cause instanceof Error && cause.name === "TimeoutError";
-    return errorResponse(
+    return problem(
       timedOut ? 504 : 502,
-      timedOut ? "TIMEOUT" : "SERVICE_UNAVAILABLE",
-      timedOut ? "the gateway did not respond in time" : "could not reach the API gateway",
-    );
-  }
-
-  // A 403 is ambiguous at the gateway: `IPAllowlist` and `RequireRole` both
-  // answer with httpx.ErrForbidden. Resolve it once, here, so no screen has to.
-  if (upstream.status === 403 && (await ipAllowlistRejects(request))) {
-    return errorResponse(
-      403,
-      "IP_NOT_ALLOWLISTED",
-      "the API gateway refused this network address",
-      upstream.headers.get("x-request-id"),
+      timedOut ? "the API did not respond in time" : "could not reach the API",
     );
   }
 
@@ -162,15 +159,13 @@ async function handler(
   });
 }
 
-function errorResponse(
-  status: number,
-  code: string,
-  message: string,
-  requestId?: string | null,
-): NextResponse {
+function problem(status: number, detail: string, code?: string): NextResponse {
   return NextResponse.json(
-    { code, message, ...(requestId ? { request_id: requestId } : {}) },
-    { status, headers: { "Cache-Control": "no-store" } },
+    { status, detail, ...(code ? { code } : {}) },
+    {
+      status,
+      headers: { "Content-Type": "application/problem+json", "Cache-Control": "no-store" },
+    },
   );
 }
 

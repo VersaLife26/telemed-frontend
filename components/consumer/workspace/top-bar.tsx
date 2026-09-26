@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/consumer/ui/Badge";
 import { browserApi } from "@/lib/consumer/api/client";
-import type { Appointment } from "@/lib/consumer/api/types";
+import type { Appointment, Paged } from "@/lib/consumer/api/types";
 import { colomboDayKey } from "@/lib/consumer/features/calendar";
 import { formatVisitClock } from "@/lib/consumer/features/patient-appointment";
 import type { ConsultationControls } from "@/lib/consumer/features/use-consultation";
@@ -115,8 +115,8 @@ function ClockPopover({ onClose }: { onClose: () => void }) {
   const days = useMemo(() => monthGrid(new Date()), []);
 
   useEffect(() => {
-    browserApi<Appointment[]>("/appointments?per_page=50&status=confirmed")
-      .then((data) => setAppointments((Array.isArray(data) ? data : []).filter((a) => colomboDayKey(a.start_at || "") === today)))
+    browserApi<Paged<Appointment>>("/appointments?pageSize=50&status=confirmed")
+      .then((data) => setAppointments(data.items.filter((a) => colomboDayKey(a.startAt) === today)))
       .catch(() => setAppointments([]));
   }, [today]);
 
@@ -148,7 +148,7 @@ function ClockPopover({ onClose }: { onClose: () => void }) {
         <ul className="flex flex-col gap-1">
           {appointments.map((a) => (
             <li key={a.id} className="text-[0.8125rem]">
-              {formatVisitClock(a.start_at_local || a.start_at)} · {a.counterpart_name || a.patient_name || "Patient"}
+              {formatVisitClock(a.startAt)} · {a.visitPatient?.name || "Patient"}
             </li>
           ))}
         </ul>

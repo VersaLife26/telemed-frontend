@@ -8,13 +8,7 @@ import { Button } from "@/components/consumer/ui/Button";
 import { browserApi } from "@/lib/consumer/api/client";
 import { endConsultBody, endPath } from "@/lib/consumer/features/consult";
 
-export function EndConsultationButton({
-  appointmentId,
-  consultationId,
-}: {
-  appointmentId: string;
-  consultationId?: string;
-}) {
+export function EndConsultationButton({ appointmentId }: { appointmentId: string }) {
   const router = useRouter();
   const [ending, setEnding] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -38,14 +32,11 @@ export function EndConsultationButton({
     }
     setEnding(true);
     try {
-      const target = consultationId || appointmentId;
-      await browserApi(endPath(target), {
+      // Ending as the doctor also completes the appointment server-side.
+      await browserApi(endPath(appointmentId), {
         method: "POST",
         body: endConsultBody(),
       });
-      await browserApi(`/appointments/${appointmentId}/complete`, {
-        method: "POST",
-      }).catch(() => {});
       setEnded(true);
       router.refresh();
     } catch (e) {

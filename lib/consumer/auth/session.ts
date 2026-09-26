@@ -1,37 +1,35 @@
 import { NextResponse } from "next/server";
 import { apiFetch } from "@/lib/consumer/api/client";
-import { ApiError } from "@/lib/consumer/api/envelope";
+import { ApiError } from "@/lib/consumer/api/errors";
 import { clearAuthCookies, getRefreshToken, setAuthCookies } from "@/lib/consumer/auth/cookies";
 import { fetchRefreshedTokens } from "@/lib/consumer/auth/refresh";
 import { SURFACE } from "@/lib/consumer/surface";
-import type { TelemedUser } from "@/lib/consumer/api/types";
+import type { AuthResponse } from "@/lib/consumer/api/types";
 
-export type AuthTokens = {
-  access_token: string;
-  refresh_token: string;
-  expires_in?: number;
-  user?: TelemedUser;
-};
+/** A BFF-originated error, shaped like the API's own problem responses so the browser reads one format. */
+export function problem(status: number, detail: string, code?: string) {
+  return NextResponse.json(
+    { status, title: detail, detail, ...(code ? { code } : {}) },
+    { status, headers: { "Content-Type": "application/problem+json" } },
+  );
+}
 
 export function gatewayUnreachable() {
-  return NextResponse.json(
-    {
-      message:
-        "Could not reach API gateway. Start telemed-api-gateway or check NEXT_PUBLIC_API_BASE_URL.",
-    },
-    { status: 502 },
-  );
+  return problem(502, "Could not reach the TeleMed API. Check NEXT_PUBLIC_API_BASE_URL.", "gateway_unreachable");
 }
 
 export function toClientError(err: unknown) {
   if (err instanceof ApiError) {
-    return NextResponse.json(err.body, { status: err.status });
+    return NextResponse.json(err.body, {
+      status: err.status,
+      headers: { "Content-Type": "application/problem+json" },
+    });
   }
   return gatewayUnreachable();
 }
 
 export async function completePasswordLogin(body: unknown) {
-  const data = await apiFetch<AuthTokens>("/api/v1/auth/login/email", {
+  const data = await apiFetch<AuthResponse>("/api/v1/auth/login/email", {
     method: "POST",
     body,
   });
@@ -39,31 +37,23 @@ export async function completePasswordLogin(body: unknown) {
 }
 
 export async function completeEmailRegister(body: unknown) {
-  const data = await apiFetch<AuthTokens>("/api/v1/auth/register/email", {
+  const data = await apiFetch<AuthResponse>("/api/v1/auth/register/email", {
     method: "POST",
     body,
   });
   return finishAuth(data);
 }
 
-export async function completeGoogleLogin(body: unknown) {
+export async function completeGoogleLogin(idToken: string) {
   try {
-    const data = await apiFetch<AuthTokens>("/api/v1/auth/oauth/google", {
+    const data = await apiFetch<AuthResponse>("/api/v1/auth/google", {
       method: "POST",
-      body,
+      body: { idToken },
     });
     return finishAuth(data, requiredRole());
   } catch (err) {
-    // A doctor account is never created from a Google sign-in -- doctors are
-    // onboarded through the application and OTP flow, and silently minting one
-    // here would put an unverified clinician on the platform. The gateway
-    // answers 404 for an unknown email; the patient surface never sees it
-    // because it asks for the account to be created.
-    if (SURFACE === "doctor" && err instanceof ApiError && err.status === 404) {
-      throw new ApiError(404, {
-        message:
-          "No doctor account for this Google email. Sign in with your mobile number first, then save this email on your profile.",
-      });
+    if (err instanceof ApiError && err.status === 404) {
+      throw new ApiError(404, { status: 404, detail: "Google sign-in is not available right now." });
     }
     throw err;
   }
@@ -73,8 +63,8 @@ export async function completeGoogleLogin(body: unknown) {
  * The role a session must hold on this surface, or undefined where any role is
  * acceptable.
  *
- * The doctor app must refuse a patient token even though the gateway issued it
- * honestly: both surfaces authenticate against the same user-service, so the
+ * The doctor app must refuse a patient token even though the API issued it
+ * honestly: both surfaces authenticate against the same user store, so the
  * token is valid, and only this check keeps a patient out of the doctor
  * console.
  */
@@ -82,34 +72,31 @@ export function requiredRole(): string | undefined {
   return SURFACE === "doctor" ? "doctor" : undefined;
 }
 
-export async function finishAuth(data: AuthTokens, requireRole?: string) {
-  if (!data.access_token || !data.refresh_token) {
-    return NextResponse.json({ message: "Login response missing tokens" }, { status: 502 });
+export async function finishAuth(data: AuthResponse, requireRole?: string) {
+  if (!data.accessToken || !data.refreshToken) {
+    return problem(502, "Login response missing tokens");
   }
   if (requireRole && data.user?.role && data.user.role !== requireRole) {
-    return NextResponse.json(
-      {
-        message:
-          requireRole === "doctor"
-            ? "This account is not a doctor account. Sign in on the patient app, or ask support to grant doctor access."
-            : "This account cannot use this app.",
-      },
-      { status: 403 },
+    return problem(
+      403,
+      requireRole === "doctor"
+        ? "This account is not a doctor account. Sign in on the patient app, or ask support to grant doctor access."
+        : "This account cannot use this app.",
     );
   }
-  await setAuthCookies(data.access_token, data.refresh_token);
-  return NextResponse.json({ data: { ok: true, user: data.user ?? null } });
+  await setAuthCookies(data.accessToken, data.refreshToken);
+  return NextResponse.json({ ok: true, user: data.user ?? null });
 }
 
 export async function completeRefresh() {
   const refresh = await getRefreshToken();
   if (!refresh) {
-    return NextResponse.json({ message: "Not signed in" }, { status: 401 });
+    return problem(401, "Not signed in");
   }
   const result = await fetchRefreshedTokens(refresh);
   if (!result.ok) {
     if (result.invalidate) await clearAuthCookies();
-    return NextResponse.json({ message: "Session expired. Sign in again." }, { status: 401 });
+    return problem(401, "Session expired. Sign in again.");
   }
   return finishAuth(result.tokens, requiredRole());
 }
@@ -123,6 +110,6 @@ export async function refreshAuthCookies(): Promise<string | undefined> {
     if (result.invalidate) await clearAuthCookies();
     return undefined;
   }
-  await setAuthCookies(result.tokens.access_token, result.tokens.refresh_token);
-  return result.tokens.access_token;
+  await setAuthCookies(result.tokens.accessToken, result.tokens.refreshToken);
+  return result.tokens.accessToken;
 }

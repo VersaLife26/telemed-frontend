@@ -11,15 +11,18 @@ import { EmptyState } from "@/components/admin/ui/empty-state";
 import { downloadFile } from "@/lib/admin/api/browser";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { reportError } from "@/lib/admin/api/hooks";
-import type { LedgerEntry } from "@/lib/admin/api/types";
-import { formatDateTime, formatMoney, humanise, shortId } from "@/lib/admin/format";
+import type { LedgerEntry, LedgerTotals } from "@/lib/admin/api/types";
+import { formatCount, formatDateTime, formatMoney, humanise, shortId } from "@/lib/admin/format";
 
 export function LedgerTable({
   entries,
+  totals,
   filtered,
   exportQuery,
 }: {
   entries: LedgerEntry[];
+  /** Totals across every entry matching the filter, not just this page. */
+  totals: LedgerTotals;
   filtered: boolean;
   /** The current filter, so the export matches what is on screen. */
   exportQuery: string;
@@ -29,50 +32,64 @@ export function LedgerTable({
   const columns = React.useMemo<ColumnDef<LedgerEntry, unknown>[]>(
     () => [
       {
-        accessorKey: "occurred_at",
+        accessorKey: "occurredAt",
         header: "When",
         cell: ({ row }) => (
           <div className="min-w-0">
             <p className="whitespace-nowrap text-sm">
-              {formatDateTime(row.original.occurred_at)}
+              {formatDateTime(row.original.occurredAt)}
             </p>
             <p
               className="truncate font-mono text-xs text-muted-foreground"
-              title={row.original.payment_id}
+              title={row.original.paymentId}
             >
-              {shortId(row.original.payment_id)}
+              {shortId(row.original.paymentId)}
             </p>
           </div>
         ),
       },
       {
-        accessorKey: "amount_cents",
+        accessorKey: "type",
+        header: "Type",
+        cell: ({ row }) => (
+          <Badge variant={row.original.type === "payment" ? "success" : "warning"}>
+            {humanise(row.original.type)}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: "amountCents",
         header: "Amount",
         cell: ({ row }) => (
           <span className="tabular-nums">
-            {formatMoney(row.original.amount_cents, row.original.currency)}
+            {formatMoney(row.original.amountCents, row.original.currency)}
           </span>
         ),
       },
       {
-        accessorKey: "commission_cents",
+        accessorKey: "commissionCents",
         header: "Commission",
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
-            {formatMoney(row.original.commission_cents, row.original.currency)}
+            {formatMoney(row.original.commissionCents, row.original.currency)}
           </span>
         ),
       },
       {
-        id: "payout",
+        accessorKey: "providerFeeCents",
+        header: "Provider fee",
+        cell: ({ row }) => (
+          <span className="tabular-nums text-muted-foreground">
+            {formatMoney(row.original.providerFeeCents, row.original.currency)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "payoutCents",
         header: "Doctor payout",
-        enableSorting: false,
         cell: ({ row }) => (
           <span className="tabular-nums">
-            {formatMoney(
-              row.original.amount_cents - row.original.commission_cents,
-              row.original.currency,
-            )}
+            {formatMoney(row.original.payoutCents, row.original.currency)}
           </span>
         ),
       },
@@ -86,38 +103,31 @@ export function LedgerTable({
             "—"
           ),
       },
-      {
-        accessorKey: "specialty_code",
-        header: "Specialty",
-        cell: ({ row }) =>
-          row.original.specialty_code ? humanise(row.original.specialty_code) : "—",
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => {
-          const status = row.original.status;
-          return (
-            <Badge
-              variant={
-                status === "succeeded"
-                  ? "success"
-                  : status === "refunded"
-                    ? "warning"
-                    : "destructive"
-              }
-            >
-              {humanise(status)}
-            </Badge>
-          );
-        },
-      },
     ],
     [],
   );
 
+  const currency = entries[0]?.currency ?? "LKR";
+  const summary: Array<[string, string]> = [
+    ["Captured", `${formatMoney(totals.capturedCents, currency)} (${formatCount(totals.paymentCount)})`],
+    ["Refunded", `${formatMoney(totals.refundedCents, currency)} (${formatCount(totals.refundCount)})`],
+    ["Net", formatMoney(totals.netCents, currency)],
+    ["Commission", formatMoney(totals.commissionCents, currency)],
+    ["Provider fees", formatMoney(totals.providerFeeCents, currency)],
+    ["Doctor payouts", formatMoney(totals.payoutCents, currency)],
+  ];
+
   return (
     <>
+      <dl className="mb-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+        {summary.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-border px-3 py-2">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className="tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
       <div className="mb-3 flex justify-end">
         <Button
           variant="outline"
@@ -145,16 +155,16 @@ export function LedgerTable({
       <DataTable
         columns={columns}
         data={entries}
-        getRowId={(row) => row.payment_id}
-        caption="Payments recorded against the platform, in integer cents converted for display only. Sorting applies to this page; export the CSV for a full-dataset sort."
+        getRowId={(row) => `${row.type}-${row.id}`}
+        caption="Captured payments and refunds, in integer cents converted for display only. Sorting applies to this page; export the CSV for a full-dataset sort."
         emptyState={
           <EmptyState
             icon={Receipt}
-            title={filtered ? "No payments match these filters" : "No payments recorded"}
+            title={filtered ? "No ledger entries match these filters" : "No ledger entries recorded"}
             description={
               filtered
-                ? "Widen the date range, or clear the provider and status filters."
-                : "The payment projection is fed by payment.succeeded, payment.failed and payment.refunded events from payment-service."
+                ? "Widen the date range, or clear the doctor filter."
+                : "Captured payments and refunds appear here as they happen."
             }
           />
         }

@@ -8,8 +8,7 @@ import { Input } from "@/components/consumer/ui/Input";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { Select } from "@/components/consumer/ui/Select";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Doctor } from "@/lib/consumer/api/types";
-import { SPECIALTIES } from "@/lib/consumer/features/doctor-apply";
+import type { Doctor, Paged, Specialty } from "@/lib/consumer/api/types";
 import {
   buildDoctorsApiQuery,
   hasActiveDoctorFilters,
@@ -37,19 +36,21 @@ export default async function DoctorsPage({
   const filters: DoctorListFilters = {
     q: params.q,
     specialty: params.specialty,
-    min_fee: params.min_fee,
-    max_fee: params.max_fee,
+    minFee: params.minFee,
+    maxFee: params.maxFee,
   };
   const filtered = hasActiveDoctorFilters(filters);
 
+  const specialtiesRequest = apiFetch<Specialty[]>("/api/v1/specialties").catch(() => [] as Specialty[]);
   let doctors: Doctor[] = [];
   let error: string | null = null;
   try {
-    const data = await apiFetch<Doctor[]>(`/api/v1/doctors?${buildDoctorsApiQuery(filters)}`);
-    doctors = Array.isArray(data) ? data : [];
+    const page = await apiFetch<Paged<Doctor>>(`/api/v1/doctors?${buildDoctorsApiQuery(filters)}`);
+    doctors = page.items;
   } catch (e) {
     error = e instanceof Error ? e.message : "Could not load doctors";
   }
+  const specialties = await specialtiesRequest;
 
   const emptyBody = filtered
     ? "Nothing matched these filters. Try another specialty or a wider fee range."
@@ -110,9 +111,9 @@ export default async function DoctorsPage({
                     fieldClassName="min-w-0 flex-1"
                   >
                     <option value="">All specialties</option>
-                    {SPECIALTIES.map((s) => (
+                    {specialties.map((s) => (
                       <option key={s.code} value={s.code}>
-                        {s.label}
+                        {s.nameEn}
                       </option>
                     ))}
                   </Select>
@@ -124,25 +125,25 @@ export default async function DoctorsPage({
                   </FieldIcon>
                   <Input
                     id="filter-min-fee"
-                    name="min_fee"
+                    name="minFee"
                     label="Min fee (LKR)"
                     type="number"
                     inputMode="decimal"
                     min={0}
                     step={100}
-                    defaultValue={filters.min_fee || ""}
+                    defaultValue={filters.minFee || ""}
                     placeholder="2000"
                     fieldClassName="min-w-0 flex-1"
                   />
                   <Input
                     id="filter-max-fee"
-                    name="max_fee"
+                    name="maxFee"
                     label="Max fee (LKR)"
                     type="number"
                     inputMode="decimal"
                     min={0}
                     step={100}
-                    defaultValue={filters.max_fee || ""}
+                    defaultValue={filters.maxFee || ""}
                     placeholder="6000"
                     fieldClassName="min-w-0 flex-1"
                   />
@@ -184,7 +185,7 @@ export default async function DoctorsPage({
       ) : (
         <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {doctors.map((d) => (
-            <DoctorCard key={d.id} doctor={d} />
+            <DoctorCard key={d.id} doctor={d} specialties={specialties} />
           ))}
         </div>
       )}

@@ -15,21 +15,19 @@ test("send refuses a blank phone", () => {
   assert.equal(sendOtpError("+94761111002"), null);
 });
 
-test("send body defaults purpose to login", () => {
+test("send body carries phone and language only", () => {
   assert.deepEqual(sendOtpBody("+94761111002"), {
     phone: "+94761111002",
-    purpose: "login",
     language: "en",
   });
 });
 
-test("verify requires phone and OTP", () => {
+test("verify requires phone and code", () => {
   assert.equal(verifyOtpError("+94", ""), "Phone and OTP are required");
-  assert.equal(verifyOtpError("+94", undefined, "123456"), null);
+  assert.equal(verifyOtpError("+94", "123456"), null);
   assert.deepEqual(verifyOtpBody("+94", "123456"), {
     phone: "+94",
-    otp: "123456",
-    purpose: "login",
+    code: "123456",
   });
 });
 

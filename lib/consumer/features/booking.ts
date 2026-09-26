@@ -1,33 +1,40 @@
-export function bookingError(slotId: string): string | null {
-  if (!slotId) return "Pick a time on the doctor’s page first.";
+import type { BookAppointmentRequest, Sex } from "@/lib/consumer/api/types";
+
+export function bookingError(startAt: string, symptoms: string): string | null {
+  if (!startAt) return "Pick a time on the doctor’s page first.";
+  if (!symptoms.trim()) return "Tell the doctor briefly what the visit is about.";
   return null;
 }
 
+/** `startAt` goes back exactly as the slot listing returned it. */
 export function bookingBody(
-  slotId: string,
   doctorId: string,
+  startAt: string,
   symptoms: string,
   visit: {
     name: string;
     dob: string;
     relation?: string;
-    sex?: string;
+    sex?: Sex | "";
     weightKg?: string;
     allergies?: string;
   },
-) {
-  const intake: Record<string, string> = { symptoms };
-  if (visit.relation?.trim()) intake.visit_relation = visit.relation.trim();
+): BookAppointmentRequest {
   const weight = Number.parseFloat(visit.weightKg || "");
   return {
-    slot_id: slotId,
-    doctor_id: doctorId,
-    visit_patient_name: visit.name.trim(),
-    visit_patient_dob: visit.dob.trim(),
-    ...(visit.sex ? { visit_patient_sex: visit.sex } : {}),
-    ...(Number.isFinite(weight) ? { visit_patient_weight_kg: Math.round(weight * 10) / 10 } : {}),
-    ...(visit.allergies?.trim() ? { visit_patient_allergies: visit.allergies.trim() } : {}),
-    intake,
+    doctorId,
+    startAt,
+    visitPatient: {
+      name: visit.name.trim(),
+      dateOfBirth: visit.dob.trim(),
+      sex: visit.sex || null,
+      weightKg: Number.isFinite(weight) ? Math.round(weight * 10) / 10 : null,
+      allergies: visit.allergies?.trim() || null,
+    },
+    intake: {
+      symptoms: symptoms.trim(),
+      visitRelation: visit.relation?.trim() || null,
+    },
   };
 }
 
@@ -63,4 +70,9 @@ export function bookingVisitError(
 
 export function paymentPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/payment`;
+}
+
+/** Intake link for a slot: the instant verbatim, plus the zone to show it in. */
+export function intakePath(doctorId: string, startAt: string, timeZone: string): string {
+  return `/doctors/${doctorId}/intake?${new URLSearchParams({ startAt, tz: timeZone })}`;
 }

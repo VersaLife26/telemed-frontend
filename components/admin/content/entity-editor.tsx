@@ -34,6 +34,8 @@ export interface FieldSpec {
   help?: string;
   placeholder?: string;
   options?: Array<{ value: string; label: string }>;
+  /** Shown but not editable when editing an existing row (e.g. a key used in the path). */
+  fixedOnEdit?: boolean;
   /** Returns a message when the value is unacceptable, or null. */
   validate?: (value: FieldValue) => string | null;
 }
@@ -41,17 +43,18 @@ export interface FieldSpec {
 /**
  * A dialog form built from a field spec.
  *
- * Content management is four entities with a dozen fields between them and no
- * interesting behaviour. Writing four near-identical forms would guarantee that
- * a fix to label association or error announcement lands in three of them.
+ * Content management is two entities with a dozen fields between them and no
+ * interesting behaviour. Writing near-identical forms would guarantee that a
+ * fix to label association or error announcement lands in only one of them.
  *
- * Server-side field errors are the point of interest: the platform's error
- * envelope carries `fields: {name: reason}` on a 422, and those are mapped back
+ * Server-side field errors are the point of interest: a validation problem
+ * carries `errors: {fieldPath: [reason]}` on a 400, and those are mapped back
  * onto the inputs here — `aria-invalid` plus a described-by message on the
  * field itself, not a summary at the top that says "check your input".
  */
 export function EntityEditor({
   open,
+  editing,
   title,
   description,
   fields,
@@ -63,6 +66,7 @@ export function EntityEditor({
   onSubmit,
 }: {
   open: boolean;
+  editing: boolean;
   title: string;
   description?: string;
   fields: readonly FieldSpec[];
@@ -98,7 +102,7 @@ export function EntityEditor({
   };
 
   const problemFor = (field: FieldSpec): string | null => {
-    const server = serverError?.fields?.[field.name];
+    const server = serverError?.errors[field.name]?.[0];
     if (server) return server;
     return touched[field.name] ? localProblem(field) : null;
   };
@@ -132,6 +136,7 @@ export function EntityEditor({
             const helpId = `${id}-help`;
             const problem = problemFor(field);
             const value = values[field.name];
+            const fixed = editing && field.fixedOnEdit === true;
 
             return (
               <div key={field.name} className="space-y-1.5">
@@ -222,6 +227,7 @@ export function EntityEditor({
                       <Input
                         id={id}
                         value={typeof value === "string" ? value : ""}
+                        disabled={fixed}
                         placeholder={field.placeholder ?? ""}
                         aria-invalid={problem !== null}
                         aria-describedby={helpId}

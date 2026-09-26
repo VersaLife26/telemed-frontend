@@ -10,14 +10,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryListServer } from "@/lib/admin/api/server";
-import type { PendingDoctor } from "@/lib/admin/api/types";
+import type { DoctorApplicationStatus, DoctorApplicationSummary } from "@/lib/admin/api/types";
 import { checkSlmcFormat } from "@/lib/admin/credentialing";
 import { filterValues, pageQuery } from "@/lib/admin/url-query";
 import { ShieldQuestion } from "lucide-react";
 
 const metadata: Metadata = { title: "Verification queue" };
 
-const PER_PAGE = 25;
+const PAGE_SIZE = 25;
+
+const STATUSES: readonly string[] = ["pending", "underReview", "approved", "rejected"];
+
+function isStatus(value: string | undefined): value is DoctorApplicationStatus {
+  return value !== undefined && STATUSES.includes(value);
+}
 
 /**
  * The doctor verification queue.
@@ -34,42 +40,23 @@ export default async function VerificationQueuePage({
 }) {
   const params = await searchParams;
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
-  const status = params.status ?? "pending";
+  const status: DoctorApplicationStatus = isStatus(params.status) ? params.status : "pending";
 
-  const result = await tryListServer<PendingDoctor>(
-    endpoints.credentialing.pending(
-      query({
-        status,
-        specialty: params.specialty,
-        q: params.q,
-        page,
-        per_page: PER_PAGE,
-      }),
-    ),
+  const result = await tryListServer<DoctorApplicationSummary>(
+    endpoints.credentialing.list(query({ status, page, pageSize: PAGE_SIZE })),
   );
 
   const filters = [
-    {
-      name: "q",
-      label: "Name or SLMC number",
-      kind: "search" as const,
-      placeholder: "e.g. Perera or 41235",
-    },
     {
       name: "status",
       label: "Status",
       kind: "select" as const,
       options: [
         { value: "pending", label: "Pending" },
+        { value: "underReview", label: "Under review" },
         { value: "approved", label: "Approved" },
         { value: "rejected", label: "Rejected" },
       ],
-    },
-    {
-      name: "specialty",
-      label: "Specialty code",
-      kind: "search" as const,
-      placeholder: "e.g. cardiology",
     },
   ];
 
@@ -79,7 +66,7 @@ export default async function VerificationQueuePage({
   const header = (
     <PageHeader
       title="Doctor verification queue"
-      description="Every doctor waiting on credential review. Nothing here reaches a patient until it is approved."
+      description="Every doctor application and where it stands. Nothing here reaches a patient until it is approved."
     />
   );
 
@@ -94,9 +81,9 @@ export default async function VerificationQueuePage({
     );
   }
 
-  const { data: doctors, meta } = result.page;
-  const malformed = doctors.filter((d) => !checkSlmcFormat(d.slmc_number).valid).length;
-  const isFiltered = Boolean(params.q || params.specialty) || status !== "pending";
+  const doctors = result.page.items;
+  const malformed = doctors.filter((d) => !checkSlmcFormat(d.slmcNumber).valid).length;
+  const isFiltered = status !== "pending";
 
   return (
     <>
@@ -121,7 +108,7 @@ export default async function VerificationQueuePage({
       ) : null}
 
       <PendingDoctorsTable doctors={doctors} filtered={isFiltered} />
-      <Pagination meta={meta} label="Verification queue" query={queryString} />
+      <Pagination meta={result.page} label="Verification queue" query={queryString} />
     </>
   );
 }

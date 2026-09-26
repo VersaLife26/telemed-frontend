@@ -40,12 +40,11 @@ export function EarlyJoinDecision({
     setError(null);
     setBusy(kind);
     try {
-      await browserApi(earlyJoinRespondPath(offer.appointment_id, kind), {
+      await browserApi(earlyJoinRespondPath(offer.appointmentId, kind), {
         method: "POST",
-        body: {},
       });
       if (kind === "accept") {
-        router.push(waitingRoomPath(offer.appointment_id));
+        router.push(waitingRoomPath(offer.appointmentId));
         return;
       }
       onChanged?.();

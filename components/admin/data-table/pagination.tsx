@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/admin/ui/button";
-import type { Meta } from "@/lib/admin/api/envelope";
+import { type Paged, totalPages as countPages } from "@/lib/admin/api/types";
 import { formatCount } from "@/lib/admin/format";
 
 /**
@@ -19,7 +19,7 @@ export function Pagination({
   label,
   query,
 }: {
-  meta: Meta;
+  meta: Pick<Paged<unknown>, "page" | "pageSize" | "total">;
   label: string;
   /** Current URL query string from the server page (may include `page`). */
   query: string;
@@ -35,9 +35,9 @@ export function Pagination({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  const totalPages = Math.max(1, meta.total_pages);
-  const first = meta.total === 0 ? 0 : (meta.page - 1) * meta.per_page + 1;
-  const last = Math.min(meta.page * meta.per_page, meta.total);
+  const totalPages = countPages(meta);
+  const first = meta.total === 0 ? 0 : (meta.page - 1) * meta.pageSize + 1;
+  const last = Math.min(meta.page * meta.pageSize, meta.total);
 
   return (
     <nav

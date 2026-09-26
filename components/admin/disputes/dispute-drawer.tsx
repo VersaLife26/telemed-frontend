@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/admin/ui/dialog";
 import { EmptyState } from "@/components/admin/ui/empty-state";
+import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
 import {
   Select,
@@ -26,8 +27,8 @@ import { Separator } from "@/components/admin/ui/separator";
 import { Skeleton } from "@/components/admin/ui/skeleton";
 import { Textarea } from "@/components/admin/ui/textarea";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import { useApiList, useApiMutation, useApiQuery } from "@/lib/admin/api/hooks";
-import type { AdminIdentity, Dispute, DisputeComment } from "@/lib/admin/api/types";
+import { useApiMutation, useApiQuery } from "@/lib/admin/api/hooks";
+import type { AdminAccount, Dispute, DisputeComment, DisputeDetail } from "@/lib/admin/api/types";
 import { formatDateTime, formatMoney, humanise, shortId } from "@/lib/admin/format";
 
 const MINIMUM_RESOLUTION = 25;
@@ -45,108 +46,118 @@ export function DisputeDrawer({
   onClose,
 }: {
   dispute: Dispute | null;
-  admins: AdminIdentity[];
+  /** Empty when the caller may not read the admin roster; ids are then shown instead of names. */
+  admins: AdminAccount[];
   onClose: () => void;
 }) {
   const [comment, setComment] = React.useState("");
   const [resolution, setResolution] = React.useState("");
-  const [outcome, setOutcome] = React.useState<"resolved" | "closed">("resolved");
+  const [refund, setRefund] = React.useState("");
   const [touched, setTouched] = React.useState(false);
 
   React.useEffect(() => {
     setComment("");
-    setResolution(dispute?.resolution ?? "");
+    setResolution("");
+    setRefund("");
     setTouched(false);
-  }, [dispute?.id, dispute?.resolution]);
+  }, [dispute?.id]);
 
   const enabled = dispute !== null;
+  const detailKey = ["dispute-detail", dispute?.id ?? ""] as const;
 
-  const comments = useApiList<DisputeComment>(
-    ["dispute-comments", dispute?.id ?? ""],
-    dispute ? endpoints.disputes.comments(dispute.id) : "",
-    { enabled },
-  );
-
-  const detail = useApiQuery<Dispute>(
-    ["dispute-detail", dispute?.id ?? ""],
+  const detail = useApiQuery<DisputeDetail>(
+    detailKey,
     dispute ? endpoints.disputes.detail(dispute.id) : "",
     { enabled },
   );
 
-  const view = detail.data ?? dispute;
+  const view = detail.data?.dispute ?? dispute;
+  const adminName = (id: string | null) => {
+    if (!id) return null;
+    const admin = admins.find((a) => a.id === id);
+    return admin ? admin.displayName || admin.email : shortId(id);
+  };
 
-  const assign = useApiMutation<Dispute, { assignedTo: string | null }>({
+  const assign = useApiMutation<DisputeDetail, { adminUserId: string | null }>({
     method: "POST",
     path: () => endpoints.disputes.assign(dispute?.id ?? ""),
-            body: (variables) => ({
-      assigned_to: variables.assignedTo,
-      version: (detail.data ?? dispute)?.version,
-    }),
+    body: (variables) => ({ adminUserId: variables.adminUserId }),
     successMessage: () => "Assignment updated.",
+    invalidate: [detailKey],
   });
 
-  const addComment = useApiMutation<DisputeComment, void>(
-    {
-      method: "POST",
-      path: () => endpoints.disputes.comments(dispute?.id ?? ""),
-      body: () => ({ body: comment.trim() }),
-      successMessage: () => "Comment added to the case file.",
-      invalidate: [["dispute-comments", dispute?.id ?? ""]],
-      onSuccess: () => setComment(""),
-    },
-  );
+  const addComment = useApiMutation<DisputeComment, void>({
+    method: "POST",
+    path: () => endpoints.disputes.comments(dispute?.id ?? ""),
+    body: () => ({ body: comment.trim() }),
+    successMessage: () => "Comment added to the case file.",
+    invalidate: [detailKey],
+    onSuccess: () => setComment(""),
+  });
 
-  const resolve = useApiMutation<Dispute, void>({
+  const refundCents = refund.trim() === "" ? null : Math.round(Number(refund) * 100);
+  const refundInvalid = refundCents !== null && (!Number.isFinite(refundCents) || refundCents <= 0);
+
+  const resolve = useApiMutation<DisputeDetail, void>({
     method: "POST",
     path: () => endpoints.disputes.resolve(dispute?.id ?? ""),
-    body: () => ({
-      status: outcome,
-      resolution: resolution.trim(),
-      version: (detail.data ?? dispute)?.version,
-    }),
-    successMessage: () => "Dispute resolved.",
+    body: () => ({ resolution: resolution.trim(), refundAmountCents: refundCents }),
+    successMessage: () =>
+      refundCents === null
+        ? "Dispute resolved."
+        : "Dispute resolved. The refund is waiting for approval on Payments.",
+    onSuccess: onClose,
+  });
+
+  const close = useApiMutation<DisputeDetail, void>({
+    method: "POST",
+    path: () => endpoints.disputes.close(dispute?.id ?? ""),
+    successMessage: () => "Dispute closed.",
     onSuccess: onClose,
   });
 
   const resolutionTooShort = resolution.trim().length < MINIMUM_RESOLUTION;
-  const settled = dispute?.status === "resolved" || dispute?.status === "closed";
+  const status = view?.status;
+  const settled = status === "resolved" || status === "closed";
 
   return (
     <Dialog open={enabled} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            {dispute ? humanise(dispute.category) : "Dispute"}
-            {dispute ? (
+            {view ? view.subject : "Dispute"}
+            {view ? (
               <Badge className="ml-2" variant="outline">
-                {humanise(dispute.status)}
+                {humanise(view.status)}
               </Badge>
             ) : null}
           </DialogTitle>
           <DialogDescription>
             Appointment{" "}
-            <span className="font-mono">{dispute ? shortId(dispute.appointment_id) : ""}</span>
-            {dispute ? ` · raised ${formatDateTime(dispute.created_at)}` : ""}
+            <span className="font-mono">{view ? shortId(view.appointmentId) : ""}</span>
+            {view ? ` · raised ${formatDateTime(view.createdAt)}` : ""}
           </DialogDescription>
         </DialogHeader>
 
-        {dispute ? (
+        {view ? (
           <div className="space-y-5">
             <section>
-              <h3 className="mb-1 text-sm font-medium">What the patient reported</h3>
+              <h3 className="mb-1 text-sm font-medium">What was reported</h3>
               <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-                {view?.description || "Open the case to load the patient's report."}
+                {view.description}
               </p>
-              {view?.refund_requested ? (
+              {detail.data && detail.data.refunds.length > 0 ? (
                 <Alert variant="warning" className="mt-3">
                   <MessageSquare aria-hidden="true" />
-                  <AlertTitle>
-                    Refund requested:{" "}
-                    {formatMoney(view.refund_amount_cents, view.currency)}
-                  </AlertTitle>
+                  <AlertTitle>Refunds from this dispute</AlertTitle>
                   <AlertDescription>
-                    Resolving this dispute does not move money. Approve the refund on the
-                    Payments screen — that is what publishes admin.refund_approved.
+                    <ul className="space-y-0.5">
+                      {detail.data.refunds.map((r) => (
+                        <li key={r.id}>
+                          {formatMoney(r.amountCents, r.currency)} · {humanise(r.status)}
+                        </li>
+                      ))}
+                    </ul>
                   </AlertDescription>
                 </Alert>
               ) : null}
@@ -156,29 +167,47 @@ export function DisputeDrawer({
 
             <section className="space-y-2">
               <Label htmlFor="dispute-assignee">Assigned to</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={dispute.assigned_to ?? "__unassigned__"}
-                  onValueChange={(value) => {
-                    if (value === "__unassigned__") return;
-                    assign.mutate({ assignedTo: value });
-                  }}
-                  disabled={settled || assign.isPending}
-                >
-                  <SelectTrigger id="dispute-assignee" className="max-w-sm">
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__unassigned__" disabled>
-                      Unassigned
-                    </SelectItem>
-                    {admins.map((admin) => (
-                      <SelectItem key={admin.id} value={admin.id}>
-                        {admin.display_name || admin.email}
+              <div className="flex flex-wrap gap-2">
+                {admins.length > 0 ? (
+                  <Select
+                    value={view.assignedAdminId ?? "__unassigned__"}
+                    onValueChange={(value) => {
+                      if (value === "__unassigned__") return;
+                      assign.mutate({ adminUserId: value });
+                    }}
+                    disabled={settled || assign.isPending}
+                  >
+                    <SelectTrigger id="dispute-assignee" className="max-w-sm">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__unassigned__" disabled>
+                        Unassigned
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      {admins
+                        .filter((admin) => admin.isActive)
+                        .map((admin) => (
+                          <SelectItem key={admin.id} value={admin.id}>
+                            {admin.displayName || admin.email}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p id="dispute-assignee" className="self-center text-sm">
+                    {adminName(view.assignedAdminId) ?? "Unassigned"}
+                  </p>
+                )}
+                {!settled ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={assign.isPending}
+                    onClick={() => assign.mutate({ adminUserId: null })}
+                  >
+                    Assign to me
+                  </Button>
+                ) : null}
               </div>
             </section>
 
@@ -186,26 +215,26 @@ export function DisputeDrawer({
 
             <section className="space-y-2">
               <h3 className="text-sm font-medium">Internal case notes</h3>
-              {comments.isPending ? (
+              {detail.isPending ? (
                 <div className="space-y-2" aria-busy="true">
                   <span className="sr-only">Loading case notes</span>
                   <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
                 </div>
-              ) : comments.isError ? (
+              ) : detail.isError ? (
                 <Alert variant="destructive">
                   <MessageSquare aria-hidden="true" />
                   <AlertTitle>Could not load case notes</AlertTitle>
                   <AlertDescription>
-                    {comments.error.userMessage}
-                    {comments.error.requestId ? (
+                    {detail.error.userMessage}
+                    {detail.error.traceId ? (
                       <span className="ml-1 font-mono text-xs">
-                        Request ID: {comments.error.requestId}
+                        Trace ID: {detail.error.traceId}
                       </span>
                     ) : null}
                   </AlertDescription>
                 </Alert>
-              ) : comments.data.data.length === 0 ? (
+              ) : detail.data.comments.length === 0 ? (
                 <EmptyState
                   icon={MessageSquare}
                   title="No case notes yet"
@@ -213,12 +242,12 @@ export function DisputeDrawer({
                 />
               ) : (
                 <ol className="max-h-60 space-y-2 overflow-y-auto pr-1">
-                  {comments.data.data.map((entry) => (
+                  {detail.data.comments.map((entry) => (
                     <li key={entry.id} className="rounded-md border border-border p-3 text-sm">
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="font-medium">{entry.author_name ?? "Admin"}</p>
+                        <p className="font-medium">{adminName(entry.authorAdminId)}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDateTime(entry.created_at)}
+                          {formatDateTime(entry.createdAt)}
                         </p>
                       </div>
                       <p className="mt-1 whitespace-pre-wrap">{entry.body}</p>
@@ -227,7 +256,7 @@ export function DisputeDrawer({
                 </ol>
               )}
 
-              {!settled ? (
+              {status !== "closed" ? (
                 <div className="flex gap-2">
                   <Textarea
                     aria-label="Add a case note"
@@ -253,24 +282,6 @@ export function DisputeDrawer({
                 <Separator />
                 <section className="space-y-2">
                   <h3 className="text-sm font-medium">Resolve</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={outcome === "resolved" ? "default" : "outline"}
-                      size="sm"
-                      aria-pressed={outcome === "resolved"}
-                      onClick={() => setOutcome("resolved")}
-                    >
-                      Resolved
-                    </Button>
-                    <Button
-                      variant={outcome === "closed" ? "default" : "outline"}
-                      size="sm"
-                      aria-pressed={outcome === "closed"}
-                      onClick={() => setOutcome("closed")}
-                    >
-                      Closed without action
-                    </Button>
-                  </div>
                   <Label htmlFor="dispute-resolution">
                     Resolution <span aria-hidden="true">*</span>
                     <span className="sr-only">(required)</span>
@@ -295,13 +306,31 @@ export function DisputeDrawer({
                   >
                     {touched && resolutionTooShort
                       ? `At least ${MINIMUM_RESOLUTION} characters.`
-                      : "Shown to the patient and recorded in the audit log."}
+                      : "Recorded in the audit log."}
+                  </p>
+                  <Label htmlFor="dispute-refund">Refund amount (LKR, optional)</Label>
+                  <Input
+                    id="dispute-refund"
+                    inputMode="decimal"
+                    className="max-w-xs"
+                    value={refund}
+                    onChange={(event) => setRefund(event.target.value)}
+                    aria-invalid={refundInvalid}
+                    aria-describedby="dispute-refund-help"
+                  />
+                  <p
+                    id="dispute-refund-help"
+                    className={refundInvalid ? "text-xs text-destructive" : "text-xs text-muted-foreground"}
+                  >
+                    {refundInvalid
+                      ? "Enter a positive amount, or leave it blank."
+                      : "Creates a refund request that still needs approval on the Payments screen."}
                   </p>
                   <Button
-                    disabled={resolutionTooShort || resolve.isPending}
+                    disabled={resolutionTooShort || refundInvalid || resolve.isPending}
                     onClick={() => {
                       setTouched(true);
-                      if (resolutionTooShort) return;
+                      if (resolutionTooShort || refundInvalid) return;
                       resolve.mutate();
                     }}
                   >
@@ -312,9 +341,19 @@ export function DisputeDrawer({
             ) : (
               <Alert variant="success">
                 <MessageSquare aria-hidden="true" />
-                <AlertTitle>{humanise(dispute.status)}</AlertTitle>
-                <AlertDescription>
-                  {dispute.resolution ?? "No resolution text was recorded."}
+                <AlertTitle>{humanise(view.status)}</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>{view.resolution ?? "No resolution text was recorded."}</p>
+                  {status === "resolved" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={close.isPending}
+                      onClick={() => close.mutate()}
+                    >
+                      {close.isPending ? "Closing…" : "Close dispute"}
+                    </Button>
+                  ) : null}
                 </AlertDescription>
               </Alert>
             )}

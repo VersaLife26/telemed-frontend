@@ -32,7 +32,7 @@ function useAccount() {
 
   useEffect(() => {
     let cancelled = false;
-    browserApi<TelemedUser>("/users/me")
+    browserApi<TelemedUser>("/me")
       .then((me) => {
         if (!cancelled) setAccount(me);
       })
@@ -40,7 +40,7 @@ function useAccount() {
         if (!cancelled) setAccount(null);
       });
 
-    // profile.ts dispatches this after a successful save, so the header does
+    // The profile page dispatches this after a successful save, so the header does
     // not keep showing the old photo until the next full navigation.
     function onProfileUpdated(event: Event) {
       setAccount((event as CustomEvent<TelemedUser>).detail ?? null);
@@ -72,8 +72,8 @@ export function PatientHeader() {
           className="flex min-h-10 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
         >
           <Avatar
-            src={profilePhotoSrc(account?.photo_url)}
-            name={account?.name}
+            src={profilePhotoSrc(account?.photoUrl)}
+            name={account?.fullName}
             size={32}
             ring
             className="ring-brand/30"

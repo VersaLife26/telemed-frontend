@@ -37,7 +37,7 @@ export function FileViewerApp({ doc, pointer }: { doc: VaultDocument; pointer?: 
       dark
       pointer={pointer}
       onDownload={() => {
-        void presignedUrl(doc.id, true).then((href) => {
+        void presignedUrl(doc.id).then((href) => {
           window.open(href, "_blank", "noopener,noreferrer");
         });
       }}

@@ -13,14 +13,7 @@ import {
   canSendDoctorOtp,
   checkDoctorEligibility,
 } from "@/lib/consumer/features/doctor-eligibility";
-
-function readError(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const message = (json as { message?: string }).message;
-    if (message) return message;
-  }
-  return fallback;
-}
+import { problemMessage } from "@/lib/consumer/api/errors";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,7 +34,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Could not sign in"));
+      if (!res.ok) throw new Error(problemMessage(json, "Could not sign in"));
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in");
@@ -64,10 +57,10 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, purpose: "login" }),
+        body: JSON.stringify({ phone }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Failed to send OTP"));
+      if (!res.ok) throw new Error(problemMessage(json, "Failed to send OTP"));
       router.push(`/login/otp?phone=${encodeURIComponent(phone)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send OTP");
@@ -83,10 +76,10 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_token: idToken }),
+        body: JSON.stringify({ idToken }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(readError(json, "Google sign-in failed"));
+      if (!res.ok) throw new Error(problemMessage(json, "Google sign-in failed"));
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");

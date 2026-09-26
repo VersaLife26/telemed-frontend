@@ -54,6 +54,20 @@ export function adminUpstreamPath(segments: readonly string[]): string | null {
 }
 
 /**
+ * The upstream path for a signed file link (`/api/v1/files/{token}`), or
+ * `null`. The API hands these out from the credentialing document endpoints;
+ * the token in the path is the credential, so the proxy forwards them without
+ * the caller's Access identity and without a permission check.
+ */
+export function fileUpstreamPath(segments: readonly string[]): string | null {
+  if (segments.length !== 4) return null;
+  if (segments[0] !== "api" || segments[1] !== "v1" || segments[2] !== "files") return null;
+  const token = segments[3] ?? "";
+  if (token === "." || token === ".." || !SAFE_SEGMENT.test(token)) return null;
+  return segments.join("/");
+}
+
+/**
  * Is this a same-origin request from the console's own pages?
  *
  * The session cookie is `SameSite=Lax`, which already stops a cross-site form
@@ -194,6 +208,11 @@ const RENDERABLE_UPSTREAM_TYPES = [
   "text/csv",
   "text/plain",
   "application/pdf",
+  // Credential scans. SVG is deliberately absent: it is a document that can
+  // carry script, not an image.
+  "image/jpeg",
+  "image/png",
+  "image/webp",
 ];
 
 export function safeContentType(raw: string | null): {

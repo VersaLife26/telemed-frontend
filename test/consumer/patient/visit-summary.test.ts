@@ -12,9 +12,20 @@ import {
 
 const draft: ClinicalNote = {
   id: "n1",
-  appointment_id: "appt-1",
+  appointmentId: "appt-1",
+  doctorId: "d1",
+  patientId: "p1",
+  subjective: "",
+  objective: "",
+  assessment: "",
+  plan: "",
   status: "draft",
+  finalisedAt: null,
+  revision: 1,
   version: 1,
+  diagnoses: [],
+  createdAt: "",
+  updatedAt: "",
 };
 
 const signed: ClinicalNote = { ...draft, status: "finalised" };
@@ -35,6 +46,6 @@ test("polling stops after a signed note plus prescription, or after 30 attempts"
 });
 
 test("summary looks up notes and prescription by appointment", () => {
-  assert.equal(clinicalNotePath("appt-1"), "/clinical-notes/appt-1");
-  assert.equal(prescriptionLookupPath("appt-1"), "/prescriptions?appointment_id=appt-1");
+  assert.equal(clinicalNotePath("appt-1"), "/appointments/appt-1/clinical-note");
+  assert.equal(prescriptionLookupPath("appt-1"), "/appointments/appt-1/prescription");
 });

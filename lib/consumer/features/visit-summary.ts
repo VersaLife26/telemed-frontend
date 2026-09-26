@@ -2,6 +2,7 @@ import type { ClinicalNote } from "@/lib/consumer/api/types";
 
 export const SUMMARY_POLL_MAX_ATTEMPTS = 30;
 
+/** The API answers a draft note with 404 for patients; this is the belt to that brace. */
 export function noteVisibleToPatient(note: ClinicalNote | null): note is ClinicalNote {
   return Boolean(note && note.status === "finalised");
 }
@@ -17,9 +18,9 @@ export function shouldStopPolling(opts: {
 }
 
 export function prescriptionLookupPath(appointmentId: string): string {
-  return `/prescriptions?appointment_id=${encodeURIComponent(appointmentId)}`;
+  return `/appointments/${appointmentId}/prescription`;
 }
 
 export function clinicalNotePath(appointmentId: string): string {
-  return `/clinical-notes/${appointmentId}`;
+  return `/appointments/${appointmentId}/clinical-note`;
 }

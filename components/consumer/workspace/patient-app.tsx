@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { Appointment } from "@/lib/consumer/api/types";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
-import { prescriptionPatientFields } from "@/lib/consumer/features/visit-patient";
+import { ageAtVisitDate } from "@/lib/consumer/features/visit-patient";
 
 const SEX_LABEL = { female: "Female", male: "Male", other: "Other" } as const;
 
@@ -46,23 +46,25 @@ export function PatientApp({
     );
   }
 
-  const p = prescriptionPatientFields(appt);
-  const relation = typeof appt.intake?.visit_relation === "string" ? appt.intake.visit_relation : "";
+  const p = appt.visitPatient;
+  const age = p?.dateOfBirth ? ageAtVisitDate(p.dateOfBirth, appt.startAt) : 0;
+  const allergies = p?.allergies?.trim() || "";
+  const relation = appt.intake?.visitRelation || "";
   const facts: [string, string][] = [
-    ["Age", p.age || "—"],
-    ["Sex", p.sex ? SEX_LABEL[p.sex] : "—"],
-    ["Weight", p.weightKg ? `${p.weightKg} kg` : "—"],
+    ["Age", age > 0 ? String(age) : "—"],
+    ["Sex", p?.sex ? SEX_LABEL[p.sex] : "—"],
+    ["Weight", p?.weightKg ? `${p.weightKg} kg` : "—"],
   ];
 
   return (
     <div className="@container flex h-full flex-col gap-4 overflow-y-auto p-4 text-white">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-h4">{p.name || "Patient"}</h3>
+          <h3 className="text-h4">{p?.name || "Patient"}</h3>
           <StatusBadge status={appt.status} />
         </div>
         <p className="mt-1 text-body-sm text-white/60 tabular-time">
-          {formatVisitDate(appt.start_at_local || appt.start_at)} · {formatVisitClock(appt.start_at_local || appt.start_at)}
+          {formatVisitDate(appt.startAt)} · {formatVisitClock(appt.startAt)}
           {relation ? ` · Booked by their ${relation}` : ""}
         </p>
       </div>
@@ -78,15 +80,15 @@ export function PatientApp({
 
       <div
         className={
-          p.allergies
+          allergies
             ? "flex gap-2 rounded-lg bg-warning/20 p-3 text-body-sm ring-1 ring-warning/40"
             : "rounded-lg bg-white/[0.06] p-3 text-body-sm text-white/60 ring-1 ring-white/10"
         }
       >
-        {p.allergies ? <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-300" /> : null}
+        {allergies ? <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-300" /> : null}
         <p>
           <span className="font-semibold text-white">Allergies: </span>
-          {p.allergies || "None reported"}
+          {allergies || "None reported"}
         </p>
       </div>
 

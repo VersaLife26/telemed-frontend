@@ -1,7 +1,8 @@
 import type { Appointment } from "@/lib/consumer/api/types";
 
-export function appointmentsListPath(perPage = 50): string {
-  return `/appointments?per_page=${perPage}`;
+/** The caller's bookings, newest start first. `pageSize` is capped at 100 by the API. */
+export function appointmentsListPath(pageSize = 50): string {
+  return `/appointments?pageSize=${pageSize}`;
 }
 
 export function appointmentReschedulePath(appointmentId: string): string {

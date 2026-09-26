@@ -25,24 +25,19 @@ import { Input } from "@/components/consumer/ui/Input";
 import { Modal } from "@/components/consumer/ui/Modal";
 import { Select } from "@/components/consumer/ui/Select";
 import { browserApi } from "@/lib/consumer/api/client";
-import type {
-  VaultDocument,
-  VaultFolder,
-  VaultFolderListing,
-  VaultPatient,
-} from "@/lib/consumer/api/types";
+import type { Paged, VaultDocument, VaultFolder, VaultPatient } from "@/lib/consumer/api/types";
 import { useOptionalCall } from "@/components/consumer/call/call-provider";
 import { cx } from "@/lib/consumer/cx";
 import {
+  UPLOAD_ACCEPT,
   VAULT_TYPES,
+  childFolders,
+  documentsListPath,
   folderCrumbs,
   foldersListPath,
   formatBytes,
-  isCapturedRecordId,
   patientsListPath,
   previewKind,
-  recordsListPath,
-  recordsUploadPath,
   scopedPatients,
   uploadError,
   type VaultDocType,
@@ -75,8 +70,7 @@ export function VaultBrowser({
   const vaultOwner = mode === "doctor" ? selectedPatient : owner;
 
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [folders, setFolders] = useState<VaultFolder[]>([]);
-  const [path, setPath] = useState<VaultFolder[]>([]);
+  const [allFolders, setAllFolders] = useState<VaultFolder[]>([]);
   const [docs, setDocs] = useState<VaultDocument[]>([]);
   const [filter, setFilter] = useState("");
   const [query, setQuery] = useState("");
@@ -102,40 +96,26 @@ export function VaultBrowser({
       setSelectedPatient(lockedRoot);
       return;
     }
-    try {
-      const data = await browserApi<VaultPatient[]>(patientsListPath());
-      const list = scopedPatients(Array.isArray(data) ? data : [], lockedRoot);
-      setPatients(list);
-      setSelectedPatient((current) => {
-        if (current && list.some((p) => p.user_id === current)) return current;
-        return list[0]?.user_id;
-      });
-    } catch (e) {
-      if (!isCapturedRecordId(e)) throw e;
-    }
+    const list = scopedPatients(await browserApi<VaultPatient[]>(patientsListPath()), lockedRoot);
+    setPatients(list);
+    setSelectedPatient((current) => {
+      if (current && list.some((p) => p.patientId === current)) return current;
+      return list[0]?.patientId;
+    });
   }, [lockedRoot, mode]);
 
   const load = useCallback(async () => {
     if (mode === "doctor" && !vaultOwner) {
-      setFolders([]);
+      setAllFolders([]);
       setDocs([]);
-      setPath([]);
       return;
     }
-    const [folderResult, fileResult] = await Promise.allSettled([
-      browserApi<VaultFolderListing>(foldersListPath(vaultOwner, folderId)),
-      browserApi<VaultDocument[]>(recordsListPath(filter, folderId, vaultOwner)),
+    const [folderList, page] = await Promise.all([
+      browserApi<VaultFolder[]>(foldersListPath(vaultOwner)),
+      browserApi<Paged<VaultDocument>>(documentsListPath(filter, folderId, vaultOwner)),
     ]);
-    if (fileResult.status === "rejected") throw fileResult.reason;
-    if (folderResult.status === "rejected") {
-      if (!isCapturedRecordId(folderResult.reason)) throw folderResult.reason;
-      setFolders([]);
-      setPath([]);
-    } else {
-      setFolders(folderResult.value?.folders ?? []);
-      setPath(folderResult.value?.path ?? []);
-    }
-    setDocs(Array.isArray(fileResult.value) ? fileResult.value : []);
+    setAllFolders(folderList);
+    setDocs(page.items);
   }, [filter, folderId, mode, vaultOwner]);
 
   useEffect(() => {
@@ -199,13 +179,16 @@ export function VaultBrowser({
     };
   }, [preview]);
 
-  const crumbs = folderCrumbs(path);
+  const crumbs = folderCrumbs(allFolders, folderId);
   const shownFolders = useMemo(
-    () => folders.filter((f) => f.name.toLowerCase().includes(query.toLowerCase())),
-    [folders, query],
+    () =>
+      childFolders(allFolders, folderId).filter((f) =>
+        f.name.toLowerCase().includes(query.toLowerCase()),
+      ),
+    [allFolders, folderId, query],
   );
   const shownDocs = useMemo(
-    () => docs.filter((d) => d.filename.toLowerCase().includes(query.toLowerCase())),
+    () => docs.filter((d) => d.fileName.toLowerCase().includes(query.toLowerCase())),
     [docs, query],
   );
 
@@ -220,10 +203,10 @@ export function VaultBrowser({
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("document_type", docType);
-      if (vaultOwner) form.append("owner_user_id", vaultOwner);
-      if (targetFolder) form.append("folder_id", targetFolder);
-      await browserApi<VaultDocument>(recordsUploadPath(), { method: "POST", body: form });
+      form.append("documentType", docType);
+      if (mode === "doctor" && vaultOwner) form.append("patientId", vaultOwner);
+      if (targetFolder) form.append("folderId", targetFolder);
+      await browserApi<VaultDocument>("/vault/documents", { method: "POST", body: form });
       if (liveCall?.activeId && liveCall.call.live) liveCall.call.announceFile(file.name);
       await load();
     } catch (e) {
@@ -235,8 +218,10 @@ export function VaultBrowser({
 
   async function download(doc: VaultDocument) {
     try {
-      const url = await presignedUrl(doc.id, true);
-      window.open(url, "_blank", "noopener,noreferrer");
+      const link = document.createElement("a");
+      link.href = await presignedUrl(doc.id);
+      link.download = doc.fileName;
+      link.click();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed");
     }
@@ -252,13 +237,9 @@ export function VaultBrowser({
 
   async function createFolder() {
     try {
-      await browserApi("/records/folders", {
+      await browserApi<VaultFolder>("/vault/folders", {
         method: "POST",
-        body: {
-          name: folderName,
-          parent_id: folderId,
-          owner_user_id: vaultOwner,
-        },
+        body: { name: folderName.trim(), parentId: folderId },
       });
       setNewFolder(false);
       setFolderName("");
@@ -272,14 +253,14 @@ export function VaultBrowser({
     if (!renaming) return;
     try {
       if (renaming.kind === "folder") {
-        await browserApi(`/records/folders/${renaming.id}`, {
+        await browserApi<VaultFolder>(`/vault/folders/${renaming.id}`, {
           method: "PATCH",
-          body: { name: renaming.name },
+          body: { name: renaming.name.trim(), parentId: null },
         });
       } else {
-        await browserApi(`/records/${renaming.id}`, {
+        await browserApi<VaultDocument>(`/vault/documents/${renaming.id}`, {
           method: "PATCH",
-          body: { filename: renaming.name },
+          body: { fileName: renaming.name.trim(), folderId: null },
         });
       }
       setRenaming(null);
@@ -289,18 +270,19 @@ export function VaultBrowser({
     }
   }
 
-  async function applyMove(target: string) {
+  /** `null` in these PATCH bodies means "unchanged"; the vault root is `root`. */
+  async function applyMove(target: string | null) {
     if (!moving) return;
     try {
       if (moving.kind === "folder") {
-        await browserApi(`/records/folders/${moving.id}`, {
+        await browserApi<VaultFolder>(`/vault/folders/${moving.id}`, {
           method: "PATCH",
-          body: { parent_id: target },
+          body: { name: null, parentId: target ?? "root" },
         });
       } else {
-        await browserApi(`/records/${moving.id}`, {
+        await browserApi<VaultDocument>(`/vault/documents/${moving.id}`, {
           method: "PATCH",
-          body: { folder_id: target },
+          body: { fileName: null, folderId: target ?? "root" },
         });
       }
       setMoving(null);
@@ -313,13 +295,13 @@ export function VaultBrowser({
   async function confirmDelete() {
     if (!pendingDelete) return;
     try {
-      if ("filename" in pendingDelete) {
-        await browserApi(`/records/${pendingDelete.id}`, { method: "DELETE" });
+      if ("fileName" in pendingDelete) {
+        await browserApi<void>(`/vault/documents/${pendingDelete.id}`, { method: "DELETE" });
       } else {
-        await browserApi(`/records/folders/${pendingDelete.id}`, { method: "DELETE" });
+        await browserApi<void>(`/vault/folders/${pendingDelete.id}`, { method: "DELETE" });
       }
       setPendingDelete(null);
-      if (preview && "filename" in pendingDelete && preview.id === pendingDelete.id) {
+      if (preview && "fileName" in pendingDelete && preview.id === pendingDelete.id) {
         setPreview(null);
       }
       await load();
@@ -345,28 +327,28 @@ export function VaultBrowser({
             <p className={cx("mb-2 text-caption uppercase", muted)}>Patients</p>
             {lockedRoot ? (
               <p className={cx("text-label", text)}>
-                {patients.find((p) => p.user_id === lockedRoot)?.name || "Current patient"}
+                {patients.find((p) => p.patientId === lockedRoot)?.fullName || "Current patient"}
               </p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {patients.map((patient) => (
-                  <li key={patient.user_id}>
+                  <li key={patient.patientId}>
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedPatient(patient.user_id);
+                        setSelectedPatient(patient.patientId);
                         setFolderId(null);
                       }}
                       className={cx(
                         "min-h-11 w-full rounded-md px-3 py-2 text-left text-body-sm",
-                        selectedPatient === patient.user_id
+                        selectedPatient === patient.patientId
                           ? "bg-brand text-on-brand"
                           : dark
                             ? "text-white/80 can-hover:hover:bg-white/10"
                             : "can-hover:hover:bg-tint",
                       )}
                     >
-                      {patient.name || "Unnamed"}
+                      {patient.fullName || "Unnamed"}
                     </button>
                   </li>
                 ))}
@@ -469,6 +451,7 @@ export function VaultBrowser({
                 </Button>
                 <input
                   type="file"
+                  accept={UPLOAD_ACCEPT}
                   className="sr-only"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -526,14 +509,14 @@ export function VaultBrowser({
               {shownDocs.map((doc) => (
                 <li key={doc.id}>
                   <VaultTile
-                    name={doc.filename}
-                    meta={[doc.document_type, formatBytes(doc.size_bytes)].filter(Boolean).join(" · ")}
-                    icon={<TypeIcon type={doc.content_type} />}
-                    thumb={previewKind(doc.content_type) === "image" ? `/api/proxy/records/${doc.id}/content` : null}
+                    name={doc.fileName}
+                    meta={[doc.documentType, formatBytes(doc.sizeBytes)].filter(Boolean).join(" · ")}
+                    icon={<TypeIcon type={doc.contentType} />}
+                    thumbId={previewKind(doc.contentType) === "image" ? doc.id : null}
                     dark={dark}
                     onOpen={() => openFile(doc)}
                     canMutate={canMutate}
-                    onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.filename })}
+                    onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.fileName })}
                     onMove={() => setMoving({ kind: "file", id: doc.id })}
                     onDelete={() => setPendingDelete(doc)}
                   />
@@ -559,15 +542,15 @@ export function VaultBrowser({
               {shownDocs.map((doc) => (
                 <Row
                   key={doc.id}
-                  name={doc.filename}
-                  meta={[doc.document_type, formatBytes(doc.size_bytes), doc.created_at?.slice(0, 10)]
+                  name={doc.fileName}
+                  meta={[doc.documentType, formatBytes(doc.sizeBytes), doc.createdAt.slice(0, 10)]
                     .filter(Boolean)
                     .join(" · ")}
-                  icon={<TypeIcon type={doc.content_type} />}
+                  icon={<TypeIcon type={doc.contentType} />}
                   dark={dark}
                   onOpen={() => openFile(doc)}
                   canMutate={canMutate}
-                  onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.filename })}
+                  onRename={() => setRenaming({ kind: "file", id: doc.id, name: doc.fileName })}
                   onMove={() => setMoving({ kind: "file", id: doc.id })}
                   onDelete={() => setPendingDelete(doc)}
                 />
@@ -635,10 +618,10 @@ export function VaultBrowser({
           title="Move to folder"
           footer={
             <>
-              <Button variant="secondary" onClick={() => void applyMove("")}>
+              <Button variant="secondary" onClick={() => void applyMove(null)}>
                 Vault root
               </Button>
-              {folders
+              {allFolders
                 .filter((folder) => folder.id !== moving?.id)
                 .map((folder) => (
                   <Button key={folder.id} variant="outline" onClick={() => void applyMove(folder.id)}>
@@ -656,8 +639,8 @@ export function VaultBrowser({
           onClose={() => setPendingDelete(null)}
           title="Delete?"
           description={
-            pendingDelete && "filename" in pendingDelete
-              ? `Delete ${pendingDelete.filename}? This cannot be undone.`
+            pendingDelete && "fileName" in pendingDelete
+              ? `Delete ${pendingDelete.fileName}? This cannot be undone.`
               : pendingDelete
                 ? `Delete folder ${(pendingDelete as VaultFolder).name}? It must be empty.`
                 : undefined
@@ -681,11 +664,30 @@ function TypeIcon({ type }: { type?: string }) {
   return <FileText className="size-8 text-ink-400" />;
 }
 
+/** Image tiles need their own signed link; the old authenticated byte stream is gone. */
+function Thumb({ id }: { id: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    presignedUrl(id)
+      .then((url) => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+  if (!src) return <span className="block h-20 w-full rounded-md bg-ink-50" />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className="h-20 w-full rounded-md object-cover" />;
+}
+
 function VaultTile({
   name,
   meta,
   icon,
-  thumb,
+  thumbId,
   dark,
   onOpen,
   onDropFile,
@@ -697,7 +699,7 @@ function VaultTile({
   name: string;
   meta: string;
   icon: ReactNode;
-  thumb?: string | null;
+  thumbId?: string | null;
   dark: boolean;
   onOpen: () => void;
   onDropFile?: (file: File) => void;
@@ -726,9 +728,8 @@ function VaultTile({
       }}
     >
       <button type="button" onClick={onOpen} className="flex flex-col items-start gap-2 text-left">
-        {thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumb} alt="" className="h-20 w-full rounded-md object-cover" />
+        {thumbId ? (
+          <Thumb id={thumbId} />
         ) : (
           <span className="flex h-20 w-full items-center justify-center">{icon}</span>
         )}

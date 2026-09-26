@@ -21,9 +21,10 @@ test("formatWait rounds seconds to minutes and floors empty waits", () => {
   assert.equal(formatWait(180), "about 3 min");
 });
 
-test("paymentSettled is true on succeeded or next_action none", () => {
+test("paymentSettled is true once captured or held on the card", () => {
   assert.equal(paymentSettled("succeeded"), true);
-  assert.equal(paymentSettled("requires_action", "none"), true);
-  assert.equal(paymentSettled("requires_action", "redirect"), false);
+  assert.equal(paymentSettled("authorized"), true);
   assert.equal(paymentSettled("pending"), false);
+  assert.equal(paymentSettled("failed"), false);
+  assert.equal(paymentSettled(undefined), false);
 });

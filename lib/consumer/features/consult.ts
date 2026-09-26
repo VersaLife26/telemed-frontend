@@ -1,53 +1,62 @@
+import { hasCode } from "@/lib/consumer/api/errors";
+import { API_BASE_URL } from "@/lib/consumer/env";
+
 export function shouldEnterCall(joinStatus?: string, consultStatus?: string): boolean {
   return joinStatus === "active" || consultStatus === "active";
 }
 
 /** Consultation has finished; media must not restart. */
 export function isConsultTerminal(status?: string): boolean {
-  const s = (status || "").toLowerCase();
-  return s === "ended" || s === "abandoned" || s === "failed" || s === "no_show";
+  return status === "ended" || status === "abandoned";
 }
 
 export function callPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/call`;
 }
 
+function consultationBase(appointmentId: string): string {
+  return `/appointments/${appointmentId}/consultation`;
+}
+
 export function joinPath(appointmentId: string): string {
-  return `/consultations/${appointmentId}/join`;
+  return `${consultationBase(appointmentId)}/join`;
+}
+
+export function consultationPath(appointmentId: string): string {
+  return consultationBase(appointmentId);
 }
 
 export function noShowPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/no-show`;
 }
 
-export function readyForNextPath(appointmentId?: string): string {
-  return appointmentId
-    ? `/consultations/${appointmentId}/ready-for-next`
-    : `/consultations/ready-for-next`;
+export function readyForNextPath(appointmentId: string): string {
+  return `${consultationBase(appointmentId)}/ready-for-next`;
 }
 
 export function earlyJoinPath(appointmentId: string): string {
-  return `/consultations/${appointmentId}/early-join`;
+  return `${consultationBase(appointmentId)}/early-join`;
 }
 
 export function earlyJoinRespondPath(appointmentId: string, kind: "accept" | "decline"): string {
-  return `/consultations/${appointmentId}/early-join/${kind}`;
+  return `${consultationBase(appointmentId)}/early-join/${kind}`;
 }
 
+/** The app's own waiting-room route (redirects to the call screen). */
 export function waitingRoomPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/waiting-room`;
 }
 
-export function waitingRoomPollPath(consultationId: string): string {
-  return `/consultations/${consultationId}/waiting-room`;
+export function waitingRoomPollPath(appointmentId: string): string {
+  return `${consultationBase(appointmentId)}/waiting-room`;
 }
 
-export function admitPath(consultationId: string): string {
-  return `/consultations/${consultationId}/admit`;
+export function admitPath(appointmentId: string): string {
+  return `${consultationBase(appointmentId)}/admit`;
 }
 
-export function endPath(consultationId: string): string {
-  return `/consultations/${consultationId}/end`;
+export function endPath(appointmentId: string): string {
+  return `${consultationBase(appointmentId)}/end`;
 }
 
 export function isWaiting(status?: string, joinStatus?: string): boolean {
@@ -74,16 +83,18 @@ export function doctorLobbyCopy(status?: string): string {
   return "Waiting for the patient to join. The booked slot is the visit window.";
 }
 
-export function consultJoinError(error: string, role: "patient" | "doctor" = "patient"): string {
-  if (/not in a state that allows this action/i.test(error)) {
+const CLOSED_JOIN_CODES = ["too_early", "join_window_closed", "consultation_ended", "not_confirmed"];
+
+export function consultJoinError(error: unknown, role: "patient" | "doctor" = "patient"): string {
+  if (CLOSED_JOIN_CODES.some((code) => hasCode(error, code))) {
     return role === "doctor"
-      ? "This visit isn’t open. The patient hasn’t joined yet, or it has already ended."
+      ? "This visit isn’t open yet, or it has already ended."
       : "This visit isn’t open yet, or it has already ended. Join from Appointments when it is time.";
   }
-  return error;
+  return error instanceof Error ? error.message : "Join failed";
 }
 
-/** Fallback slot length when end_at is unknown. Matches consultation DefaultBookedSlot. */
+/** Fallback slot length when the end time is unknown. */
 export const DEFAULT_SLOT_MS = 15 * 60 * 1000;
 export const LATE_JOIN_GRACE_MS = DEFAULT_SLOT_MS;
 export const LATE_JOIN_CUTOFF_MS = DEFAULT_SLOT_MS;
@@ -168,27 +179,25 @@ export function afterEndPath(role: "patient" | "doctor", appointmentId: string):
 // --- in-house WebRTC --------------------------------------------------------
 
 /**
- * Builds the signalling websocket URL for a join.
+ * Builds the signalling hub URL for a join.
  *
  * This one deliberately does NOT go through /api/proxy. A Next route handler
- * cannot proxy a websocket upgrade, so the browser connects to the backend
- * directly -- which means signal_url has to be an address the user's device
- * can actually reach, and is why the backend refuses to boot in production
- * without an absolute wss:// value for it.
- *
- * Returns null when the deployment is not running the in-house stack, so the
- * caller can say so rather than opening a socket to "undefined".
+ * cannot proxy a websocket, so the browser connects to the API directly --
+ * which means NEXT_PUBLIC_API_BASE_URL has to be an address the user's device
+ * can reach, and the API has to allow this site's origin in Cors:Origins.
+ * `hubUrl` comes back relative to the API origin (`/hubs/consultation`).
  */
-export function signalUrlFor(join: {
-  signal_url?: string;
-  token: string;
-}): string | null {
-  if (!join.signal_url) return null;
-  return `${join.signal_url}?token=${encodeURIComponent(join.token)}`;
+export function hubUrlFor(
+  join: { hubUrl: string; roomToken: string },
+  apiBase: string = API_BASE_URL,
+): string {
+  const url = new URL(join.hubUrl, `${apiBase}/`);
+  url.searchParams.set("roomToken", join.roomToken);
+  return url.toString();
 }
 
-export function qualityPath(consultationId: string): string {
-  return `/consultations/${consultationId}/quality`;
+export function qualityPath(appointmentId: string): string {
+  return `${consultationBase(appointmentId)}/quality`;
 }
 
 /**

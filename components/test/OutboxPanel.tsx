@@ -2,26 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  clearOutbox,
-  fetchOutbox,
+  clearCapturedMessages,
+  fetchCapturedMessages,
+  otpCodeOf,
   sendOtp,
   verifyOtp,
-  type OutboxMessage,
+  type CapturedMessage,
+  type MessageChannel,
 } from "@/lib/test/api";
 
 /**
  * Reads back everything the platform tried to send.
  *
- * In test mode the SMS and email providers are replaced by a capture that
- * records the rendered message and delivers nothing, so this is where an OTP
- * code and an email body actually become visible. Nothing here fabricates a
+ * With the API's capture senders on, SMS and email are recorded instead of
+ * delivered, so this is where an OTP code and an email body actually become
+ * visible. Nothing here fabricates a
  * message: the OTP form below calls the real /auth/otp/send, so what appears
  * in the list went through the real validation, the real rate limiter and the
  * real template.
  */
 export function OutboxPanel() {
-  const [messages, setMessages] = useState<OutboxMessage[]>([]);
-  const [filter, setFilter] = useState<string>("");
+  const [messages, setMessages] = useState<CapturedMessage[]>([]);
+  const [filter, setFilter] = useState<MessageChannel | "">("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -32,8 +34,7 @@ export function OutboxPanel() {
 
   const refresh = useCallback(async () => {
     try {
-      const { messages: got } = await fetchOutbox(filter || undefined);
-      setMessages(got ?? []);
+      setMessages(await fetchCapturedMessages(filter || undefined));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -82,7 +83,7 @@ export function OutboxPanel() {
         <p className="mb-3 text-xs text-neutral-500">
           Calls the real <code className="font-mono">/auth/otp/send</code> and{" "}
           <code className="font-mono">/auth/otp/verify</code>. Only delivery is swapped, so the rate
-          limiter and validation still apply — three sends an hour per number.
+          limiter and validation still apply.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-neutral-500">
@@ -126,13 +127,12 @@ export function OutboxPanel() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Outbox</h2>
           <select
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value as MessageChannel | "")}
             className="rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
           >
             <option value="">all channels</option>
             <option value="sms">sms</option>
             <option value="email">email</option>
-            <option value="push">push</option>
           </select>
           <label className="flex items-center gap-1.5 text-xs text-neutral-500">
             <input
@@ -151,7 +151,7 @@ export function OutboxPanel() {
           </button>
           <button
             type="button"
-            onClick={() => void clearOutbox().then(refresh)}
+            onClick={() => void clearCapturedMessages().then(refresh)}
             className="rounded border border-neutral-300 px-3 py-1 text-sm dark:border-neutral-600"
           >
             Clear
@@ -166,52 +166,55 @@ export function OutboxPanel() {
           </p>
         ) : (
           <ul className="divide-y divide-neutral-200 dark:divide-neutral-700">
-            {messages.map((m) => (
-              <li key={m.id} className="py-3">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="rounded bg-neutral-200 px-1.5 py-0.5 font-mono text-xs uppercase dark:bg-neutral-700">
-                    {m.kind}
-                  </span>
-                  <span className="font-mono text-sm text-neutral-800 dark:text-neutral-200">{m.to}</span>
-                  <span className="text-xs text-neutral-400">{new Date(m.at).toLocaleTimeString()}</span>
-                  {m.code ? (
-                    <button
-                      type="button"
-                      onClick={() => useCode(m.code!)}
-                      title="Use this code in the verify box above"
-                      className="rounded bg-green-600 px-2 py-0.5 font-mono text-sm font-bold text-white"
-                    >
-                      {m.code}
-                    </button>
-                  ) : null}
-                </div>
-                {m.subject ? (
-                  <p className="mt-1 text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                    {m.subject}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => setExpanded(expanded === m.id ? null : m.id)}
-                  className="mt-1 text-xs text-blue-600 underline"
-                >
-                  {expanded === m.id ? "hide body" : "view body"}
-                </button>
-                {expanded === m.id ? (
-                  <>
-                    <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
-                      {m.body}
-                    </pre>
-                    <p className="mt-1 text-xs text-neutral-400">
-                      {/* Rendered as text, never as HTML. An email body is
-                          attacker-influenced content (a name, an address), and
-                          this page is same-origin with the app's session. */}
-                      shown as source · {m.provider}
+            {messages.map((m) => {
+              const code = otpCodeOf(m.body);
+              return (
+                <li key={m.id} className="py-3">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="rounded bg-neutral-200 px-1.5 py-0.5 font-mono text-xs uppercase dark:bg-neutral-700">
+                      {m.channel}
+                    </span>
+                    <span className="font-mono text-sm text-neutral-800 dark:text-neutral-200">{m.recipient}</span>
+                    <span className="text-xs text-neutral-400">{new Date(m.createdAt).toLocaleTimeString()}</span>
+                    {code ? (
+                      <button
+                        type="button"
+                        onClick={() => useCode(code)}
+                        title="Use this code in the verify box above"
+                        className="rounded bg-green-600 px-2 py-0.5 font-mono text-sm font-bold text-white"
+                      >
+                        {code}
+                      </button>
+                    ) : null}
+                  </div>
+                  {m.subject ? (
+                    <p className="mt-1 text-sm font-medium text-neutral-800 dark:text-neutral-200">
+                      {m.subject}
                     </p>
-                  </>
-                ) : null}
-              </li>
-            ))}
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(expanded === m.id ? null : m.id)}
+                    className="mt-1 text-xs text-blue-600 underline"
+                  >
+                    {expanded === m.id ? "hide body" : "view body"}
+                  </button>
+                  {expanded === m.id ? (
+                    <>
+                      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                        {m.body}
+                      </pre>
+                      <p className="mt-1 text-xs text-neutral-400">
+                        {/* Rendered as text, never as HTML. An email body is
+                            attacker-influenced content (a name, an address), and
+                            this page is same-origin with the app's session. */}
+                        shown as source
+                      </p>
+                    </>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

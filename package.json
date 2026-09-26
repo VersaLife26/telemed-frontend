@@ -13,6 +13,7 @@
     "build": "opennextjs-cloudflare build",
     "start": "next start",
     "lint": "eslint .",
+    "gen:api": "npx -y openapi-typescript@7.13.0 ${OPENAPI_SPEC:-../telemed-api/openapi/v1.json} -o lib/api/schema.d.ts",
     "pretypecheck": "node scripts/select-surface.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:patient && npm run test:doctor && npm run test:admin",
@@ -32,6 +33,7 @@
     "deploy:admin": "npm run build:cf:admin && wrangler deploy --env admin"
   },
   "dependencies": {
+    "@microsoft/signalr": "10.0.11",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-table": "8.21.3",
     "class-variance-authority": "0.7.1",

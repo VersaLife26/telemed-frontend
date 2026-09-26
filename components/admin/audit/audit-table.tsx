@@ -15,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/admin/ui/dialog";
-import { DiffView } from "@/components/admin/payments/diff-view";
 import { downloadFile } from "@/lib/admin/api/browser";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { reportError } from "@/lib/admin/api/hooks";
@@ -25,10 +24,8 @@ import { formatDateTime, humanise, shortId } from "@/lib/admin/format";
 /**
  * The audit log.
  *
- * Each row can be opened to see the before/after values as a diff. That is the
- * whole reason `old_value` and `new_value` are stored as JSONB rather than as a
- * rendered sentence — "commission rules changed" is not evidence, and a diff
- * between two JSON documents is.
+ * Each row can be opened to see the recorded `changes` document. "Commission
+ * changed" is not evidence; the JSON of what changed is.
  */
 export function AuditTable({
   entries,
@@ -40,14 +37,12 @@ export function AuditTable({
   filtered: boolean;
   exportQuery: string;
   /**
-   * Whether the signed-in admin holds `finance` or `super_admin`. Computed
+   * Whether the signed-in admin holds the `auditExport` permission. Computed
    * server-side from the session, never from anything the browser can set.
    *
-   * Hiding the button is a courtesy, not the control: admin-service gates
-   * `GET /audit/export` on `GroupAuditExport` and the BFF proxy applies the
-   * same matrix. Before this prop existed the console offered the export to
-   * all five roles and three of them got a 403 toast, which reads as a broken
-   * console rather than as a boundary.
+   * Hiding the button is a courtesy, not the control: the API gates
+   * `GET /audit.csv` on `auditExport` and the BFF proxy applies the same
+   * matrix.
    */
   canExport: boolean;
 }) {
@@ -57,26 +52,26 @@ export function AuditTable({
   const columns = React.useMemo<ColumnDef<AuditEntry, unknown>[]>(
     () => [
       {
-        accessorKey: "created_at",
+        accessorKey: "createdAt",
         header: "When",
         cell: ({ row }) => (
           <span className="whitespace-nowrap text-sm">
-            {formatDateTime(row.original.created_at)}
+            {formatDateTime(row.original.createdAt)}
           </span>
         ),
       },
       {
-        accessorKey: "actor_role",
+        accessorKey: "actorType",
         header: "Actor",
         cell: ({ row }) => (
           <div className="min-w-0">
-            <Badge variant="outline">{row.original.actor_role}</Badge>
-            {row.original.actor_id ? (
+            <Badge variant="outline">{row.original.actorType}</Badge>
+            {row.original.actorEmail || row.original.actorId ? (
               <p
                 className="mt-0.5 truncate font-mono text-xs text-muted-foreground"
-                title={row.original.actor_id}
+                title={row.original.actorEmail ?? row.original.actorId ?? undefined}
               >
-                {shortId(row.original.actor_id)}
+                {row.original.actorEmail ?? shortId(row.original.actorId)}
               </p>
             ) : null}
           </div>
@@ -88,19 +83,17 @@ export function AuditTable({
         cell: ({ row }) => <code className="text-xs">{row.original.action}</code>,
       },
       {
-        accessorKey: "resource_type",
-        header: "Resource",
+        accessorKey: "entityType",
+        header: "Entity",
         cell: ({ row }) => (
           <div className="min-w-0">
-            <p className="text-sm">{humanise(row.original.resource_type)}</p>
-            {row.original.resource_id ? (
-              <p
-                className="truncate font-mono text-xs text-muted-foreground"
-                title={row.original.resource_id}
-              >
-                {shortId(row.original.resource_id)}
-              </p>
-            ) : null}
+            <p className="text-sm">{humanise(row.original.entityType)}</p>
+            <p
+              className="truncate font-mono text-xs text-muted-foreground"
+              title={row.original.entityId}
+            >
+              {shortId(row.original.entityId)}
+            </p>
           </div>
         ),
       },
@@ -163,7 +156,7 @@ export function AuditTable({
         columns={columns}
         data={entries}
         getRowId={(row) => String(row.id)}
-        caption="Admin actions, newest first. The table is append-only in the database; nothing shown here can be edited or deleted through any console route."
+        caption="Audit entries, newest first. Nothing shown here can be edited or deleted through any console route."
         emptyState={
           <EmptyState
             icon={ScrollText}
@@ -171,7 +164,7 @@ export function AuditTable({
             description={
               filtered
                 ? "Widen the date range, or clear the actor and action filters."
-                : "Nothing has been done through the console yet. Every state-changing admin action writes a row here."
+                : "Nothing has been recorded yet. Every state-changing action writes a row here."
             }
           />
         }
@@ -184,11 +177,11 @@ export function AuditTable({
             <DialogDescription>
               {selected ? (
                 <>
-                  {formatDateTime(selected.created_at)} · {selected.actor_role}
-                  {selected.request_id ? (
+                  {formatDateTime(selected.createdAt)} · {selected.actorEmail ?? selected.actorType}
+                  {selected.requestId ? (
                     <>
                       {" · "}
-                      <span className="font-mono">request {selected.request_id}</span>
+                      <span className="font-mono">request {selected.requestId}</span>
                     </>
                   ) : null}
                 </>
@@ -200,21 +193,16 @@ export function AuditTable({
             <div className="space-y-4">
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Field label="Row id" value={String(selected.id)} />
-                <Field label="Resource" value={`${selected.resource_type} ${selected.resource_id ?? ""}`} />
+                <Field label="Entity" value={`${selected.entityType} ${selected.entityId}`} />
+                <Field label="Actor id" value={selected.actorId ?? "—"} mono />
                 <Field label="Source address" value={selected.ip ?? "—"} />
-                <Field label="User agent" value={selected.user_agent ?? "—"} />
-                <Field label="Previous hash" value={selected.prev_hash} mono />
-                <Field label="Row hash" value={selected.row_hash} mono />
               </dl>
 
               <div className="space-y-2">
                 <h3 className="text-sm font-medium">What changed</h3>
-                <DiffView
-                  before={render(selected.old_value)}
-                  after={render(selected.new_value)}
-                  beforeLabel="Before"
-                  afterLabel="After"
-                />
+                <pre className="max-h-96 overflow-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs">
+                  {JSON.stringify(selected.changes, null, 2)}
+                </pre>
               </div>
             </div>
           ) : null}
@@ -239,9 +227,4 @@ function Field({
       <dd className={mono ? "break-all font-mono text-xs" : "break-words"}>{value}</dd>
     </div>
   );
-}
-
-function render(value: unknown): string {
-  if (value === undefined || value === null) return "";
-  return `${JSON.stringify(value, null, 2)}\n`;
 }

@@ -7,13 +7,9 @@ import { Bell } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/admin/ui/popover";
 import { Separator } from "@/components/admin/ui/separator";
-import { endpoints } from "@/lib/admin/api/endpoints";
-import { useApiMutation, useApiQuery } from "@/lib/admin/api/hooks";
-import type {
-  AdminNotification,
-  AdminNotificationList,
-  AdminNotificationUnreadCount,
-} from "@/lib/admin/api/types";
+import { endpoints, query } from "@/lib/admin/api/endpoints";
+import { useApiList, useApiMutation, useApiQuery } from "@/lib/admin/api/hooks";
+import type { AdminNotification, AdminNotificationUnreadCount } from "@/lib/admin/api/types";
 import { formatRelative } from "@/lib/admin/format";
 import { cn } from "@/lib/admin/utils";
 
@@ -22,7 +18,7 @@ const LIST_KEY = ["admin-notifications", "list"] as const;
 const POLL_MS = 60_000;
 
 /**
- * Header inbox for admin-service in-app notifications.
+ * Header inbox for the API's admin in-app notifications.
  *
  * Unread count is polled so the badge stays fresh without a websocket; the
  * list loads when the popover opens (and on each poll while open).
@@ -39,9 +35,9 @@ export function NotificationBell() {
     },
   );
 
-  const listQuery = useApiQuery<AdminNotificationList>(
+  const listQuery = useApiList<AdminNotification>(
     LIST_KEY,
-    endpoints.notifications.list(),
+    endpoints.notifications.list(query({ unreadOnly: true, pageSize: 50 })),
     {
       enabled: open,
       refetchInterval: open ? POLL_MS : false,
@@ -138,6 +134,22 @@ export function NotificationBell() {
   );
 }
 
+/**
+ * The API's `href` names API resources (`/doctor-applications/{id}`), not
+ * console pages, so the destination is derived from the kind instead.
+ */
+function consoleHref(item: AdminNotification): string {
+  switch (item.kind) {
+    case "doctorApplicationSubmitted":
+      return item.resourceId ? `/doctors/${item.resourceId}` : "/doctors";
+    case "refundManualRequired":
+      return "/payments";
+    case "doctorNoShow":
+    case "paymentCaptureFailed":
+      return "/appointments";
+  }
+}
+
 function NotificationRow({
   item,
   onSelect,
@@ -148,15 +160,13 @@ function NotificationRow({
   return (
     <li>
       <Link
-        href={item.href}
+        href={consoleHref(item)}
         onClick={onSelect}
         className="block px-4 py-3 transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none"
       >
         <p className="text-sm font-medium leading-snug">{item.title}</p>
         <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.body}</p>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          {formatRelative(item.created_at)}
-        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{formatRelative(item.createdAt)}</p>
       </Link>
     </li>
   );

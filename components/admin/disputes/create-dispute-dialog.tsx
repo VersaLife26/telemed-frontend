@@ -13,25 +13,10 @@ import {
 } from "@/components/admin/ui/dialog";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/admin/ui/select";
 import { Textarea } from "@/components/admin/ui/textarea";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiMutation } from "@/lib/admin/api/hooks";
-import type { Dispute, DisputeCategory } from "@/lib/admin/api/types";
-
-const CATEGORIES: DisputeCategory[] = [
-  "billing",
-  "quality_of_care",
-  "no_show",
-  "technical",
-  "other",
-];
+import type { DisputeDetail } from "@/lib/admin/api/types";
 
 export function CreateDisputeDialog({
   open,
@@ -41,31 +26,23 @@ export function CreateDisputeDialog({
   onClose: () => void;
 }) {
   const [appointmentId, setAppointmentId] = React.useState("");
-  const [patientId, setPatientId] = React.useState("");
-  const [doctorId, setDoctorId] = React.useState("");
-  const [category, setCategory] = React.useState<DisputeCategory>("billing");
+  const [subject, setSubject] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [refundRequested, setRefundRequested] = React.useState(false);
 
-  const create = useApiMutation<Dispute, void>({
+  const create = useApiMutation<DisputeDetail, void>({
     method: "POST",
     path: () => endpoints.disputes.create(),
     body: () => ({
-      appointment_id: appointmentId.trim(),
-      patient_id: patientId.trim(),
-      doctor_id: doctorId.trim(),
-      category,
+      appointmentId: appointmentId.trim(),
+      subject: subject.trim(),
       description: description.trim(),
-      refund_requested: refundRequested,
     }),
     successMessage: () => "Dispute opened.",
     onSuccess: () => {
       onClose();
       setAppointmentId("");
-      setPatientId("");
-      setDoctorId("");
+      setSubject("");
       setDescription("");
-      setRefundRequested(false);
     },
   });
 
@@ -75,27 +52,19 @@ export function CreateDisputeDialog({
         <DialogHeader>
           <DialogTitle>Open a dispute</DialogTitle>
           <DialogDescription>
-            Staff-raised case file. Refunds still need a separate approval on Payments.
+            Staff-raised case file. The patient and doctor are taken from the appointment.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <Field label="Appointment ID" value={appointmentId} onChange={setAppointmentId} />
-          <Field label="Patient ID" value={patientId} onChange={setPatientId} />
-          <Field label="Doctor ID" value={doctorId} onChange={setDoctorId} />
           <div className="space-y-1">
-            <Label htmlFor="dispute-category">Category</Label>
-            <Select value={category} onValueChange={(value) => setCategory(value as DisputeCategory)}>
-              <SelectTrigger id="dispute-category">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="dispute-subject">Subject</Label>
+            <Input
+              id="dispute-subject"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="e.g. Doctor did not join the consultation"
+            />
           </div>
           <div className="space-y-1">
             <Label htmlFor="dispute-description">What happened</Label>
@@ -106,14 +75,6 @@ export function CreateDisputeDialog({
               onChange={(event) => setDescription(event.target.value)}
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={refundRequested}
-              onChange={(event) => setRefundRequested(event.target.checked)}
-            />
-            Refund requested
-          </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -123,8 +84,7 @@ export function CreateDisputeDialog({
             disabled={
               create.isPending ||
               appointmentId.trim().length < 8 ||
-              patientId.trim().length < 8 ||
-              doctorId.trim().length < 8 ||
+              subject.trim().length === 0 ||
               description.trim().length < 8
             }
             onClick={() => create.mutate()}
