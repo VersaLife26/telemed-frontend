@@ -18,13 +18,13 @@ export function AuthLayout({
   scroll?: boolean;
 }) {
   return (
-    <div className="page-wash flex min-h-dvh flex-col gap-4 p-4 lg:flex-row lg:p-6">
+    <div className="page-wash flex min-h-dvh flex-col gap-4 p-4 lg:h-dvh lg:max-h-dvh lg:flex-row lg:overflow-hidden lg:p-6">
       <AuthHeroPanel blurb={blurb} />
 
-      <div className={cx("flex min-h-[600px] flex-1 flex-col lg:min-h-0", scroll && "lg:overflow-y-auto")}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:overflow-y-auto">
         <div
           className={cx(
-            "flex min-h-[600px] flex-1 flex-col gap-8 rounded-xl bg-surface px-6 py-10 shadow-md sm:px-12 lg:min-h-0 lg:px-16 xl:px-20",
+            "flex min-h-[480px] flex-1 flex-col gap-8 rounded-xl bg-surface px-6 py-10 shadow-md sm:px-12 lg:min-h-full lg:px-16 xl:px-20",
             scroll ? "justify-start" : "justify-center",
           )}
         >
