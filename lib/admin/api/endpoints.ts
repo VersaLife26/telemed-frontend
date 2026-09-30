@@ -43,6 +43,7 @@ export const endpoints = {
     activity: (userId: string) => `${ADMIN}/users/${userId}/activity`,
     suspend: (userId: string) => `${ADMIN}/users/${userId}/suspend`,
     reinstate: (userId: string) => `${ADMIN}/users/${userId}/reinstate`,
+    resetPassword: (userId: string) => `${ADMIN}/users/${userId}/reset-password`,
   },
 
   appointments: {

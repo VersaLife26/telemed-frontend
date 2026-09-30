@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Activity, CircleSlash, RotateCcw, Search } from "lucide-react";
+import { Activity, CircleSlash, KeyRound, RotateCcw, Search } from "lucide-react";
 
 import { DataTable } from "@/components/admin/data-table/data-table";
 import { Badge } from "@/components/admin/ui/badge";
@@ -14,6 +14,7 @@ import { formatDate, shortId } from "@/lib/admin/format";
 import { SuspensionDialog } from "./suspension-dialog";
 import { ActivityDialog } from "./activity-dialog";
 import { UserDetailDialog } from "./user-detail-dialog";
+import { ResetPasswordDialog } from "./reset-password-dialog";
 
 /**
  * User search results.
@@ -30,6 +31,7 @@ export function UsersTable({
   filtered: boolean;
 }) {
   const [suspendTarget, setSuspendTarget] = React.useState<PlatformUser | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = React.useState<PlatformUser | null>(null);
   const [activityTarget, setActivityTarget] = React.useState<PlatformUser | null>(null);
   const [detailId, setDetailId] = React.useState<string | null>(null);
 
@@ -112,6 +114,17 @@ export function UsersTable({
               Activity
             </Button>
             {row.original.status === "deleted" ? null : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setResetPasswordTarget(row.original)}
+                aria-label={`Reset password for ${row.original.fullName || row.original.id}`}
+              >
+                <KeyRound className="size-4" aria-hidden="true" />
+                Reset Password
+              </Button>
+            )}
+            {row.original.status === "deleted" ? null : (
             <Button
               variant={row.original.status === "suspended" ? "outline" : "destructive"}
               size="sm"
@@ -164,6 +177,10 @@ export function UsersTable({
       <SuspensionDialog
         user={suspendTarget}
         onClose={() => setSuspendTarget(null)}
+      />
+      <ResetPasswordDialog
+        user={resetPasswordTarget}
+        onClose={() => setResetPasswordTarget(null)}
       />
       <ActivityDialog user={activityTarget} onClose={() => setActivityTarget(null)} />
       <UserDetailDialog userId={detailId} onClose={() => setDetailId(null)} />
