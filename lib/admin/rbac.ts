@@ -122,6 +122,7 @@ const API_ROUTE_GROUPS: ReadonlyArray<readonly [string, RbacGroup]> = [
   ["/api/v1/admin/payments", "finance"],
   ["/api/v1/admin/specialties", "content"],
   ["/api/v1/admin/drugs", "content"],
+  ["/api/v1/admin/waiting-room-items", "content"],
   ["/api/v1/admin/disputes", "disputes"],
   ["/api/v1/admin/analytics", "analytics"],
 ];

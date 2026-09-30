@@ -7,24 +7,25 @@ import { ContentTabs } from "@/components/admin/content/content-tabs";
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer, tryListServer } from "@/lib/admin/api/server";
-import type { Drug, Specialty } from "@/lib/admin/api/types";
+import type { Drug, Specialty, WaitingRoomItem } from "@/lib/admin/api/types";
 import { can } from "@/lib/admin/rbac";
 
 export const metadata: Metadata = { title: "Content" };
 
-/** Reference data the API owns: specialties and the drug formulary. */
+/** Reference data the API owns: specialties, the drug formulary, and waiting-room reading. */
 export default async function ContentPage() {
   const readOnly = !can(await adminRoles(), "content");
 
-  const [specialties, drugs] = await Promise.all([
+  const [specialties, drugs, waitingRoomItems] = await Promise.all([
     tryGetServer<Specialty[]>(endpoints.content.specialties()),
     tryListServer<Drug>(endpoints.content.drugs(query({ pageSize: 100 }))),
+    tryGetServer<WaitingRoomItem[]>(endpoints.content.waitingRoomItems()),
   ]);
 
   const header = (
     <PageHeader
       title="Content"
-      description="Specialties and the drug formulary offered to patients and doctors."
+      description="Specialties, the drug formulary, and waiting-room articles and ads offered to patients."
     />
   );
 
@@ -35,6 +36,7 @@ export default async function ContentPage() {
   const failures = [
     !specialties.ok ? { what: "specialties", error: specialties.error } : null,
     !drugs.ok ? { what: "the drug formulary", error: drugs.error } : null,
+    !waitingRoomItems.ok ? { what: "waiting room items", error: waitingRoomItems.error } : null,
   ].filter((entry) => entry !== null);
 
   return (
@@ -52,6 +54,7 @@ export default async function ContentPage() {
       <ContentTabs
         specialties={specialties.ok ? specialties.data : []}
         drugs={drugs.ok ? drugs.page.items : []}
+        waitingRoomItems={waitingRoomItems.ok ? waitingRoomItems.data : []}
         readOnly={readOnly}
       />
     </>

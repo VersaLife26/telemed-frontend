@@ -82,6 +82,10 @@ export const endpoints = {
       code ? `${ADMIN}/specialties/${encodeURIComponent(code)}` : `${ADMIN}/specialties`,
     drugs: (q: URLSearchParams) => `${ADMIN}/drugs?${q}`,
     drug: (id?: string) => (id ? `${ADMIN}/drugs/${id}` : `${ADMIN}/drugs`),
+    waitingRoomItems: () => `${ADMIN}/waiting-room-items`,
+    waitingRoomItem: (id?: string) =>
+      id ? `${ADMIN}/waiting-room-items/${id}` : `${ADMIN}/waiting-room-items`,
+    waitingRoomItemImage: (id: string) => `${ADMIN}/waiting-room-items/${id}/image`,
   },
 
   disputes: {

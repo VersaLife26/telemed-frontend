@@ -122,7 +122,8 @@ async function handler(
     upstream = await fetch(target, {
       method: request.method,
       headers,
-      body: hasBody ? await request.text() : undefined,
+      // arrayBuffer keeps multipart image uploads intact; JSON is fine as bytes too.
+      body: hasBody ? await request.arrayBuffer() : undefined,
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(serverEnv().TELEMED_API_TIMEOUT_MS),

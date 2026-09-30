@@ -124,6 +124,18 @@ export type UpdatePromoCodeRequest = S["UpdatePromoCodeRequest"];
 
 export type Specialty = S["AdminSpecialtyDto"];
 export type Drug = S["AdminDrugDto"];
+export type WaitingRoomItemKind = "article" | "ad";
+export type WaitingRoomItem = {
+  id: string;
+  kind: WaitingRoomItemKind;
+  title: string;
+  body: string | null;
+  linkUrl: string | null;
+  videoUrl: string | null;
+  imageUrl: string | null;
+  displayOrder: number;
+  isActive: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Disputes

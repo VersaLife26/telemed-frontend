@@ -6,16 +6,18 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/admin/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/admin/ui/tabs";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import type { Drug, Specialty } from "@/lib/admin/api/types";
+import type { Drug, Specialty, WaitingRoomItem } from "@/lib/admin/api/types";
 
 import { ContentSection } from "./content-section";
 import type { FieldSpec } from "./entity-editor";
+import { WaitingRoomItemsSection } from "./waiting-room-items";
 
 /**
  * The content types the API owns, on one route.
  *
  * Specialties carry English, Sinhala and Tamil names because the patient app
- * offers all three languages; the API requires all three.
+ * offers all three languages; the API requires all three. Waiting-room items
+ * are articles and ads patients can open while they wait.
  */
 
 const activeField: FieldSpec = {
@@ -60,10 +62,12 @@ const orNull = (value: unknown) =>
 export function ContentTabs({
   specialties,
   drugs,
+  waitingRoomItems,
   readOnly,
 }: {
   specialties: Specialty[];
   drugs: Drug[];
+  waitingRoomItems: WaitingRoomItem[];
   readOnly: boolean;
 }) {
   const specialtyColumns = React.useMemo<ColumnDef<Specialty, unknown>[]>(
@@ -99,6 +103,7 @@ export function ContentTabs({
       <TabsList>
         <TabsTrigger value="specialties">Specialties</TabsTrigger>
         <TabsTrigger value="drugs">Drug formulary</TabsTrigger>
+        <TabsTrigger value="waiting-room">Waiting room</TabsTrigger>
       </TabsList>
 
       <TabsContent value="specialties">
@@ -188,6 +193,10 @@ export function ContentTabs({
             category: orNull(values.category),
           })}
         />
+      </TabsContent>
+
+      <TabsContent value="waiting-room">
+        <WaitingRoomItemsSection rows={waitingRoomItems} readOnly={readOnly} />
       </TabsContent>
     </Tabs>
   );

@@ -55,6 +55,17 @@ export type JoinResult = S["JoinConsultationDto"];
 export type ConsultationStatus = S["ConsultationStatus"];
 export type Consultation = S["ConsultationDto"];
 export type WaitingRoomStatus = S["WaitingRoomDto"];
+export type WaitingRoomItemKind = "article" | "ad";
+export type WaitingRoomItem = {
+  id: string;
+  kind: WaitingRoomItemKind;
+  title: string;
+  body: string | null;
+  linkUrl: string | null;
+  videoUrl: string | null;
+  imageUrl: string | null;
+  displayOrder: number;
+};
 export type ConsultationMessage = S["ConsultationMessageDto"];
 export type EarlyJoinOffer = S["EarlyJoinDto"];
 export type ReadyForNext = S["ReadyForNextDto"];

@@ -24,6 +24,7 @@ export interface RequestOptions {
 /** Performs the request and returns the raw Response, mapping only transport failures. */
 export async function rawFetch(url: string, options: RequestOptions): Promise<Response> {
   const { method = "GET", body, headers = {}, timeoutMs = 15_000 } = options;
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -36,7 +37,7 @@ export async function rawFetch(url: string, options: RequestOptions): Promise<Re
     method,
     headers: {
       Accept: "application/json",
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(body === undefined || isForm ? {} : { "Content-Type": "application/json" }),
       ...headers,
     },
     signal: controller.signal,
@@ -44,7 +45,7 @@ export async function rawFetch(url: string, options: RequestOptions): Promise<Re
     // cached read passes `next: { revalidate }` explicitly.
     cache: options.cache ?? "no-store",
   };
-  if (body !== undefined) init.body = JSON.stringify(body);
+  if (body !== undefined) init.body = isForm ? (body as FormData) : JSON.stringify(body);
   if (options.next) init.next = options.next;
 
   try {

@@ -28,6 +28,7 @@ import type { ConsultationControls } from "@/lib/consumer/features/use-consultat
 import { formatWait } from "@/lib/consumer/money";
 import { cx } from "@/lib/consumer/cx";
 import { project, spring } from "@/lib/consumer/motion";
+import { WaitingRoomFeed } from "@/components/consumer/call/waiting-room-feed";
 
 export function PatientCall({ appointmentId }: { appointmentId: string }) {
   const router = useRouter();
@@ -379,6 +380,7 @@ function Lobby({
           </div>
         ) : null}
       </div>
+      <WaitingRoomFeed />
       <div className="flex w-full max-w-sm flex-col gap-2">{alerts}</div>
       <Button variant="glass" onClick={onLeave}>
         Leave waiting room

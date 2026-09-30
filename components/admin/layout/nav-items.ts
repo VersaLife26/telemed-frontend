@@ -68,7 +68,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     href: "/content",
     label: "Content",
-    description: "Specialties and formulary",
+    description: "Specialties, formulary and waiting room",
     icon: FileText,
     group: "content",
   },
