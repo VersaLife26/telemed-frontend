@@ -116,6 +116,11 @@ async function handler(
   if (contentType) headers.set("Content-Type", contentType);
 
   const hasBody = request.method !== "GET" && request.method !== "DELETE";
+  const uploadTimeoutMs = 120_000;
+  const timeoutMs =
+    contentType?.includes("multipart/form-data") === true
+      ? Math.max(serverEnv().TELEMED_API_TIMEOUT_MS, uploadTimeoutMs)
+      : serverEnv().TELEMED_API_TIMEOUT_MS;
 
   let upstream: Response;
   try {
@@ -126,7 +131,7 @@ async function handler(
       body: hasBody ? await request.arrayBuffer() : undefined,
       cache: "no-store",
       redirect: "manual",
-      signal: AbortSignal.timeout(serverEnv().TELEMED_API_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (cause) {
     const timedOut = cause instanceof Error && cause.name === "TimeoutError";

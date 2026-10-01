@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { FileText, Pencil, Plus } from "lucide-react";
+import { CircleAlert, CircleCheck, FileText, Pencil, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert";
 import { DataTable } from "@/components/admin/data-table/data-table";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
@@ -73,12 +74,18 @@ function normalizeHttpUrl(raw: string): string | null {
   return `https://${trimmed}`;
 }
 
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 function isValidHttpUrl(raw: string): boolean {
   const normalized = normalizeHttpUrl(raw);
   if (!normalized) return true;
   try {
     const url = new URL(normalized);
-    return url.protocol === "http:" || url.protocol === "https:";
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (url.hostname.includes(".")) return true;
+    return url.hostname === "localhost";
   } catch {
     return false;
   }
@@ -97,6 +104,12 @@ function payload(draft: Draft) {
 }
 
 type FieldKey = "title" | "body" | "linkUrl" | "videoUrl" | "displayOrder";
+
+type SubmitFeedback = {
+  tone: "success" | "error";
+  title: string;
+  description: string;
+};
 
 function firstFieldError(errors: Record<string, string[]>, ...keys: string[]): string | null {
   for (const key of keys) {
@@ -124,6 +137,9 @@ export function WaitingRoomItemsSection({
   const [pending, setPending] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<FieldKey, string>>>({});
   const [touched, setTouched] = React.useState<Partial<Record<FieldKey, boolean>>>({});
+  const [mediaError, setMediaError] = React.useState<string | null>(null);
+  const [submitFeedback, setSubmitFeedback] = React.useState<SubmitFeedback | null>(null);
+  const feedbackRef = React.useRef<HTMLDivElement>(null);
 
   const open = creating || editing !== null;
 
@@ -136,10 +152,21 @@ export function WaitingRoomItemsSection({
     setRemoveVideo(false);
     setFieldErrors({});
     setTouched({});
+    setMediaError(null);
+    setSubmitFeedback(null);
     setDraft(emptyDraft());
   }
 
+  React.useEffect(() => {
+    if (submitFeedback) {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [submitFeedback]);
+
   function localProblem(field: FieldKey): string | null {
+    if (field === "title" && draft.title.trim() === "") {
+      return "Title is required.";
+    }
     if (field === "body" && draft.kind === "article" && draft.body.trim() === "") {
       return "Articles need a body patients can read.";
     }
@@ -157,6 +184,30 @@ export function WaitingRoomItemsSection({
 
   function problemFor(field: FieldKey): string | null {
     return fieldErrors[field] ?? (touched[field] ? localProblem(field) : null);
+  }
+
+  function collectLocalFieldErrors(): Partial<Record<FieldKey, string>> {
+    const next: Partial<Record<FieldKey, string>> = {};
+    for (const field of ["title", "body", "linkUrl", "videoUrl", "displayOrder"] as const) {
+      const message = localProblem(field);
+      if (message) next[field] = message;
+    }
+    return next;
+  }
+
+  function localMediaError(): string | null {
+    if (file && file.size > IMAGE_MAX_BYTES) {
+      return "Image must be at most 5 MB.";
+    }
+    if (videoFile && videoFile.size > VIDEO_MAX_BYTES) {
+      return "Video must be at most 25 MB.";
+    }
+    return null;
+  }
+
+  function showSaveError(title: string, description: string) {
+    setSubmitFeedback({ tone: "error", title, description });
+    toast.error(title, { description });
   }
 
   const columns = React.useMemo<ColumnDef<WaitingRoomItem, unknown>[]>(
@@ -207,6 +258,8 @@ export function WaitingRoomItemsSection({
               onClick={() => {
                 setFieldErrors({});
                 setTouched({});
+                setSubmitFeedback(null);
+                setMediaError(null);
                 setFile(null);
                 setVideoFile(null);
                 setRemoveImage(false);
@@ -227,6 +280,9 @@ export function WaitingRoomItemsSection({
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    setSubmitFeedback(null);
+    setMediaError(null);
+
     const markTouched: Partial<Record<FieldKey, boolean>> = {
       title: true,
       body: true,
@@ -236,10 +292,18 @@ export function WaitingRoomItemsSection({
     };
     setTouched(markTouched);
 
-    const blocked = (["title", "body", "linkUrl", "videoUrl", "displayOrder"] as const).some(
-      (field) => localProblem(field) !== null,
-    );
-    if (blocked) return;
+    const localErrors = collectLocalFieldErrors();
+    const mediaProblem = localMediaError();
+    if (Object.keys(localErrors).length > 0 || mediaProblem) {
+      setFieldErrors(localErrors);
+      if (mediaProblem) setMediaError(mediaProblem);
+      const firstFieldMessage = Object.values(localErrors)[0];
+      showSaveError(
+        "Could not save yet",
+        mediaProblem ?? firstFieldMessage ?? "Fix the highlighted fields below and try again.",
+      );
+      return;
+    }
 
     setPending(true);
     setFieldErrors({});
@@ -252,25 +316,55 @@ export function WaitingRoomItemsSection({
             payload(draft),
           );
 
-      if (file) {
-        const form = new FormData();
-        form.append("file", file);
-        await send<WaitingRoomItem>("PUT", endpoints.content.waitingRoomItemImage(saved.id), form);
-      } else if (removeImage && editing?.imageUrl) {
-        await send("DELETE", endpoints.content.waitingRoomItemImage(editing.id));
+      try {
+        if (file) {
+          const form = new FormData();
+          form.append("file", file);
+          await send<WaitingRoomItem>(
+            "PUT",
+            endpoints.content.waitingRoomItemImage(saved.id),
+            form,
+            { timeoutMs: UPLOAD_TIMEOUT_MS },
+          );
+        } else if (removeImage && editing?.imageUrl) {
+          await send("DELETE", endpoints.content.waitingRoomItemImage(editing.id));
+        }
+
+        if (videoFile) {
+          const form = new FormData();
+          form.append("file", videoFile);
+          await send<WaitingRoomItem>(
+            "PUT",
+            endpoints.content.waitingRoomItemVideo(saved.id),
+            form,
+            { timeoutMs: UPLOAD_TIMEOUT_MS },
+          );
+        } else if (removeVideo && editing?.videoFileUrl) {
+          await send("DELETE", endpoints.content.waitingRoomItemVideo(editing.id));
+        }
+      } catch (mediaCause) {
+        const error = toApiError(mediaCause);
+        const fileMessage = firstFieldError(error.errors, "file");
+        setMediaError(fileMessage ?? error.userMessage);
+        router.refresh();
+        showSaveError(
+          "Saved, but media upload failed",
+          fileMessage ??
+            error.userMessage +
+              (error.remedy ? ` ${error.remedy}` : "") +
+              (error.traceId ? ` Trace ID: ${error.traceId}` : ""),
+        );
+        return;
       }
 
-      if (videoFile) {
-        const form = new FormData();
-        form.append("file", videoFile);
-        await send<WaitingRoomItem>("PUT", endpoints.content.waitingRoomItemVideo(saved.id), form);
-      } else if (removeVideo && editing?.videoFileUrl) {
-        await send("DELETE", endpoints.content.waitingRoomItemVideo(editing.id));
-      }
-
-      toast.success(creating ? "Waiting room item created." : "Waiting room item updated.");
-      close();
+      const successTitle = creating ? "Waiting room item created" : "Changes saved";
+      const successDescription = creating
+        ? "Patients will see this item in the waiting room when it is active."
+        : "Your waiting room item was updated successfully.";
+      setSubmitFeedback({ tone: "success", title: successTitle, description: successDescription });
+      toast.success(successTitle, { description: successDescription });
       router.refresh();
+      window.setTimeout(() => close(), 1600);
     } catch (cause) {
       const error = toApiError(cause);
       setFieldErrors({
@@ -280,8 +374,14 @@ export function WaitingRoomItemsSection({
         videoUrl: firstFieldError(error.errors, "videoUrl") ?? undefined,
         displayOrder: firstFieldError(error.errors, "displayOrder") ?? undefined,
       });
+      const fileMessage = firstFieldError(error.errors, "file");
+      if (fileMessage) setMediaError(fileMessage);
       const { title, description } = describeForToast(error);
-      toast.error(title, description ? { description } : undefined);
+      showSaveError(
+        title,
+        description ??
+          error.userMessage + (error.traceId ? ` Trace ID: ${error.traceId}` : ""),
+      );
     } finally {
       setPending(false);
     }
@@ -319,6 +419,8 @@ export function WaitingRoomItemsSection({
           onClick={() => {
             setFieldErrors({});
             setTouched({});
+            setSubmitFeedback(null);
+            setMediaError(null);
             setFile(null);
             setVideoFile(null);
             setRemoveImage(false);
@@ -362,6 +464,20 @@ export function WaitingRoomItemsSection({
           </DialogHeader>
 
           <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
+            {submitFeedback ? (
+              <div ref={feedbackRef}>
+                <Alert variant={submitFeedback.tone === "success" ? "success" : "destructive"}>
+                  {submitFeedback.tone === "success" ? (
+                    <CircleCheck aria-hidden="true" />
+                  ) : (
+                    <CircleAlert aria-hidden="true" />
+                  )}
+                  <AlertTitle>{submitFeedback.title}</AlertTitle>
+                  <AlertDescription>{submitFeedback.description}</AlertDescription>
+                </Alert>
+              </div>
+            ) : null}
+
             <div className="space-y-1.5">
               <Label htmlFor="wr-kind">Type</Label>
               <Select
@@ -388,8 +504,13 @@ export function WaitingRoomItemsSection({
                 id="wr-title"
                 value={draft.title}
                 required
+                aria-invalid={problemFor("title") !== null}
+                onBlur={() => setTouched((current) => ({ ...current, title: true }))}
                 onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
               />
+              {problemFor("title") ? (
+                <p className="text-xs text-destructive">{problemFor("title")}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -432,6 +553,7 @@ export function WaitingRoomItemsSection({
                 }}
               />
               <p className="text-xs text-muted-foreground">JPEG, PNG or WebP, up to 5 MB.</p>
+              {mediaError && file ? <p className="text-xs text-destructive">{mediaError}</p> : null}
               {editing?.imageUrl && !file ? (
                 <div className="flex items-center gap-2 text-sm">
                   <Checkbox
@@ -469,6 +591,7 @@ export function WaitingRoomItemsSection({
                   }}
                 />
                 <p className="text-xs text-muted-foreground">MP4 or WebM, up to 25 MB. Plays in the waiting room.</p>
+                {mediaError && videoFile ? <p className="text-xs text-destructive">{mediaError}</p> : null}
                 {editing?.videoFileUrl && !videoFile ? (
                   <div className="flex items-center gap-2 text-sm">
                     <Checkbox
@@ -496,9 +619,9 @@ export function WaitingRoomItemsSection({
                   setDraft((current) => ({ ...current, videoUrl: event.target.value }))
                 }
               />
-                  <p className="text-xs text-muted-foreground">
-                    Optional YouTube or other link. Ads can also upload a video file above.
-                  </p>
+              <p className="text-xs text-muted-foreground">
+                Optional YouTube or other link. Ads can also upload a video file above.
+              </p>
               {problemFor("videoUrl") ? (
                 <p className="text-xs text-destructive">{problemFor("videoUrl")}</p>
               ) : null}
