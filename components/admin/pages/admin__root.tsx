@@ -91,12 +91,17 @@ export default async function DashboardPage({
     <>
       {header}
 
-      <section aria-label="Headline figures" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section
+        aria-label="Headline figures"
+        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      >
         <StatTile
+          className="sm:col-span-2 lg:col-span-1 xl:col-span-2"
           label="Gross revenue"
           value={formatMoney(summary.grossRevenueCents, currency)}
           hint={`Commission ${formatMoney(summary.commissionCents, currency)}`}
           icon={Coins}
+          valueClassName="text-sm sm:text-base xl:text-lg"
         />
         <StatTile
           label="Bookings"

@@ -18,15 +18,26 @@ export function StatTile({
   hint,
   icon: Icon,
   tone = "default",
+  className,
+  valueClassName,
+  hintClassName,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon?: LucideIcon;
   tone?: "default" | "warning" | "success";
+  className?: string;
+  valueClassName?: string;
+  hintClassName?: string;
 }) {
   return (
-    <Card className="transition-[box-shadow,transform] duration-[160ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md">
+    <Card
+      className={cn(
+        "transition-[box-shadow,transform] duration-[160ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md",
+        className,
+      )}
+    >
       <CardContent className="flex items-start gap-3 p-5">
         {Icon ? (
           <span
@@ -46,10 +57,17 @@ export function StatTile({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="font-display text-lg font-bold leading-snug tabular-nums tracking-tight break-words sm:text-xl xl:text-2xl">
+          <p
+            className={cn(
+              "font-display text-base font-bold tabular-nums tracking-tight whitespace-nowrap sm:text-lg xl:text-xl",
+              valueClassName,
+            )}
+          >
             {value}
           </p>
-          {hint ? <p className="text-xs leading-snug text-muted-foreground break-words">{hint}</p> : null}
+          {hint ? (
+            <p className={cn("text-xs text-muted-foreground whitespace-nowrap", hintClassName)}>{hint}</p>
+          ) : null}
         </div>
       </CardContent>
     </Card>
