@@ -369,6 +369,11 @@
     isolation: isolate;
   }
 
+  /* Sign-in / register: one page scroll (no inner panel scrollbar). */
+  html:has(.auth-frame) {
+    scroll-behavior: smooth;
+  }
+
   .page-wash::before {
     content: "";
     position: absolute;

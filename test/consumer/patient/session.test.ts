@@ -28,3 +28,11 @@ test("patient and doctor surfaces publish the refresh route", () => {
   assert.equal(servedBy("doctor", "/api/auth/refresh"), true);
   assert.equal(servedBy("admin", "/api/auth/refresh"), false);
 });
+
+test("patient and doctor surfaces publish forgot-password routes", () => {
+  for (const path of ["/login/forgot", "/login/reset", "/api/auth/password/forgot", "/api/auth/password/reset"]) {
+    assert.equal(servedBy("patient", path), true, path);
+    assert.equal(servedBy("doctor", path), true, path);
+    assert.equal(servedBy("admin", path), false, path);
+  }
+});

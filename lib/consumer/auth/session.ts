@@ -36,6 +36,14 @@ export async function completePasswordLogin(body: unknown) {
   return finishAuth(data, requiredRole());
 }
 
+export async function completePasswordReset(body: unknown) {
+  const data = await apiFetch<AuthResponse>("/api/v1/auth/password/reset", {
+    method: "POST",
+    body,
+  });
+  return finishAuth(data, requiredRole());
+}
+
 export async function completeEmailRegister(body: unknown) {
   const data = await apiFetch<AuthResponse>("/api/v1/auth/register/email", {
     method: "POST",

@@ -18,14 +18,20 @@ export function AuthLayout({
   scroll?: boolean;
 }) {
   return (
-    <div className="page-wash flex min-h-dvh flex-col gap-4 p-4 lg:h-dvh lg:max-h-dvh lg:flex-row lg:overflow-hidden lg:p-6">
+    <div className="auth-frame page-wash flex min-h-dvh flex-col gap-4 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:flex-row lg:items-stretch lg:p-6">
       <AuthHeroPanel blurb={blurb} />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:overflow-y-auto">
+      {/*
+        Page scrolls as one surface — no nested overflow panel. Nested
+        justify-center + overflow-y-auto trapped the top of the form (logo
+        clipped, scroll could not reach y=0). Short forms still center via
+        margin on the card; tall forms grow the page normally.
+      */}
+      <div className="flex min-w-0 flex-1 flex-col lg:min-h-[calc(100dvh-3rem)]">
         <div
           className={cx(
-            "flex min-h-[480px] flex-1 flex-col gap-8 rounded-xl bg-surface px-6 py-10 shadow-md sm:px-12 lg:min-h-full lg:px-16 xl:px-20",
-            scroll ? "justify-start" : "justify-center",
+            "flex w-full flex-col gap-8 rounded-xl bg-surface px-6 py-10 shadow-md sm:px-12 lg:px-16 xl:px-20",
+            !scroll && "lg:my-auto",
           )}
         >
           <div className="relative h-14 w-14 shrink-0">

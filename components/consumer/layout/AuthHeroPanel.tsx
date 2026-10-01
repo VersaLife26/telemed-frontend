@@ -14,7 +14,7 @@ export const AUTH_BLURB =
  */
 export function AuthHeroPanel({ blurb = AUTH_BLURB }: { blurb?: string }) {
   return (
-    <div className="relative flex min-h-[280px] w-full flex-col justify-end overflow-hidden rounded-xl p-5 lg:h-full lg:min-h-0 lg:w-[min(46vw,560px)] lg:shrink-0 lg:p-8">
+    <div className="relative flex min-h-[280px] w-full flex-col justify-end overflow-hidden rounded-xl p-5 lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)] lg:max-h-[720px] lg:min-h-0 lg:w-[min(46vw,560px)] lg:shrink-0 lg:self-start lg:p-8">
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[image:var(--gradient-hero)]" />
         <Image

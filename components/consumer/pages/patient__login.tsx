@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { AuthDivider, GoogleButton } from "@/components/consumer/auth/GoogleButton";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Alert } from "@/components/consumer/ui/Alert";
@@ -110,6 +111,14 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
+            <p className="-mt-2 text-right text-body-sm">
+              <Link
+                href="/login/forgot"
+                className="font-semibold text-brand underline-offset-4 can-hover:hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </p>
             {error ? <Alert tone="danger">{error}</Alert> : null}
             <Button type="submit" size="lg" fullWidth busy={loading === "email"} disabled={busy}>
               {loading === "email" ? "Signing in…" : "Sign in with email"}
