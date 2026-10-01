@@ -42,14 +42,14 @@ export function StatTile({
             <Icon className="size-4" aria-hidden="true" />
           </span>
         ) : null}
-        <div className="min-w-0 space-y-0.5">
+        <div className="min-w-0 flex-1 space-y-0.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="font-display truncate text-2xl font-bold tabular-nums tracking-tight">
+          <p className="font-display text-lg font-bold leading-snug tabular-nums tracking-tight break-words sm:text-xl xl:text-2xl">
             {value}
           </p>
-          {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+          {hint ? <p className="text-xs leading-snug text-muted-foreground break-words">{hint}</p> : null}
         </div>
       </CardContent>
     </Card>
