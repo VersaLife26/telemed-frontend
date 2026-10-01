@@ -450,7 +450,14 @@ export function WaitingRoomItemsSection({
               <div className="space-y-1.5">
                 <Label htmlFor="wr-video-file">Ad video</Label>
                 {uploadedVideo ? (
-                  <video className="h-32 w-full rounded-md bg-black object-contain" src={uploadedVideo} controls />
+                  <video
+                    className="h-32 w-full rounded-md bg-black object-contain"
+                    src={uploadedVideo}
+                    controls
+                    aria-label="Ad video preview"
+                  >
+                    <track kind="captions" label="Captions not provided" />
+                  </video>
                 ) : null}
                 <Input
                   id="wr-video-file"

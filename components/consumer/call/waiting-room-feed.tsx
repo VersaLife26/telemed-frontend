@@ -77,9 +77,20 @@ export function WaitingRoomFeed({ layout = "inline" }: { layout?: "inline" | "si
                   controls
                   src={apiFileSrc(item.videoFileUrl) ?? item.videoFileUrl}
                   preload="metadata"
-                />
+                  aria-label={`Video: ${item.title}`}
+                >
+                  <track kind="captions" label="Captions not provided" />
+                </video>
               ) : item.videoUrl && isDirectVideo(item.videoUrl) ? (
-                <video className="w-full rounded-lg" controls src={item.videoUrl} preload="metadata" />
+                <video
+                  className="w-full rounded-lg"
+                  controls
+                  src={item.videoUrl}
+                  preload="metadata"
+                  aria-label={`Video: ${item.title}`}
+                >
+                  <track kind="captions" label="Captions not provided" />
+                </video>
               ) : null}
               {(item.linkUrl || (item.videoUrl && !isDirectVideo(item.videoUrl))) ? (
                 <div className="flex flex-wrap gap-2 pt-1">
