@@ -15,7 +15,8 @@ import { Skeleton } from "@/components/admin/ui/skeleton";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiQuery } from "@/lib/admin/api/hooks";
 import type { Appointment, AuditEntry } from "@/lib/admin/api/types";
-import { formatDateTime, humanise, shortId } from "@/lib/admin/format";
+import { describeAuditActivity, describeAuditActor } from "@/lib/admin/audit-message";
+import { formatDateTime, shortId } from "@/lib/admin/format";
 
 /**
  * The audit trail for one appointment, taken from the same audit log the audit
@@ -78,18 +79,16 @@ export function AppointmentAuditDialog({
             {queryResult.data.map((entry) => (
               <li key={entry.id} className="rounded-md border border-border p-3 text-sm">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="font-medium">{humanise(entry.action)}</p>
+                  <p className="font-medium">{describeAuditActivity(entry)}</p>
                   <p className="shrink-0 text-xs text-muted-foreground">
                     {formatDateTime(entry.createdAt)}
                   </p>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {humanise(entry.actorType)}
-                  {entry.actorEmail
-                    ? ` · ${entry.actorEmail}`
-                    : entry.actorId
-                      ? ` · ${shortId(entry.actorId)}`
-                      : ""}
+                  {describeAuditActor(entry)}
+                  {entry.actorId && entry.actorType !== "admin" && entry.actorType !== "system"
+                    ? ` · ${shortId(entry.actorId)}`
+                    : ""}
                   {entry.ip ? ` · ${entry.ip}` : ""}
                 </p>
                 {entry.requestId ? (

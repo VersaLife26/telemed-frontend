@@ -20,6 +20,7 @@ import { endpoints } from "@/lib/admin/api/endpoints";
 import { reportError } from "@/lib/admin/api/hooks";
 import type { AuditEntry } from "@/lib/admin/api/types";
 import { formatDateTime, humanise, shortId } from "@/lib/admin/format";
+import { describeAuditActivity } from "@/lib/admin/audit-message";
 
 /**
  * The audit log.
@@ -80,7 +81,7 @@ export function AuditTable({
       {
         accessorKey: "action",
         header: "Action",
-        cell: ({ row }) => <code className="text-xs">{row.original.action}</code>,
+        cell: ({ row }) => <span className="text-sm">{describeAuditActivity(row.original)}</span>,
       },
       {
         accessorKey: "entityType",
@@ -173,7 +174,7 @@ export function AuditTable({
       <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{selected ? humanise(selected.action) : "Audit entry"}</DialogTitle>
+            <DialogTitle>{selected ? describeAuditActivity(selected) : "Audit entry"}</DialogTitle>
             <DialogDescription>
               {selected ? (
                 <>

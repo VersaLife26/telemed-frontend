@@ -15,7 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { useApiQuery } from "@/lib/admin/api/hooks";
 import type { PlatformUser, UserActivity } from "@/lib/admin/api/types";
-import { formatCount, formatDateTime, humanise } from "@/lib/admin/format";
+import { describeAuditActivity, describeAuditActor } from "@/lib/admin/audit-message";
+import { formatCount, formatDateTime } from "@/lib/admin/format";
 
 /**
  * Recent activity for one user: a count of their appointments by status and
@@ -106,14 +107,13 @@ export function ActivityDialog({
                 {queryResult.data.audit.map((entry) => (
                   <li key={entry.id} className="rounded-md border border-border p-3">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-medium">{humanise(entry.action)}</p>
+                      <p className="text-sm font-medium">{describeAuditActivity(entry)}</p>
                       <p className="shrink-0 text-xs text-muted-foreground">
                         {formatDateTime(entry.createdAt)}
                       </p>
                     </div>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      {humanise(entry.actorType)}
-                      {entry.actorEmail ? ` · ${entry.actorEmail}` : ""}
+                      {describeAuditActor(entry, user)}
                     </p>
                   </li>
                 ))}
