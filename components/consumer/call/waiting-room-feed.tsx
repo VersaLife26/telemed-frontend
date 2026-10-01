@@ -6,12 +6,14 @@ import { Newspaper } from "lucide-react";
 import { browserApi } from "@/lib/consumer/api/client";
 import type { WaitingRoomItem } from "@/lib/consumer/api/types";
 import { apiFileSrc } from "@/lib/consumer/features/practice";
+import { cx } from "@/lib/consumer/cx";
 
 function isDirectVideo(url: string): boolean {
   return /\.(mp4|webm|ogg)(\?|$)/i.test(url);
 }
 
-export function WaitingRoomFeed() {
+export function WaitingRoomFeed({ layout = "inline" }: { layout?: "inline" | "sidebar" }) {
+  const sidebar = layout === "sidebar";
   const [items, setItems] = useState<WaitingRoomItem[] | null>(null);
 
   useEffect(() => {
@@ -31,12 +33,25 @@ export function WaitingRoomFeed() {
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="w-full max-w-sm text-left" aria-label="While you wait">
-      <p className="mb-3 flex items-center gap-2 text-body-sm text-white/70">
+    <section
+      className={cx(
+        "w-full min-w-0 text-left text-white",
+        sidebar &&
+          "flex min-h-0 flex-1 flex-col overflow-hidden border-t border-white/10 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:border-t-0",
+        !sidebar && "max-w-sm",
+      )}
+      aria-label="While you wait"
+    >
+      <p className="mb-3 flex shrink-0 items-center gap-2 text-body-sm text-white/70">
         <Newspaper className="size-4" aria-hidden="true" />
         While you wait
       </p>
-      <ul className="flex max-h-[40vh] flex-col gap-3 overflow-y-auto pr-1">
+      <ul
+        className={cx(
+          "flex flex-col gap-3 overflow-y-auto pr-1",
+          sidebar ? "min-h-0 flex-1" : "max-h-[40vh]",
+        )}
+      >
         {items.map((item) => (
           <li
             key={item.id}

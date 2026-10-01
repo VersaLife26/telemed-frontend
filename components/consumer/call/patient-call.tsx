@@ -333,58 +333,60 @@ function Lobby({
 }) {
   const when = call.join?.scheduledStartAt || startAt;
   return (
-    <div className="relative flex h-full flex-col items-center justify-center gap-6 overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center">
-      <div className="relative aspect-[4/3] w-full max-w-sm overflow-hidden rounded-2xl bg-ink-800 shadow-2xl ring-1 ring-white/15">
-        <StreamVideo
-          stream={call.localStream}
-          muted
-          className={cx("h-full w-full scale-x-[-1] object-cover", call.cameraOff && "opacity-0")}
-        />
-        <div className="glass-dark absolute inset-x-0 bottom-3 mx-auto flex w-fit items-center gap-1.5 rounded-pill p-1.5">
-          <LobbyToggle
-            label={call.muted ? "Unmute" : "Mute"}
-            on={!call.muted}
-            onClick={call.toggleMute}
-            icon={call.muted ? "mic-off" : "mic"}
+    <div className="flex h-full min-h-0 flex-col lg:flex-row">
+      <div className="flex min-h-0 flex-col items-center justify-center gap-5 overflow-y-auto p-6 pb-4 text-center lg:w-[min(100%,28rem)] lg:shrink-0 lg:border-r lg:border-white/10 lg:py-8">
+        <div className="relative aspect-[4/3] w-full max-w-sm overflow-hidden rounded-2xl bg-ink-800 shadow-2xl ring-1 ring-white/15">
+          <StreamVideo
+            stream={call.localStream}
+            muted
+            className={cx("h-full w-full scale-x-[-1] object-cover", call.cameraOff && "opacity-0")}
           />
-          <LobbyToggle
-            label={call.cameraOff ? "Start video" : "Stop video"}
-            on={!call.cameraOff}
-            onClick={call.toggleCamera}
-            icon={call.cameraOff ? "video-off" : "video"}
-          />
-        </div>
-      </div>
-      <div className="text-white">
-        <p className="text-h3">{doctorName || "Your doctor"}</p>
-        {when ? (
-          <p className="mt-1 text-body text-white/70 tabular-time">
-            {formatVisitDate(when)} · {formatVisitClock(when)}
-          </p>
-        ) : null}
-        {call.queue?.waiting ? (
-          <p className="mt-3 text-body text-white/80 tabular-time">
-            Position #{call.queue.position} · {formatWait(call.queue.estimatedWaitSeconds)}
-          </p>
-        ) : null}
-        <p className="mt-2 text-body-sm text-white/60">
-          {call.connecting
-            ? "Connecting…"
-            : "You’ll enter the call when the doctor admits you. You can keep using the app meanwhile."}
-        </p>
-        {!call.hasLocalMedia && !call.connecting ? (
-          <div className="mt-4">
-            <Button size="lg" onClick={() => void call.retryMedia()}>
-              Enable camera and microphone
-            </Button>
+          <div className="glass-dark absolute inset-x-0 bottom-3 mx-auto flex w-fit items-center gap-1.5 rounded-pill p-1.5">
+            <LobbyToggle
+              label={call.muted ? "Unmute" : "Mute"}
+              on={!call.muted}
+              onClick={call.toggleMute}
+              icon={call.muted ? "mic-off" : "mic"}
+            />
+            <LobbyToggle
+              label={call.cameraOff ? "Start video" : "Stop video"}
+              on={!call.cameraOff}
+              onClick={call.toggleCamera}
+              icon={call.cameraOff ? "video-off" : "video"}
+            />
           </div>
-        ) : null}
+        </div>
+        <div className="text-white">
+          <p className="text-h3">{doctorName || "Your doctor"}</p>
+          {when ? (
+            <p className="mt-1 text-body text-white/70 tabular-time">
+              {formatVisitDate(when)} · {formatVisitClock(when)}
+            </p>
+          ) : null}
+          {call.queue?.waiting ? (
+            <p className="mt-3 text-body text-white/80 tabular-time">
+              Position #{call.queue.position} · {formatWait(call.queue.estimatedWaitSeconds)}
+            </p>
+          ) : null}
+          <p className="mt-2 text-body-sm text-white/60">
+            {call.connecting
+              ? "Connecting…"
+              : "You’ll enter the call when the doctor admits you. You can keep using the app meanwhile."}
+          </p>
+          {!call.hasLocalMedia && !call.connecting ? (
+            <div className="mt-4">
+              <Button size="lg" onClick={() => void call.retryMedia()}>
+                Enable camera and microphone
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        <div className="flex w-full max-w-sm flex-col gap-2">{alerts}</div>
+        <Button variant="glass" onClick={onLeave}>
+          Leave waiting room
+        </Button>
       </div>
-      <WaitingRoomFeed />
-      <div className="flex w-full max-w-sm flex-col gap-2">{alerts}</div>
-      <Button variant="glass" onClick={onLeave}>
-        Leave waiting room
-      </Button>
+      <WaitingRoomFeed layout="sidebar" />
     </div>
   );
 }
