@@ -11,11 +11,15 @@ import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { useApiList, useApiMutation, useApiQuery } from "@/lib/admin/api/hooks";
 import type { AdminNotification, AdminNotificationUnreadCount } from "@/lib/admin/api/types";
 import { formatRelative } from "@/lib/admin/format";
+import { navHrefForNotification } from "@/lib/admin/notifications/inbox-nav";
+import {
+  ADMIN_UNREAD_INBOX_POLL_MS,
+  ADMIN_UNREAD_INBOX_QUERY_KEY,
+} from "@/lib/admin/notifications/use-unread-inbox";
 import { cn } from "@/lib/admin/utils";
 
 const UNREAD_COUNT_KEY = ["admin-notifications", "unread-count"] as const;
 const LIST_KEY = ["admin-notifications", "list"] as const;
-const POLL_MS = 60_000;
 
 /**
  * Header inbox for the API's admin in-app notifications.
@@ -30,7 +34,7 @@ export function NotificationBell() {
     UNREAD_COUNT_KEY,
     endpoints.notifications.unreadCount(),
     {
-      refetchInterval: POLL_MS,
+      refetchInterval: ADMIN_UNREAD_INBOX_POLL_MS,
       refetchOnWindowFocus: true,
     },
   );
@@ -40,7 +44,7 @@ export function NotificationBell() {
     endpoints.notifications.list(query({ unreadOnly: true, pageSize: 50 })),
     {
       enabled: open,
-      refetchInterval: open ? POLL_MS : false,
+      refetchInterval: open ? ADMIN_UNREAD_INBOX_POLL_MS : false,
       refetchOnWindowFocus: open,
     },
   );
@@ -48,14 +52,14 @@ export function NotificationBell() {
   const markRead = useApiMutation<void, { id: string }>({
     method: "POST",
     path: ({ id }) => endpoints.notifications.markRead(id),
-    invalidate: [UNREAD_COUNT_KEY, LIST_KEY],
+    invalidate: [UNREAD_COUNT_KEY, LIST_KEY, ADMIN_UNREAD_INBOX_QUERY_KEY],
     refreshRoute: false,
   });
 
   const markAllRead = useApiMutation<void, void>({
     method: "POST",
     path: () => endpoints.notifications.markAllRead(),
-    invalidate: [UNREAD_COUNT_KEY, LIST_KEY],
+    invalidate: [UNREAD_COUNT_KEY, LIST_KEY, ADMIN_UNREAD_INBOX_QUERY_KEY],
     refreshRoute: false,
     successMessage: () => "All notifications marked read",
   });
@@ -134,20 +138,12 @@ export function NotificationBell() {
   );
 }
 
-/**
- * The API's `href` names API resources (`/doctor-applications/{id}`), not
- * console pages, so the destination is derived from the kind instead.
- */
 function consoleHref(item: AdminNotification): string {
-  switch (item.kind) {
-    case "doctorApplicationSubmitted":
-      return item.resourceId ? `/doctors/${item.resourceId}` : "/doctors";
-    case "refundManualRequired":
-      return "/payments";
-    case "doctorNoShow":
-    case "paymentCaptureFailed":
-      return "/appointments";
+  const section = navHrefForNotification(item) ?? "/";
+  if (item.kind === "doctorApplicationSubmitted" && item.resourceId) {
+    return `/doctors/${item.resourceId}`;
   }
+  return section;
 }
 
 function NotificationRow({

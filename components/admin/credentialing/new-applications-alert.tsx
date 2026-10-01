@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert";
 import { Button } from "@/components/admin/ui/button";
-import { endpoints, query } from "@/lib/admin/api/endpoints";
-import { useApiList } from "@/lib/admin/api/hooks";
-import type { AdminNotification } from "@/lib/admin/api/types";
+import { useUnreadAdminInbox } from "@/lib/admin/notifications/use-unread-inbox";
 
 /**
  * Banner on the verification queue when the admin inbox has unread
@@ -18,14 +16,7 @@ import type { AdminNotification } from "@/lib/admin/api/types";
  */
 export function NewApplicationsAlert() {
   const router = useRouter();
-  const { data } = useApiList<AdminNotification>(
-    ["admin-notifications", "unread"],
-    endpoints.notifications.list(query({ unreadOnly: true, pageSize: 100 })),
-    {
-      refetchInterval: 60_000,
-      refetchOnWindowFocus: true,
-    },
-  );
+  const { data } = useUnreadAdminInbox();
 
   const count = data?.items.filter((n) => n.kind === "doctorApplicationSubmitted").length ?? 0;
   if (count < 1) return null;
