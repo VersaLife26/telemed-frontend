@@ -66,16 +66,44 @@ function fromRow(row: WaitingRoomItem): Draft {
   };
 }
 
+function normalizeHttpUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function isValidHttpUrl(raw: string): boolean {
+  const normalized = normalizeHttpUrl(raw);
+  if (!normalized) return true;
+  try {
+    const url = new URL(normalized);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function payload(draft: Draft) {
   return {
     kind: draft.kind,
     title: draft.title.trim(),
     body: draft.body.trim() || null,
-    linkUrl: draft.linkUrl.trim() || null,
-    videoUrl: draft.videoUrl.trim() || null,
+    linkUrl: normalizeHttpUrl(draft.linkUrl),
+    videoUrl: normalizeHttpUrl(draft.videoUrl),
     displayOrder: Number(draft.displayOrder),
     isActive: draft.isActive,
   };
+}
+
+type FieldKey = "title" | "body" | "linkUrl" | "videoUrl" | "displayOrder";
+
+function firstFieldError(errors: Record<string, string[]>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const message = errors[key]?.[0];
+    if (message) return message;
+  }
+  return null;
 }
 
 export function WaitingRoomItemsSection({
@@ -92,7 +120,8 @@ export function WaitingRoomItemsSection({
   const [file, setFile] = React.useState<File | null>(null);
   const [removeImage, setRemoveImage] = React.useState(false);
   const [pending, setPending] = React.useState(false);
-  const [fieldError, setFieldError] = React.useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<FieldKey, string>>>({});
+  const [touched, setTouched] = React.useState<Partial<Record<FieldKey, boolean>>>({});
 
   const open = creating || editing !== null;
 
@@ -101,8 +130,29 @@ export function WaitingRoomItemsSection({
     setEditing(null);
     setFile(null);
     setRemoveImage(false);
-    setFieldError(null);
+    setFieldErrors({});
+    setTouched({});
     setDraft(emptyDraft());
+  }
+
+  function localProblem(field: FieldKey): string | null {
+    if (field === "body" && draft.kind === "article" && draft.body.trim() === "") {
+      return "Articles need a body patients can read.";
+    }
+    if (field === "displayOrder" && !/^\d+$/.test(draft.displayOrder.trim())) {
+      return "Display order must be a whole number.";
+    }
+    if (field === "linkUrl" && draft.linkUrl.trim() !== "" && !isValidHttpUrl(draft.linkUrl)) {
+      return "Link must be an http or https URL.";
+    }
+    if (field === "videoUrl" && draft.videoUrl.trim() !== "" && !isValidHttpUrl(draft.videoUrl)) {
+      return "Video must be an http or https URL.";
+    }
+    return null;
+  }
+
+  function problemFor(field: FieldKey): string | null {
+    return fieldErrors[field] ?? (touched[field] ? localProblem(field) : null);
   }
 
   const columns = React.useMemo<ColumnDef<WaitingRoomItem, unknown>[]>(
@@ -151,7 +201,8 @@ export function WaitingRoomItemsSection({
               size="sm"
               disabled={readOnly}
               onClick={() => {
-                setFieldError(null);
+                setFieldErrors({});
+                setTouched({});
                 setFile(null);
                 setRemoveImage(false);
                 setEditing(row.original);
@@ -170,17 +221,22 @@ export function WaitingRoomItemsSection({
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (draft.kind === "article" && draft.body.trim() === "") {
-      setFieldError("Articles need a body patients can read.");
-      return;
-    }
-    if (!/^\d+$/.test(draft.displayOrder.trim())) {
-      setFieldError("Display order must be a whole number.");
-      return;
-    }
+    const markTouched: Partial<Record<FieldKey, boolean>> = {
+      title: true,
+      body: true,
+      linkUrl: true,
+      videoUrl: true,
+      displayOrder: true,
+    };
+    setTouched(markTouched);
+
+    const blocked = (["title", "body", "linkUrl", "videoUrl", "displayOrder"] as const).some(
+      (field) => localProblem(field) !== null,
+    );
+    if (blocked) return;
 
     setPending(true);
-    setFieldError(null);
+    setFieldErrors({});
     try {
       const saved = creating
         ? await send<WaitingRoomItem>("POST", endpoints.content.waitingRoomItem(), payload(draft))
@@ -203,7 +259,13 @@ export function WaitingRoomItemsSection({
       router.refresh();
     } catch (cause) {
       const error = toApiError(cause);
-      setFieldError(error.errors.body?.[0] ?? error.errors.title?.[0] ?? error.detail ?? null);
+      setFieldErrors({
+        title: firstFieldError(error.errors, "title") ?? undefined,
+        body: firstFieldError(error.errors, "body") ?? undefined,
+        linkUrl: firstFieldError(error.errors, "linkUrl") ?? undefined,
+        videoUrl: firstFieldError(error.errors, "videoUrl") ?? undefined,
+        displayOrder: firstFieldError(error.errors, "displayOrder") ?? undefined,
+      });
       const { title, description } = describeForToast(error);
       toast.error(title, description ? { description } : undefined);
     } finally {
@@ -233,7 +295,8 @@ export function WaitingRoomItemsSection({
           size="sm"
           disabled={readOnly}
           onClick={() => {
-            setFieldError(null);
+            setFieldErrors({});
+            setTouched({});
             setFile(null);
             setRemoveImage(false);
             setDraft(emptyDraft());
@@ -312,13 +375,18 @@ export function WaitingRoomItemsSection({
                 rows={6}
                 value={draft.body}
                 required={draft.kind === "article"}
+                aria-invalid={problemFor("body") !== null}
                 placeholder={
                   draft.kind === "article"
                     ? "What should the patient read while they wait?"
                     : "Optional short copy for the ad."
                 }
+                onBlur={() => setTouched((current) => ({ ...current, body: true }))}
                 onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}
               />
+              {problemFor("body") ? (
+                <p className="text-xs text-destructive">{problemFor("body")}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -358,6 +426,8 @@ export function WaitingRoomItemsSection({
                 id="wr-video"
                 value={draft.videoUrl}
                 placeholder="https://…"
+                aria-invalid={problemFor("videoUrl") !== null}
+                onBlur={() => setTouched((current) => ({ ...current, videoUrl: true }))}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, videoUrl: event.target.value }))
                 }
@@ -365,6 +435,9 @@ export function WaitingRoomItemsSection({
               <p className="text-xs text-muted-foreground">
                 Optional. Patients can watch this from the waiting room (ads especially).
               </p>
+              {problemFor("videoUrl") ? (
+                <p className="text-xs text-destructive">{problemFor("videoUrl")}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -373,10 +446,19 @@ export function WaitingRoomItemsSection({
                 id="wr-link"
                 value={draft.linkUrl}
                 placeholder="https://versalifehealth.com"
+                aria-invalid={problemFor("linkUrl") !== null}
+                onBlur={() => setTouched((current) => ({ ...current, linkUrl: true }))}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, linkUrl: event.target.value }))
                 }
               />
+              <p className="text-xs text-muted-foreground">
+                You can paste a domain like <span className="font-mono">www.example.com</span>; https is added
+                automatically.
+              </p>
+              {problemFor("linkUrl") ? (
+                <p className="text-xs text-destructive">{problemFor("linkUrl")}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -384,11 +466,16 @@ export function WaitingRoomItemsSection({
               <Input
                 id="wr-order"
                 value={draft.displayOrder}
+                aria-invalid={problemFor("displayOrder") !== null}
+                onBlur={() => setTouched((current) => ({ ...current, displayOrder: true }))}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, displayOrder: event.target.value }))
                 }
               />
               <p className="text-xs text-muted-foreground">Lower numbers are listed first.</p>
+              {problemFor("displayOrder") ? (
+                <p className="text-xs text-destructive">{problemFor("displayOrder")}</p>
+              ) : null}
             </div>
 
             <div className="flex items-start gap-3">
@@ -406,8 +493,6 @@ export function WaitingRoomItemsSection({
                 </p>
               </div>
             </div>
-
-            {fieldError ? <p className="text-xs text-destructive">{fieldError}</p> : null}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={close} disabled={pending}>
