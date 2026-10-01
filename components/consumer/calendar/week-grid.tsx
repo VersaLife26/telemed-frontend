@@ -16,6 +16,10 @@ import { statusLabel } from "@/lib/consumer/features/patient-appointment";
 
 /** Below this, a block has room for the title and the time and nothing else. */
 const COMPACT_MINUTES = 50;
+/** Shorter slots only fit one line — time stays in the tooltip. */
+const SHORT_MINUTES = 28;
+/** Fixed row height so short visits still have readable blocks (see bodyHeight). */
+const HOUR_HEIGHT_REM = 9;
 
 function EventBlock({
   event,
@@ -28,22 +32,28 @@ function EventBlock({
 }) {
   const { top, height } = bandStyle(window, event.startMinute, event.endMinute);
   const width = 100 / event.lanes;
-  const compact = event.endMinute - event.startMinute < COMPACT_MINUTES;
+  const duration = event.endMinute - event.startMinute;
+  const short = duration < SHORT_MINUTES;
+  const compact = duration < COMPACT_MINUTES;
   const tooltip = `${event.title} · ${event.startLabel} – ${event.endLabel}`;
 
-  const body = (
+  const body = short ? (
+    <p className="truncate text-[0.75rem] font-semibold leading-snug text-ink">
+      {event.title}
+    </p>
+  ) : (
     <>
-      <p className="truncate text-[0.8125rem] font-semibold leading-[1.2] text-ink">
+      <p className="truncate text-[0.8125rem] font-semibold leading-snug text-ink">
         {event.title}
       </p>
-      <p className="truncate text-[0.75rem] leading-[1.2] text-blue-700 tabular-time">
+      <p className="truncate text-[0.75rem] leading-snug text-blue-700 tabular-time">
         {event.startLabel} – {event.endLabel}
       </p>
       {/* The mock puts the room at the bottom edge of the block. There are no
           rooms in a video consult, so the slot carries the status instead —
           the one thing a doctor scanning the week actually needs from it. */}
       {!compact ? (
-        <p className="mt-auto truncate pt-2 text-[0.75rem] leading-[1.2] text-muted">
+        <p className="mt-auto truncate pt-2 text-[0.75rem] leading-snug text-muted">
           {statusLabel(event.status)}
         </p>
       ) : null}
@@ -52,7 +62,7 @@ function EventBlock({
 
   const className = cx(
     "absolute flex flex-col overflow-hidden rounded-md border border-blue-200 border-l-[3px] border-l-brand bg-surface px-2 shadow-sm",
-    compact ? "justify-center gap-0.5 py-1" : "gap-0.5 py-1.5",
+    short ? "justify-center py-0.5" : compact ? "justify-center gap-0.5 py-1" : "gap-0.5 py-1.5",
     "transition-[background-color,box-shadow,transform] duration-[160ms] ease-out",
     href && "can-hover:hover:z-10 can-hover:hover:bg-blue-100 can-hover:hover:shadow-md active:scale-[0.99]",
   );
@@ -100,29 +110,31 @@ export function WeekGrid({
   // One hour is a fixed height rather than a fraction of the viewport: a week
   // with a 14-hour span has to stay readable, and scrolling is the honest
   // answer to that.
-  // 8rem keeps a 20-minute consult at ~43px: enough for the title and the
-  // time on two lines without clipping either.
-  const bodyHeight = `${(window.hours.length - 1) * 8}rem`;
+  // 9rem keeps a 15-minute consult at ~34px and a 20-minute one at ~45px.
+  const bodyHeight = `${(window.hours.length - 1) * HOUR_HEIGHT_REM}rem`;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border-subtle bg-surface p-4 shadow-sm md:p-6">
       <div className="min-w-[56rem]">
-        <div className="grid" style={{ gridTemplateColumns: columns }}>
-          <div />
+        <div
+          className="sticky top-[calc(var(--nav-h)+0.75rem)] z-20 grid border-b border-border-default bg-surface pb-3"
+          style={{ gridTemplateColumns: columns }}
+        >
+          <div aria-hidden="true" className="border-r border-transparent" />
           {dayKeys.map((key, index) => {
             const isToday = key === todayKey;
             const onLeave = leaveByDayKey[key];
             return (
-              <div key={key} className="px-1 pb-4 text-center">
+              <div key={key} className="border-l border-border-subtle px-1 text-center">
                 <p
                   className={cx(
-                    "inline-flex min-h-7 items-center rounded-pill px-3 text-label",
-                    isToday ? "bg-brand text-on-brand" : "text-muted",
+                    "inline-flex min-h-8 items-center rounded-pill px-3 text-label",
+                    isToday ? "bg-brand text-on-brand" : "bg-ink-50 text-ink",
                   )}
                 >
                   {WEEK_DAY_LABELS[index]}
                 </p>
-                <p className="mt-1 text-caption text-faint">{dayKeyLabel(key)}</p>
+                <p className="mt-1 text-caption font-medium text-muted">{dayKeyLabel(key)}</p>
                 {onLeave ? (
                   <p className="mt-1 truncate text-caption text-warning" title={onLeave}>
                     Leave
@@ -134,16 +146,16 @@ export function WeekGrid({
         </div>
 
         <div
-          className="relative grid border-t border-border-subtle"
+          className="relative grid"
           style={{ gridTemplateColumns: columns, height: bodyHeight }}
         >
-          <div className="relative">
+          <div className="relative border-r border-border-subtle">
             {window.hours.map((minute) => {
               const { top } = bandStyle(window, minute, minute);
               return (
                 <span
                   key={minute}
-                  className="absolute right-3 -translate-y-1/2 text-caption text-faint tabular-time"
+                  className="absolute right-3 -translate-y-1/2 text-caption font-medium text-muted tabular-time"
                   style={{ top }}
                 >
                   {minuteLabel(minute)}
@@ -178,13 +190,13 @@ export function WeekGrid({
                     ))
                   : null}
 
-                {window.hours.slice(1, -1).map((minute) => {
+                {window.hours.map((minute) => {
                   const { top } = bandStyle(window, minute, minute);
                   return (
                     <div
                       key={minute}
                       aria-hidden="true"
-                      className="absolute inset-x-0 border-t border-border-subtle/70"
+                      className="absolute inset-x-0 border-t border-border-default/80"
                       style={{ top }}
                     />
                   );
