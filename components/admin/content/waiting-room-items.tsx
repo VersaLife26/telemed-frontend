@@ -32,7 +32,7 @@ import {
 import { Textarea } from "@/components/admin/ui/textarea";
 import { send } from "@/lib/admin/api/browser";
 import { endpoints } from "@/lib/admin/api/endpoints";
-import { describeForToast, toApiError } from "@/lib/admin/api/errors";
+import { ApiError, describeForToast, isApiError, toApiError } from "@/lib/admin/api/errors";
 import type { WaitingRoomItem, WaitingRoomItemKind } from "@/lib/admin/api/types";
 
 type Draft = {
@@ -210,6 +210,20 @@ export function WaitingRoomItemsSection({
     toast.error(title, { description });
   }
 
+  function mediaUploadFailureMessage(error: ApiError, kind: "image" | "video"): string {
+    const fileMessage = firstFieldError(error.errors, "file");
+    if (fileMessage) return fileMessage;
+    if (error.status === 404) {
+      return kind === "video"
+        ? "The live API does not support ad video uploads yet (404 Not Found). Ops needs to deploy the latest telemed-api. Until then, use Video URL for YouTube or a direct MP4 link."
+        : "The image upload endpoint was not found (404). Deploy the latest telemed-api and try again.";
+    }
+    const parts = [error.userMessage];
+    if (error.remedy) parts.push(error.remedy);
+    if (error.traceId) parts.push(`Trace ID: ${error.traceId}`);
+    return parts.join(" ");
+  }
+
   const columns = React.useMemo<ColumnDef<WaitingRoomItem, unknown>[]>(
     () => [
       {
@@ -316,8 +330,10 @@ export function WaitingRoomItemsSection({
             payload(draft),
           );
 
+      let failedUploadKind: "image" | "video" = "image";
       try {
         if (file) {
+          failedUploadKind = "image";
           const form = new FormData();
           form.append("file", file);
           await send<WaitingRoomItem>(
@@ -327,10 +343,12 @@ export function WaitingRoomItemsSection({
             { timeoutMs: UPLOAD_TIMEOUT_MS },
           );
         } else if (removeImage && editing?.imageUrl) {
+          failedUploadKind = "image";
           await send("DELETE", endpoints.content.waitingRoomItemImage(editing.id));
         }
 
         if (videoFile) {
+          failedUploadKind = "video";
           const form = new FormData();
           form.append("file", videoFile);
           await send<WaitingRoomItem>(
@@ -340,20 +358,19 @@ export function WaitingRoomItemsSection({
             { timeoutMs: UPLOAD_TIMEOUT_MS },
           );
         } else if (removeVideo && editing?.videoFileUrl) {
+          failedUploadKind = "video";
           await send("DELETE", endpoints.content.waitingRoomItemVideo(editing.id));
         }
       } catch (mediaCause) {
         const error = toApiError(mediaCause);
-        const fileMessage = firstFieldError(error.errors, "file");
-        setMediaError(fileMessage ?? error.userMessage);
+        const message = mediaUploadFailureMessage(error, failedUploadKind);
+        setMediaError(message);
         router.refresh();
-        showSaveError(
-          "Saved, but media upload failed",
-          fileMessage ??
-            error.userMessage +
-              (error.remedy ? ` ${error.remedy}` : "") +
-              (error.traceId ? ` Trace ID: ${error.traceId}` : ""),
-        );
+        if (creating && isApiError(mediaCause)) {
+          setCreating(false);
+          setEditing(saved);
+        }
+        showSaveError("Saved, but media upload failed", message);
         return;
       }
 
