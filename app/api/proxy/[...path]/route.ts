@@ -45,10 +45,13 @@ async function forward(req: Request, ctx: Ctx) {
       return new NextResponse(null, { status: upstream.status });
     }
     const upstreamType = upstream.headers.get("Content-Type") || "application/json";
+    const baseType = upstreamType.split(";")[0]?.trim().toLowerCase() ?? "";
     const isBinary =
-      upstreamType.startsWith("image/") ||
-      upstreamType.startsWith("application/pdf") ||
-      upstreamType.startsWith("application/octet-stream");
+      baseType.startsWith("image/") ||
+      baseType.startsWith("video/") ||
+      baseType.startsWith("audio/") ||
+      baseType === "application/pdf" ||
+      baseType === "application/octet-stream";
     if (isBinary) {
       const bytes = await upstream.arrayBuffer();
       const headers: Record<string, string> = {

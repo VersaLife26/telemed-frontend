@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/admin/ui/select";
 import { Textarea } from "@/components/admin/ui/textarea";
-import { send } from "@/lib/admin/api/browser";
+import { proxyUrl, send } from "@/lib/admin/api/browser";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { ApiError, describeForToast, isApiError, toApiError } from "@/lib/admin/api/errors";
 import type { WaitingRoomItem, WaitingRoomItemKind } from "@/lib/admin/api/types";
@@ -110,6 +110,15 @@ type SubmitFeedback = {
   title: string;
   description: string;
 };
+
+/** Signed API file URLs must load through the admin gateway, not the API host directly. */
+function adminFileSrc(url?: string | null): string | null {
+  if (!url?.trim()) return null;
+  const raw = url.trim();
+  if (raw.startsWith("blob:") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("/api/v1/")) return proxyUrl(raw);
+  return proxyUrl(raw.startsWith("/") ? raw : `/api/v1/${raw}`);
+}
 
 function firstFieldError(errors: Record<string, string[]>, ...keys: string[]): string | null {
   for (const key of keys) {
@@ -418,8 +427,8 @@ export function WaitingRoomItemsSection({
     },
     [videoPreview],
   );
-  const preview = filePreview ?? (!removeImage ? (editing?.imageUrl ?? null) : null);
-  const uploadedVideo = videoPreview ?? (!removeVideo ? (editing?.videoFileUrl ?? null) : null);
+  const preview = filePreview ?? (!removeImage ? adminFileSrc(editing?.imageUrl) : null);
+  const uploadedVideo = videoPreview ?? (!removeVideo ? adminFileSrc(editing?.videoFileUrl) : null);
 
   return (
     <section className="space-y-3">

@@ -60,6 +60,7 @@ export function contentSecurityPolicy({ nonce, dev = false }: CspOptions = {}): 
     "style-src": ["'self'"],
     "style-src-attr": ["'unsafe-inline'"],
     "img-src": ["'self'", "blob:", "data:", ...storage],
+    "media-src": ["'self'", "blob:", ...storage],
     "font-src": ["'self'", "data:"],
     // The browser talks to this origin only. Every backend call is proxied by
     // the BFF route handler, which is what keeps a replayable bearer token out

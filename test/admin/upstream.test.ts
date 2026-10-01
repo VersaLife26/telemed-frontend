@@ -250,6 +250,7 @@ test("safeContentType relabels anything a browser would render as a document", (
     attachment: false,
   });
   assert.deepEqual(safeContentType("image/png"), { contentType: "image/png", attachment: false });
+  assert.deepEqual(safeContentType("video/mp4"), { contentType: "video/mp4", attachment: false });
   for (const hostile of [
     "text/html",
     "text/html; charset=utf-8",

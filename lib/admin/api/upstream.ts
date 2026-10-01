@@ -213,6 +213,8 @@ const RENDERABLE_UPSTREAM_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "video/mp4",
+  "video/webm",
 ];
 
 export function safeContentType(raw: string | null): {

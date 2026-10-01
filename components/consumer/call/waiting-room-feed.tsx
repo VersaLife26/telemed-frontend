@@ -13,6 +13,29 @@ function isDirectVideo(url: string): boolean {
   return /\.(mp4|webm|ogg)(\?|$)/i.test(url);
 }
 
+function HostedVideo({ src, title }: { src: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <p className="rounded-lg bg-tint px-3 py-2 text-body-sm text-muted">
+        This video could not be played here. Try &quot;Watch video&quot; below or open the link in your browser.
+      </p>
+    );
+  }
+  return (
+    <video
+      className="w-full rounded-xl"
+      controls
+      src={src}
+      preload="metadata"
+      aria-label={`Video: ${title}`}
+      onError={() => setFailed(true)}
+    >
+      <track kind="captions" label="Captions not provided" />
+    </video>
+  );
+}
+
 type FeedFilter = "all" | WaitingRoomItemKind;
 
 function kindLabel(kind: WaitingRoomItemKind): string {
@@ -20,6 +43,12 @@ function kindLabel(kind: WaitingRoomItemKind): string {
 }
 
 function WaitingRoomItemDetail({ item }: { item: WaitingRoomItem }) {
+  const hostedVideoSrc = item.videoFileUrl
+    ? (apiFileSrc(item.videoFileUrl) ?? item.videoFileUrl)
+    : item.videoUrl && isDirectVideo(item.videoUrl)
+      ? item.videoUrl
+      : null;
+
   return (
     <div className="space-y-4 text-ink">
       {item.imageUrl ? (
@@ -34,27 +63,7 @@ function WaitingRoomItemDetail({ item }: { item: WaitingRoomItem }) {
         {kindLabel(item.kind)}
       </p>
       {item.body ? <p className="whitespace-pre-wrap text-body text-ink">{item.body}</p> : null}
-      {item.videoFileUrl ? (
-        <video
-          className="w-full rounded-xl"
-          controls
-          src={apiFileSrc(item.videoFileUrl) ?? item.videoFileUrl}
-          preload="metadata"
-          aria-label={`Video: ${item.title}`}
-        >
-          <track kind="captions" label="Captions not provided" />
-        </video>
-      ) : item.videoUrl && isDirectVideo(item.videoUrl) ? (
-        <video
-          className="w-full rounded-xl"
-          controls
-          src={item.videoUrl}
-          preload="metadata"
-          aria-label={`Video: ${item.title}`}
-        >
-          <track kind="captions" label="Captions not provided" />
-        </video>
-      ) : null}
+      {hostedVideoSrc ? <HostedVideo src={hostedVideoSrc} title={item.title} /> : null}
       {(item.linkUrl || (item.videoUrl && !isDirectVideo(item.videoUrl))) ? (
         <div className="flex flex-wrap gap-2">
           {item.videoUrl && !isDirectVideo(item.videoUrl) ? (
