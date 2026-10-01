@@ -392,7 +392,6 @@ export function WaitingRoomItemsSection({
             <div className="space-y-1.5">
               <Label htmlFor="wr-image">Image</Label>
               {preview ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={preview}
                   alt=""
@@ -410,13 +409,16 @@ export function WaitingRoomItemsSection({
               />
               <p className="text-xs text-muted-foreground">JPEG, PNG or WebP, up to 5 MB.</p>
               {editing?.imageUrl && !file ? (
-                <label className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm">
                   <Checkbox
+                    id="wr-remove-image"
                     checked={removeImage}
                     onCheckedChange={(next) => setRemoveImage(next === true)}
                   />
-                  Remove current image
-                </label>
+                  <Label htmlFor="wr-remove-image" className="font-normal">
+                    Remove current image
+                  </Label>
+                </div>
               ) : null}
             </div>
 

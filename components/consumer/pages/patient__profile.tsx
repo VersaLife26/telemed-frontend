@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LogOut, UserRound } from "lucide-react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
@@ -29,6 +30,7 @@ import { HEROES } from "@/lib/consumer/heroes";
 const emptyDraft: ProfileDraft = { name: "", address: "", dateOfBirth: "", sex: "", allergies: "" };
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState<TelemedUser | null>(null);
   const [draft, setDraft] = useState<ProfileDraft>(emptyDraft);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export default function ProfilePage() {
     setSigningOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      window.location.href = "/login";
+      router.push("/login");
     } finally {
       setSigningOut(false);
     }

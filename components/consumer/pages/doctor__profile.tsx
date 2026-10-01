@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 
 import { Card } from "@/components/consumer/ui/Card";
@@ -32,6 +33,7 @@ import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [me, setMe] = useState<DoctorProfile | null>(null);
   const [user, setUser] = useState<TelemedUser | null>(null);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -77,7 +79,7 @@ export default function ProfilePage() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+    router.push("/login");
   }
 
   async function savePassword(e: React.FormEvent) {
