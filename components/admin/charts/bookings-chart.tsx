@@ -28,7 +28,12 @@ import type { BookingsDay } from "@/lib/admin/api/types";
 import { formatCount, formatDate, formatPercent, formatShortDay } from "@/lib/admin/format";
 
 import { BOOKINGS_VISUALIZATIONS, ChartFrame, type SeriesSpec } from "./chart-frame";
-import { ChartTooltipBody } from "./chart-tooltip";
+import {
+  ChartTooltipBody,
+  firstPayloadValue,
+  numericPayloadValue,
+  type RechartsTooltipPayload,
+} from "./chart-tooltip";
 
 const SERIES: SeriesSpec[] = [
   { key: "completed", label: "Completed", color: "var(--success)" },
@@ -72,14 +77,14 @@ export function BookingsChart({ points }: { points: BookingsDay[] }) {
     [rows],
   );
 
-  const tooltipRows = (payload: readonly { dataKey?: string; value?: number }[], label: string) => (
+  const tooltipRows = (payload: RechartsTooltipPayload | undefined, label: string) => (
     <ChartTooltipBody
       label={formatDate(label)}
       rows={SERIES.map((s) => ({
         key: s.key,
         label: s.label,
         color: s.color,
-        value: formatCount(Number(payload.find((p) => p.dataKey === s.key)?.value ?? 0)),
+        value: formatCount(numericPayloadValue(payload, s.key)),
       }))}
     />
   );
@@ -114,7 +119,7 @@ export function BookingsChart({ points }: { points: BookingsDay[] }) {
           <Tooltip
             cursor={{ fill: "var(--muted)", opacity: 0.5 }}
             content={({ active, payload, label }) =>
-              active && payload?.length ? tooltipRows(payload, String(label)) : null
+              active && payload?.length ? tooltipRows(payload as RechartsTooltipPayload, String(label)) : null
             }
           />
           {SERIES.map((s, index) => (
@@ -148,7 +153,7 @@ export function BookingsChart({ points }: { points: BookingsDay[] }) {
               {axisY}
               <Tooltip
                 content={({ active, payload, label }) =>
-                  active && payload?.length ? tooltipRows(payload, String(label)) : null
+                  active && payload?.length ? tooltipRows(payload as RechartsTooltipPayload, String(label)) : null
                 }
               />
               {SERIES.map((s) => (
@@ -185,7 +190,7 @@ export function BookingsChart({ points }: { points: BookingsDay[] }) {
                           key: "total",
                           label: "Total bookings",
                           color: "var(--chart-1)",
-                          value: formatCount(Number(payload[0].value)),
+                          value: formatCount(firstPayloadValue(payload as RechartsTooltipPayload)),
                         },
                       ]}
                     />

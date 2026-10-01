@@ -139,8 +139,8 @@ export function RankedBars({
                       rows={[
                         {
                           key: row.key,
-                          label: unitLabel,
-                          color: row.fill,
+                          label: unitLabel ?? "bookings",
+                          color: row.fill ?? CHART_COLORS.slot1,
                           value: `${formatCount(row.value)} (${total > 0 ? formatPercent(row.value / total) : "—"})`,
                         },
                       ]}

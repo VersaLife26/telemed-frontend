@@ -2,6 +2,28 @@
 
 import * as React from "react";
 
+/** Recharts tooltip payload entries (dataKey is not always a string). */
+export type RechartsTooltipPayload = ReadonlyArray<{
+  dataKey?: string | number;
+  value?: number | string | ReadonlyArray<number | string>;
+  payload?: unknown;
+}>;
+
+export function numericPayloadValue(payload: RechartsTooltipPayload | undefined, dataKey: string): number {
+  const entry = payload?.find((p) => String(p.dataKey ?? "") === dataKey);
+  const raw = entry?.value;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (Array.isArray(raw)) return Number(raw[0] ?? 0);
+  return Number(raw ?? 0);
+}
+
+export function firstPayloadValue(payload: RechartsTooltipPayload | undefined): number {
+  const raw = payload?.[0]?.value;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (Array.isArray(raw)) return Number(raw[0] ?? 0);
+  return Number(raw ?? 0);
+}
+
 /**
  * Tooltip body shared by every chart.
  *

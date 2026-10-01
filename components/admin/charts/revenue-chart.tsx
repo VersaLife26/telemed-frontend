@@ -35,12 +35,20 @@ import {
   REVENUE_VISUALIZATIONS,
   type SeriesSpec,
 } from "./chart-frame";
-import { ChartTooltipBody } from "./chart-tooltip";
+import {
+  ChartTooltipBody,
+  firstPayloadValue,
+  numericPayloadValue,
+  type RechartsTooltipPayload,
+} from "./chart-tooltip";
 
 const SERIES: SeriesSpec[] = [
   { key: "gross", label: "Captured", color: CHART_COLORS.slot1 },
   { key: "commission", label: "Platform commission", color: CHART_COLORS.slot2 },
 ];
+
+const GROSS_SERIES = SERIES[0]!;
+const COMMISSION_SERIES = SERIES[1]!;
 
 interface Row {
   day: string;
@@ -72,25 +80,30 @@ export function RevenueChart({
 
   const pieTotals = React.useMemo(
     () => [
-      { key: "gross", name: SERIES[0].label, value: rows.reduce((s, r) => s + r.gross, 0), fill: SERIES[0].color },
+      {
+        key: "gross",
+        name: GROSS_SERIES.label,
+        value: rows.reduce((s, r) => s + r.gross, 0),
+        fill: GROSS_SERIES.color,
+      },
       {
         key: "commission",
-        name: SERIES[1].label,
+        name: COMMISSION_SERIES.label,
         value: rows.reduce((s, r) => s + r.commission, 0),
-        fill: SERIES[1].color,
+        fill: COMMISSION_SERIES.color,
       },
     ],
     [rows],
   );
 
-  const tooltipRows = (payload: readonly { dataKey?: string; value?: number }[], label: string) => (
+  const tooltipRows = (payload: RechartsTooltipPayload | undefined, label: string) => (
     <ChartTooltipBody
       label={formatDate(label)}
       rows={SERIES.map((s) => ({
         key: s.key,
         label: s.label,
         color: s.color,
-        value: formatMoney(Number(payload.find((p) => p.dataKey === s.key)?.value ?? 0), currency),
+        value: formatMoney(numericPayloadValue(payload, s.key), currency),
       }))}
     />
   );
@@ -134,7 +147,7 @@ export function RevenueChart({
               <Tooltip
                 cursor={{ fill: "var(--muted)", opacity: 0.5 }}
                 content={({ active, payload, label }) =>
-                  active && payload?.length ? tooltipRows(payload, String(label)) : null
+                  active && payload?.length ? tooltipRows(payload as RechartsTooltipPayload, String(label)) : null
                 }
               />
               {SERIES.map((s) => (
@@ -152,7 +165,7 @@ export function RevenueChart({
               {axisY}
               <Tooltip
                 content={({ active, payload, label }) =>
-                  active && payload?.length ? tooltipRows(payload, String(label)) : null
+                  active && payload?.length ? tooltipRows(payload as RechartsTooltipPayload, String(label)) : null
                 }
               />
               {SERIES.map((s) => (
@@ -189,15 +202,15 @@ export function RevenueChart({
                         {
                           key: "gross",
                           label: "Captured",
-                          color: SERIES[0].color,
-                          value: formatMoney(Number(payload[0].value), currency),
+                          color: GROSS_SERIES.color,
+                          value: formatMoney(firstPayloadValue(payload as RechartsTooltipPayload), currency),
                         },
                       ]}
                     />
                   );
                 }}
               />
-              <Bar dataKey="gross" name="Captured" fill={SERIES[0].color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="gross" name="Captured" fill={GROSS_SERIES.color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -216,7 +229,7 @@ export function RevenueChart({
                         {
                           key: row.key,
                           label: row.name,
-                          color: row.fill,
+                          color: row.fill ?? GROSS_SERIES.color,
                           value: formatMoney(row.value, currency),
                         },
                       ]}
@@ -253,7 +266,7 @@ export function RevenueChart({
               <Tooltip
                 cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }}
                 content={({ active, payload, label }) =>
-                  active && payload?.length ? tooltipRows(payload, String(label)) : null
+                  active && payload?.length ? tooltipRows(payload as RechartsTooltipPayload, String(label)) : null
                 }
               />
               {SERIES.map((s) => (
