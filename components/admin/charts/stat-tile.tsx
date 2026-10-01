@@ -19,8 +19,6 @@ export function StatTile({
   icon: Icon,
   tone = "default",
   className,
-  valueClassName,
-  hintClassName,
 }: {
   label: string;
   value: string;
@@ -28,17 +26,10 @@ export function StatTile({
   icon?: LucideIcon;
   tone?: "default" | "warning" | "success";
   className?: string;
-  valueClassName?: string;
-  hintClassName?: string;
 }) {
   return (
-    <Card
-      className={cn(
-        "transition-[box-shadow,transform] duration-[160ms] ease-out can-hover:hover:-translate-y-0.5 can-hover:hover:shadow-md",
-        className,
-      )}
-    >
-      <CardContent className="flex items-start gap-3 p-5">
+    <Card className={cn("h-full min-w-0 overflow-hidden", className)}>
+      <CardContent className="flex h-full items-start gap-3 p-4 pt-4 sm:p-5 sm:pt-5">
         {Icon ? (
           <span
             className={cn(
@@ -53,20 +44,20 @@ export function StatTile({
             <Icon className="size-4" aria-hidden="true" />
           </span>
         ) : null}
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
           <p
-            className={cn(
-              "font-display text-base font-bold tabular-nums tracking-tight whitespace-nowrap sm:text-lg xl:text-xl",
-              valueClassName,
-            )}
+            className="mt-1 font-display text-xl font-bold leading-tight tracking-tight tabular-nums break-words"
+            title={value}
           >
             {value}
           </p>
           {hint ? (
-            <p className={cn("text-xs text-muted-foreground whitespace-nowrap", hintClassName)}>{hint}</p>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground" title={hint}>
+              {hint}
+            </p>
           ) : null}
         </div>
       </CardContent>

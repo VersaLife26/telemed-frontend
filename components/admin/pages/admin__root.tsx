@@ -93,15 +93,13 @@ export default async function DashboardPage({
 
       <section
         aria-label="Headline figures"
-        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+        className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5"
       >
         <StatTile
-          className="sm:col-span-2 lg:col-span-1 xl:col-span-2"
           label="Gross revenue"
           value={formatMoney(summary.grossRevenueCents, currency)}
           hint={`Commission ${formatMoney(summary.commissionCents, currency)}`}
           icon={Coins}
-          valueClassName="text-sm sm:text-base xl:text-lg"
         />
         <StatTile
           label="Bookings"
@@ -113,7 +111,7 @@ export default async function DashboardPage({
         <StatTile
           label="No-show rate"
           value={formatPercent(noShowRate)}
-          hint="Share of appointments marked no-show"
+          hint="Of all bookings"
           icon={Percent}
           tone={noShowRate > 0.15 ? "warning" : "default"}
         />
