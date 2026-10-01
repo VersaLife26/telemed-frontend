@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/admin/ui/empty-state";
 import type { ApiError } from "@/lib/admin/api/errors";
 import { useApiMutation } from "@/lib/admin/api/hooks";
 
+import { ContentDeleteButton } from "./content-delete-button";
 import { EntityEditor, type FieldSpec, type FieldValue } from "./entity-editor";
 
 /** Table plus create/edit dialog, shared by the content types. */
@@ -26,6 +27,9 @@ export function ContentSection<T>({
   updatePath,
   singular,
   readOnly,
+  isDeletable,
+  deletePath,
+  deleteItemName,
 }: {
   title: string;
   description: string;
@@ -40,6 +44,11 @@ export function ContentSection<T>({
   updatePath: (id: string) => string;
   singular: string;
   readOnly: boolean;
+  /** When false, the delete action is hidden (e.g. already inactive). */
+  isDeletable?: (row: T) => boolean;
+  /** Defaults to `updatePath` — DELETE uses the same resource URL. */
+  deletePath?: (id: string) => string;
+  deleteItemName: (row: T) => string;
 }) {
   const [editing, setEditing] = React.useState<T | null>(null);
   const [creating, setCreating] = React.useState(false);
@@ -73,6 +82,14 @@ export function ContentSection<T>({
     { onError: (error) => setServerError(error) },
   );
 
+  const resolveDeletePath = deletePath ?? updatePath;
+
+  const deleteMutation = useApiMutation<void, string>({
+    method: "DELETE",
+    path: (id) => resolveDeletePath(id),
+    successMessage: () => `${singular} deleted.`,
+  });
+
   const columnsWithActions = React.useMemo<ColumnDef<T, unknown>[]>(
     () => [
       ...columns,
@@ -80,25 +97,38 @@ export function ContentSection<T>({
         id: "actions",
         header: "Actions",
         enableSorting: false,
-        cell: ({ row }) => (
-          <div className="flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={readOnly}
-              onClick={() => {
-                setServerError(null);
-                setEditing(row.original);
-              }}
-            >
-              <Pencil className="size-4" aria-hidden="true" />
-              Edit
-            </Button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const id = rowId(row.original);
+          const deletable = isDeletable?.(row.original) ?? true;
+          return (
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={readOnly}
+                onClick={() => {
+                  setServerError(null);
+                  setEditing(row.original);
+                }}
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+                Edit
+              </Button>
+              {deletable ? (
+                <ContentDeleteButton
+                  disabled={readOnly}
+                  itemLabel={singular.toLowerCase()}
+                  itemName={deleteItemName(row.original)}
+                  pending={deleteMutation.isPending}
+                  onConfirm={() => deleteMutation.mutate(id)}
+                />
+              ) : null}
+            </div>
+          );
+        },
       },
     ],
-    [columns, readOnly],
+    [columns, readOnly, rowId, singular, isDeletable, deleteItemName, deleteMutation],
   );
 
   const open = creating || editing !== null;

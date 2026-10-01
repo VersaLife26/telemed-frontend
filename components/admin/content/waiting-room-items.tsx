@@ -33,7 +33,10 @@ import { Textarea } from "@/components/admin/ui/textarea";
 import { proxyUrl, send } from "@/lib/admin/api/browser";
 import { endpoints } from "@/lib/admin/api/endpoints";
 import { ApiError, describeForToast, isApiError, toApiError } from "@/lib/admin/api/errors";
+import { useApiMutation } from "@/lib/admin/api/hooks";
 import type { WaitingRoomItem, WaitingRoomItemKind } from "@/lib/admin/api/types";
+
+import { ContentDeleteButton } from "./content-delete-button";
 
 type Draft = {
   kind: WaitingRoomItemKind;
@@ -149,6 +152,12 @@ export function WaitingRoomItemsSection({
   const [mediaError, setMediaError] = React.useState<string | null>(null);
   const [submitFeedback, setSubmitFeedback] = React.useState<SubmitFeedback | null>(null);
   const feedbackRef = React.useRef<HTMLDivElement>(null);
+
+  const deleteMutation = useApiMutation<void, string>({
+    method: "DELETE",
+    path: (id) => endpoints.content.waitingRoomItem(id),
+    successMessage: () => "Waiting room item deleted.",
+  });
 
   const open = creating || editing !== null;
 
@@ -273,7 +282,7 @@ export function WaitingRoomItemsSection({
         header: "Actions",
         enableSorting: false,
         cell: ({ row }) => (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-1">
             <Button
               variant="ghost"
               size="sm"
@@ -294,11 +303,20 @@ export function WaitingRoomItemsSection({
               <Pencil className="size-4" aria-hidden="true" />
               Edit
             </Button>
+            {row.original.isActive ? (
+              <ContentDeleteButton
+                disabled={readOnly}
+                itemLabel="waiting room item"
+                itemName={row.original.title}
+                pending={deleteMutation.isPending}
+                onConfirm={() => deleteMutation.mutate(row.original.id)}
+              />
+            ) : null}
           </div>
         ),
       },
     ],
-    [readOnly],
+    [readOnly, deleteMutation],
   );
 
   async function onSubmit(event: React.FormEvent) {
