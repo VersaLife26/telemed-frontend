@@ -303,15 +303,13 @@ export function WaitingRoomItemsSection({
               <Pencil className="size-4" aria-hidden="true" />
               Edit
             </Button>
-            {row.original.isActive ? (
-              <ContentDeleteButton
-                disabled={readOnly}
-                itemLabel="waiting room item"
-                itemName={row.original.title}
-                pending={deleteMutation.isPending}
-                onConfirm={() => deleteMutation.mutate(row.original.id)}
-              />
-            ) : null}
+            <ContentDeleteButton
+              disabled={readOnly}
+              itemLabel="waiting room item"
+              itemName={row.original.title}
+              pending={deleteMutation.isPending}
+              onConfirm={() => deleteMutation.mutate(row.original.id)}
+            />
           </div>
         ),
       },

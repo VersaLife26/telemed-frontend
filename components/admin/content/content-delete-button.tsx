@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/admin/ui/alert-dialog";
 
-/** Confirmed DELETE (API deactivates; row may show as inactive in admin). */
+/** Confirmed permanent DELETE. */
 export function ContentDeleteButton({
   disabled,
   itemLabel,
@@ -42,9 +42,8 @@ export function ContentDeleteButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {itemLabel}?</AlertDialogTitle>
           <AlertDialogDescription>
-            <span className="font-medium text-foreground">{itemName}</span> will be deactivated. It stays in the
-            database for records, but patients will no longer see it. You can turn it back on by editing the row and
-            setting Active.
+            <span className="font-medium text-foreground">{itemName}</span> will be permanently removed. This cannot be
+            undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

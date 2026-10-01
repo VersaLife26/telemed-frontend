@@ -115,7 +115,6 @@ export function ContentTabs({
           singular="Specialty"
           readOnly={readOnly}
           rowId={(row) => row.code}
-          isDeletable={(row) => row.isActive}
           deleteItemName={(row) => row.nameEn}
           createPath={endpoints.content.specialty()}
           updatePath={(code) => endpoints.content.specialty(code)}
@@ -165,7 +164,6 @@ export function ContentTabs({
           singular="Drug"
           readOnly={readOnly}
           rowId={(row) => row.id}
-          isDeletable={(row) => row.isActive}
           deleteItemName={(row) => row.name}
           createPath={endpoints.content.drug()}
           updatePath={(id) => endpoints.content.drug(id)}
