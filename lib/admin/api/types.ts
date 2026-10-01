@@ -133,6 +133,7 @@ export type WaitingRoomItem = {
   linkUrl: string | null;
   videoUrl: string | null;
   imageUrl: string | null;
+  videoFileUrl: string | null;
   displayOrder: number;
   isActive: boolean;
 };

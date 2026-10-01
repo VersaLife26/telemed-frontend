@@ -118,7 +118,9 @@ export function WaitingRoomItemsSection({
   const [creating, setCreating] = React.useState(false);
   const [draft, setDraft] = React.useState<Draft>(emptyDraft);
   const [file, setFile] = React.useState<File | null>(null);
+  const [videoFile, setVideoFile] = React.useState<File | null>(null);
   const [removeImage, setRemoveImage] = React.useState(false);
+  const [removeVideo, setRemoveVideo] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<FieldKey, string>>>({});
   const [touched, setTouched] = React.useState<Partial<Record<FieldKey, boolean>>>({});
@@ -129,7 +131,9 @@ export function WaitingRoomItemsSection({
     setCreating(false);
     setEditing(null);
     setFile(null);
+    setVideoFile(null);
     setRemoveImage(false);
+    setRemoveVideo(false);
     setFieldErrors({});
     setTouched({});
     setDraft(emptyDraft());
@@ -173,7 +177,7 @@ export function WaitingRoomItemsSection({
         cell: ({ row }) => {
           const parts = [
             row.original.imageUrl ? "Image" : null,
-            row.original.videoUrl ? "Video" : null,
+            row.original.videoFileUrl || row.original.videoUrl ? "Video" : null,
             row.original.linkUrl ? "Link" : null,
           ].filter(Boolean);
           return parts.length > 0 ? parts.join(" · ") : "—";
@@ -204,7 +208,9 @@ export function WaitingRoomItemsSection({
                 setFieldErrors({});
                 setTouched({});
                 setFile(null);
+                setVideoFile(null);
                 setRemoveImage(false);
+                setRemoveVideo(false);
                 setEditing(row.original);
                 setDraft(fromRow(row.original));
               }}
@@ -254,6 +260,14 @@ export function WaitingRoomItemsSection({
         await send("DELETE", endpoints.content.waitingRoomItemImage(editing.id));
       }
 
+      if (videoFile) {
+        const form = new FormData();
+        form.append("file", videoFile);
+        await send<WaitingRoomItem>("PUT", endpoints.content.waitingRoomItemVideo(saved.id), form);
+      } else if (removeVideo && editing?.videoFileUrl) {
+        await send("DELETE", endpoints.content.waitingRoomItemVideo(editing.id));
+      }
+
       toast.success(creating ? "Waiting room item created." : "Waiting room item updated.");
       close();
       router.refresh();
@@ -274,13 +288,21 @@ export function WaitingRoomItemsSection({
   }
 
   const filePreview = React.useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  const videoPreview = React.useMemo(() => (videoFile ? URL.createObjectURL(videoFile) : null), [videoFile]);
   React.useEffect(
     () => () => {
       if (filePreview) URL.revokeObjectURL(filePreview);
     },
     [filePreview],
   );
+  React.useEffect(
+    () => () => {
+      if (videoPreview) URL.revokeObjectURL(videoPreview);
+    },
+    [videoPreview],
+  );
   const preview = filePreview ?? (!removeImage ? (editing?.imageUrl ?? null) : null);
+  const uploadedVideo = videoPreview ?? (!removeVideo ? (editing?.videoFileUrl ?? null) : null);
 
   return (
     <section className="space-y-3">
@@ -298,7 +320,9 @@ export function WaitingRoomItemsSection({
             setFieldErrors({});
             setTouched({});
             setFile(null);
+            setVideoFile(null);
             setRemoveImage(false);
+            setRemoveVideo(false);
             setDraft(emptyDraft());
             setCreating(true);
           }}
@@ -332,8 +356,8 @@ export function WaitingRoomItemsSection({
           <DialogHeader>
             <DialogTitle>{creating ? "New waiting room item" : "Edit waiting room item"}</DialogTitle>
             <DialogDescription>
-              Articles need a title and body. Ads can include an image, a video URL, and a link back
-              to VersaLife.
+              Articles need a title and body. Ads can include an image, an uploaded video, a video
+              URL, and a link.
             </DialogDescription>
           </DialogHeader>
 
@@ -422,6 +446,37 @@ export function WaitingRoomItemsSection({
               ) : null}
             </div>
 
+            {draft.kind === "ad" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="wr-video-file">Ad video</Label>
+                {uploadedVideo ? (
+                  <video className="h-32 w-full rounded-md bg-black object-contain" src={uploadedVideo} controls />
+                ) : null}
+                <Input
+                  id="wr-video-file"
+                  type="file"
+                  accept="video/mp4,video/webm"
+                  onChange={(event) => {
+                    setVideoFile(event.target.files?.[0] ?? null);
+                    setRemoveVideo(false);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">MP4 or WebM, up to 25 MB. Plays in the waiting room.</p>
+                {editing?.videoFileUrl && !videoFile ? (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      id="wr-remove-video"
+                      checked={removeVideo}
+                      onCheckedChange={(next) => setRemoveVideo(next === true)}
+                    />
+                    <Label htmlFor="wr-remove-video" className="font-normal">
+                      Remove current video
+                    </Label>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="space-y-1.5">
               <Label htmlFor="wr-video">Video URL</Label>
               <Input
@@ -434,9 +489,9 @@ export function WaitingRoomItemsSection({
                   setDraft((current) => ({ ...current, videoUrl: event.target.value }))
                 }
               />
-              <p className="text-xs text-muted-foreground">
-                Optional. Patients can watch this from the waiting room (ads especially).
-              </p>
+                  <p className="text-xs text-muted-foreground">
+                    Optional YouTube or other link. Ads can also upload a video file above.
+                  </p>
               {problemFor("videoUrl") ? (
                 <p className="text-xs text-destructive">{problemFor("videoUrl")}</p>
               ) : null}

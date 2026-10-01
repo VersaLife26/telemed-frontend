@@ -71,29 +71,39 @@ export function WaitingRoomFeed({ layout = "inline" }: { layout?: "inline" | "si
               </p>
               <h2 className="text-h3">{item.title}</h2>
               {item.body ? <p className="text-body-sm text-white/75 whitespace-pre-wrap">{item.body}</p> : null}
-              {item.videoUrl ? (
-                isDirectVideo(item.videoUrl) ? (
-                  <video className="w-full rounded-lg" controls src={item.videoUrl} preload="metadata" />
-                ) : (
-                  <a
-                    href={item.videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex text-body-sm text-white underline underline-offset-2"
-                  >
-                    Watch video
-                  </a>
-                )
+              {item.videoFileUrl ? (
+                <video
+                  className="w-full rounded-lg"
+                  controls
+                  src={apiFileSrc(item.videoFileUrl) ?? item.videoFileUrl}
+                  preload="metadata"
+                />
+              ) : item.videoUrl && isDirectVideo(item.videoUrl) ? (
+                <video className="w-full rounded-lg" controls src={item.videoUrl} preload="metadata" />
               ) : null}
-              {item.linkUrl ? (
-                <a
-                  href={item.linkUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex text-body-sm text-white underline underline-offset-2"
-                >
-                  {item.kind === "ad" ? "Learn more" : "Read more"}
-                </a>
+              {(item.linkUrl || (item.videoUrl && !isDirectVideo(item.videoUrl))) ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {item.videoUrl && !isDirectVideo(item.videoUrl) ? (
+                    <a
+                      href={item.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-9 items-center justify-center rounded-pill bg-white px-4 text-[0.8125rem] font-semibold text-ink shadow-sm transition-[scale] duration-[140ms] ease-out active:scale-[0.97] can-hover:hover:brightness-[1.06]"
+                    >
+                      Watch video
+                    </a>
+                  ) : null}
+                  {item.linkUrl ? (
+                    <a
+                      href={item.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-9 items-center justify-center rounded-pill bg-[image:var(--gradient-cta)] px-4 text-[0.8125rem] font-semibold text-on-brand shadow-brand transition-[scale] duration-[140ms] ease-out active:scale-[0.97] can-hover:hover:brightness-[1.06]"
+                    >
+                      {item.kind === "ad" ? "Learn more" : "Read more"}
+                    </a>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           </li>

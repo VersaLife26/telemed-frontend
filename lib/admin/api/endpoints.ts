@@ -86,6 +86,7 @@ export const endpoints = {
     waitingRoomItem: (id?: string) =>
       id ? `${ADMIN}/waiting-room-items/${id}` : `${ADMIN}/waiting-room-items`,
     waitingRoomItemImage: (id: string) => `${ADMIN}/waiting-room-items/${id}/image`,
+    waitingRoomItemVideo: (id: string) => `${ADMIN}/waiting-room-items/${id}/video`,
   },
 
   disputes: {
