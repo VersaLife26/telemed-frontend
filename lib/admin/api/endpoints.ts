@@ -60,6 +60,7 @@ export const endpoints = {
     ledger: (q: URLSearchParams) => `${ADMIN}/finance/ledger?${q}`,
     ledgerExport: (q: URLSearchParams) => `${ADMIN}/finance/ledger.csv?${q}`,
     commission: () => `${ADMIN}/finance/commission`,
+    doctorCommission: (doctorId: string) => `${ADMIN}/finance/commission/doctors/${doctorId}`,
     payoutBatches: (q: URLSearchParams) => `${ADMIN}/finance/payout-batches?${q}`,
     payoutBatch: (id: string) => `${ADMIN}/finance/payout-batches/${id}`,
     runPayouts: () => `${ADMIN}/finance/payouts/run`,

@@ -2012,7 +2012,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["AdminFinance_Commission"];
-        put?: never;
+        put: operations["AdminFinance_UpdateCommission"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/finance/commission/doctors/{doctorId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AdminFinance_SetDoctorCommission"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2705,6 +2721,8 @@ export interface components {
             experienceYears?: number;
             /** Format: int64 */
             feeCents?: number;
+            /** Format: int32 */
+            commissionBps?: null | number;
             currency?: string;
             acceptsNewPatients?: boolean;
             bankName?: string;
@@ -2736,6 +2754,8 @@ export interface components {
             email: null | string;
             /** Format: int64 */
             feeCents: number;
+            /** Format: int32 */
+            commissionBps: null | number;
             /** Format: date-time */
             createdAt: string;
         };
@@ -3098,6 +3118,7 @@ export interface components {
             currency: string;
             /** Format: int32 */
             payoutHoldHours: number;
+            doctorRates: components["schemas"]["DoctorCommissionDto"][];
         };
         ConsultationDto: {
             /** Format: uuid */
@@ -3405,6 +3426,14 @@ export interface components {
             status: components["schemas"]["DoctorApplicationStatus"];
             /** Format: date-time */
             createdAt: string;
+        };
+        DoctorCommissionDto: {
+            /** Format: uuid */
+            doctorId: string;
+            displayName: string;
+            slmcNumber: string;
+            /** Format: int32 */
+            commissionBps: number;
         };
         DoctorDocumentDto: {
             /** Format: uuid */
@@ -4464,6 +4493,10 @@ export interface components {
             timezone?: string;
             workingHours?: components["schemas"]["WorkingHourDto"][];
         };
+        SetDoctorCommissionRequest: {
+            /** Format: int32 */
+            commissionBps: null | number;
+        };
         /** @enum {string} */
         Sex: "female" | "male" | "other";
         SignedUrlDto: {
@@ -4537,6 +4570,10 @@ export interface components {
             experience: null | boolean;
             nicMatch: null | boolean;
             photoClarity: null | boolean;
+        };
+        UpdateCommissionRequest: {
+            /** Format: int32 */
+            commissionBps: number;
         };
         UpdateDoctorProfileRequest: {
             displayName: string;
@@ -13052,6 +13089,137 @@ export interface operations {
             };
             /** @description The caller may not do this. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AdminFinance_UpdateCommission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCommissionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommissionDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The current state does not allow this; see `code`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AdminFinance_SetDoctorCommission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctorId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDoctorCommissionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommissionDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The current state does not allow this; see `code`. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -73,7 +73,7 @@ export default async function PaymentsPage({
     <>
       <PageHeader
         title="Payments"
-        description="Ledger, commission policy, payout batches, refunds and promo codes. All amounts are integer cents on the wire; the currency is carried separately and never inferred."
+        description="Ledger, commission (default and per-doctor), payout batches, refunds and promo codes. All amounts are integer cents on the wire; the currency is carried separately and never inferred."
       />
 
       <Tabs defaultValue="ledger">
