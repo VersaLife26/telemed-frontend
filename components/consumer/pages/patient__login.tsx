@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { AuthDivider, GoogleButton } from "@/components/consumer/auth/GoogleButton";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
@@ -11,9 +11,12 @@ import { Input } from "@/components/consumer/ui/Input";
 import { Reveal } from "@/components/consumer/ui/Reveal";
 import { assets } from "@/lib/consumer/assets";
 import { problemMessage } from "@/lib/consumer/api/errors";
+import { safeNextPath } from "@/lib/consumer/auth/redirect";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const afterLogin = safeNextPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
@@ -32,7 +35,7 @@ export default function LoginPage() {
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Could not sign in"));
-      router.replace("/home");
+      router.replace(afterLogin);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in");
     } finally {
@@ -52,7 +55,10 @@ export default function LoginPage() {
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Failed to send OTP"));
-      router.push(`/login/otp?phone=${encodeURIComponent(phone)}`);
+      const next = searchParams.get("next");
+      const q = new URLSearchParams({ phone });
+      if (next) q.set("next", next);
+      router.push(`/login/otp?${q.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send OTP");
     } finally {
@@ -71,7 +77,7 @@ export default function LoginPage() {
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Google sign-in failed"));
-      router.replace("/home");
+      router.replace(afterLogin);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {
@@ -154,5 +160,13 @@ export default function LoginPage() {
         </Reveal>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

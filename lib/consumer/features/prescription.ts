@@ -149,6 +149,11 @@ export function prescriptionPagePath(appointmentId: string): string {
   return `/appointments/${appointmentId}/prescription`;
 }
 
+/** Patient portal link from prescription-ready email (by prescription id). */
+export function prescriptionByIdPagePath(prescriptionId: string): string {
+  return `/prescriptions/${prescriptionId}`;
+}
+
 export function prescriptionPdfPath(id: string): string {
   return `/prescriptions/${id}/pdf`;
 }

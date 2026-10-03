@@ -12,6 +12,7 @@ import {
   issuePayload,
   looksLikePdf,
   messageFromPdfDownloadFailure,
+  prescriptionByIdPagePath,
   prescriptionPagePath,
   prescriptionPath,
   prescriptionPdfPath,
@@ -124,6 +125,7 @@ test("prescription paths are keyed by appointment; stamps live under /doctors/me
   assert.equal(prescriptionPath("appt-1"), "/appointments/appt-1/prescription");
   assert.equal(prescriptionPagePath("appt-1"), "/appointments/appt-1/prescription");
   assert.equal(prescriptionPdfPath("rx-1"), "/prescriptions/rx-1/pdf");
+  assert.equal(prescriptionByIdPagePath("rx-1"), "/prescriptions/rx-1");
   assert.equal(stampPath("signature"), "/doctors/me/signature");
   assert.equal(stampPath("seal"), "/doctors/me/seal");
 });

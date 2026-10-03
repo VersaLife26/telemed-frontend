@@ -10,6 +10,7 @@ import { Reveal } from "@/components/consumer/ui/Reveal";
 import { OtpInput } from "@/components/consumer/ui/OtpInput";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { problemMessage } from "@/lib/consumer/api/errors";
+import { safeNextPath } from "@/lib/consumer/auth/redirect";
 
 const RESEND_COOLDOWN_SEC = 30;
 
@@ -43,7 +44,7 @@ function OtpForm() {
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Invalid OTP"));
-      router.replace("/home");
+      router.replace(safeNextPath(params.get("next")));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid OTP");
     } finally {
