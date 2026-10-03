@@ -7,7 +7,7 @@ import { cx } from "@/lib/consumer/cx";
 import type { Doctor, Specialty } from "@/lib/consumer/api/types";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
-import { formatMoney } from "@/lib/consumer/money";
+import { formatMoney, quotedFee } from "@/lib/consumer/money";
 
 /**
  * Photo-forward directory tile: the face is the identifying thing, so it gets
@@ -18,14 +18,18 @@ import { formatMoney } from "@/lib/consumer/money";
 export function DoctorCard({
   doctor,
   specialties,
+  international = false,
   className,
 }: {
   doctor: Doctor;
   specialties: Specialty[];
+  /** Signed-in patient who is not a Sri Lankan citizen. Anonymous viewers stay on the LKR fee. */
+  international?: boolean;
   className?: string;
 }) {
   const name = doctor.displayName || "Doctor";
   const photo = profilePhotoSrc(doctor.photoUrl) ?? fallbackPortrait(doctor.id ?? "");
+  const quote = quotedFee(doctor, international);
 
   return (
     <Link
@@ -67,7 +71,7 @@ export function DoctorCard({
 
         <div className="mt-auto flex w-full items-center justify-between gap-2 border-t border-border-subtle pt-3">
           <span className="text-label text-brand tabular-time">
-            {formatMoney(doctor.feeCents, doctor.currency)}
+            {quote.available ? formatMoney(quote.cents, quote.currency) : "International fee not set"}
           </span>
         </div>
       </div>

@@ -8,7 +8,8 @@ import { Input } from "@/components/consumer/ui/Input";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { Select } from "@/components/consumer/ui/Select";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Doctor, Paged, Specialty } from "@/lib/consumer/api/types";
+import type { Doctor, Paged, Specialty, TelemedUser } from "@/lib/consumer/api/types";
+import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import {
   buildDoctorsApiQuery,
   hasActiveDoctorFilters,
@@ -41,6 +42,10 @@ export default async function DoctorsPage({
   };
   const filtered = hasActiveDoctorFilters(filters);
 
+  const token = await getAccessToken();
+  const meRequest = token
+    ? apiFetch<TelemedUser>("/api/v1/me", { token }).catch(() => null)
+    : Promise.resolve(null);
   const specialtiesRequest = apiFetch<Specialty[]>("/api/v1/specialties").catch(() => [] as Specialty[]);
   let doctors: Doctor[] = [];
   let error: string | null = null;
@@ -50,7 +55,8 @@ export default async function DoctorsPage({
   } catch (e) {
     error = e instanceof Error ? e.message : "Could not load doctors";
   }
-  const specialties = await specialtiesRequest;
+  const [specialties, me] = await Promise.all([specialtiesRequest, meRequest]);
+  const international = me != null && me.isSriLankanCitizen === false;
 
   const emptyBody = filtered
     ? "Nothing matched these filters. Try another specialty or a wider fee range."
@@ -185,7 +191,7 @@ export default async function DoctorsPage({
       ) : (
         <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {doctors.map((d) => (
-            <DoctorCard key={d.id} doctor={d} specialties={specialties} />
+            <DoctorCard key={d.id} doctor={d} specialties={specialties} international={international} />
           ))}
         </div>
       )}

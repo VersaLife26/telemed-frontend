@@ -44,19 +44,24 @@ export async function completePasswordReset(body: unknown) {
   return finishAuth(data, requiredRole());
 }
 
-export async function completeEmailRegister(body: unknown) {
+export async function completeEmailRegister(body: unknown, headers?: Record<string, string>) {
   const data = await apiFetch<AuthResponse>("/api/v1/auth/register/email", {
     method: "POST",
     body,
+    headers,
   });
   return finishAuth(data);
 }
 
-export async function completeGoogleLogin(idToken: string) {
+export async function completeGoogleLogin(
+  idToken: string,
+  extra?: { headers?: Record<string, string>; residency?: { isSriLankanCitizen?: boolean; nationalId?: string } },
+) {
   try {
     const data = await apiFetch<AuthResponse>("/api/v1/auth/google", {
       method: "POST",
-      body: { idToken },
+      headers: extra?.headers,
+      body: { idToken, ...extra?.residency },
     });
     return finishAuth(data, requiredRole());
   } catch (err) {

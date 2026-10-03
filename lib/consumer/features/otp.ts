@@ -15,10 +15,18 @@ export function verifyOtpError(phone?: string, code?: string): string | null {
   return null;
 }
 
-export function verifyOtpBody(phone: string, code: string) {
+export function verifyOtpBody(
+  phone: string,
+  code: string,
+  residency?: { isSriLankanCitizen?: boolean; nationalId?: string },
+) {
   return {
     phone: phone.trim(),
     code: code.trim(),
+    ...(typeof residency?.isSriLankanCitizen === "boolean"
+      ? { isSriLankanCitizen: residency.isSriLankanCitizen }
+      : {}),
+    ...(residency?.nationalId?.trim() ? { nationalId: residency.nationalId.trim() } : {}),
   };
 }
 

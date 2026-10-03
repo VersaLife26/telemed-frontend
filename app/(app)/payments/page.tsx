@@ -7,6 +7,7 @@ import { Pagination } from "@/components/admin/data-table/pagination";
 import { CommissionView } from "@/components/admin/payments/commission-view";
 import { LedgerTable } from "@/components/admin/payments/ledger-table";
 import { PayoutBatches } from "@/components/admin/payments/payout-batches";
+import { InternationalRateForm } from "@/components/admin/payments/international-rate";
 import { PromoCodesPanel } from "@/components/admin/payments/promo-codes";
 import { RefundsPanel } from "@/components/admin/payments/refunds-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/admin/ui/tabs";
@@ -15,6 +16,7 @@ import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer, tryListServer } from "@/lib/admin/api/server";
 import type {
   AdminRefund,
+  BillingSettings,
   Commission,
   LedgerPage,
   PayoutBatch,
@@ -48,12 +50,13 @@ export default async function PaymentsPage({
   };
   const ledgerQuery = query({ ...exportFilter, page, pageSize: PER_PAGE });
 
-  const [ledger, commission, batches, refunds, promos] = await Promise.all([
+  const [ledger, commission, batches, refunds, promos, billing] = await Promise.all([
     tryGetServer<LedgerPage>(endpoints.finance.ledger(ledgerQuery)),
     tryGetServer<Commission>(endpoints.finance.commission()),
     tryListServer<PayoutBatch>(endpoints.finance.payoutBatches(query({ pageSize: 10 }))),
     tryListServer<AdminRefund>(endpoints.finance.refunds(query({ pageSize: 25 }))),
     tryListServer<PromoCode>(endpoints.finance.promoCodes(query({ pageSize: 50 }))),
+    tryGetServer<BillingSettings>(endpoints.finance.billing()),
   ]);
 
   const filters = [
@@ -83,6 +86,7 @@ export default async function PaymentsPage({
           <TabsTrigger value="payouts">Payout batches</TabsTrigger>
           <TabsTrigger value="refunds">Refunds</TabsTrigger>
           <TabsTrigger value="promos">Promo codes</TabsTrigger>
+          <TabsTrigger value="international">International</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ledger">
@@ -139,6 +143,14 @@ export default async function PaymentsPage({
             <PromoCodesPanel codes={promos.page.items} />
           ) : (
             <ErrorState error={promos.error} what="promo codes" />
+          )}
+        </TabsContent>
+
+        <TabsContent value="international">
+          {billing.ok ? (
+            <InternationalRateForm settings={billing.data} />
+          ) : (
+            <ErrorState error={billing.error} what="the international exchange rate" />
           )}
         </TabsContent>
       </Tabs>

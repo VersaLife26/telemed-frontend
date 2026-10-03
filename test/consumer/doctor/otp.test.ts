@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { countryHeaders } from "@/lib/consumer/auth/country";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/consumer/env";
 import {
   missingTokensMessage,
@@ -33,6 +34,13 @@ test("verify requires phone and code", () => {
 
 test("missing tokens is a 502-shaped message", () => {
   assert.equal(missingTokensMessage(), "OTP verify response missing tokens");
+});
+
+test("doctor app does not forward the visitor country", () => {
+  assert.deepEqual(
+    countryHeaders(new Request("https://doctor.example", { headers: { "CF-IPCountry": "LK" } })),
+    {},
+  );
 });
 
 test("doctor cookies do not collide with the patient app", () => {

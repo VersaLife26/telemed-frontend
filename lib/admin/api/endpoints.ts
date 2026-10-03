@@ -25,6 +25,7 @@ export const endpoints = {
   doctors: {
     list: (q: URLSearchParams) => `${ADMIN}/doctors?${q}`,
     detail: (id: string) => `${ADMIN}/doctors/${id}`,
+    foreignMultiplier: (id: string) => `${ADMIN}/doctors/${id}/foreign-multiplier`,
     document: (id: string, documentId: string) => `${ADMIN}/doctors/${id}/documents/${documentId}`,
     suspend: (id: string) => `${ADMIN}/doctors/${id}/suspend`,
     reinstate: (id: string) => `${ADMIN}/doctors/${id}/reinstate`,
@@ -57,6 +58,7 @@ export const endpoints = {
   },
 
   finance: {
+    billing: () => `${ADMIN}/finance/billing`,
     ledger: (q: URLSearchParams) => `${ADMIN}/finance/ledger?${q}`,
     ledgerExport: (q: URLSearchParams) => `${ADMIN}/finance/ledger.csv?${q}`,
     commission: () => `${ADMIN}/finance/commission`,

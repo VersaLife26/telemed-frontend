@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { CitizenshipFields } from "@/components/consumer/auth/CitizenshipFields";
 import { AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
@@ -11,6 +12,8 @@ import { OtpInput } from "@/components/consumer/ui/OtpInput";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { problemMessage } from "@/lib/consumer/api/errors";
 import { safeNextPath } from "@/lib/consumer/auth/redirect";
+import { useRegistrationContext } from "@/lib/consumer/features/registration-context";
+import { residencyError, residencyFields } from "@/lib/consumer/features/residency";
 
 const RESEND_COOLDOWN_SEC = 30;
 
@@ -19,7 +22,10 @@ function OtpForm() {
   const params = useSearchParams();
   const phone = params.get("phone") || "";
   const [code, setCode] = useState("");
+  const [citizen, setCitizen] = useState<boolean | null>(null);
+  const [nationalId, setNationalId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { ready, askCitizenship } = useRegistrationContext();
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -35,12 +41,17 @@ function OtpForm() {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    const residency = residencyError(askCitizenship, citizen, nationalId);
+    if (residency) {
+      setError(residency);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code }),
+        body: JSON.stringify({ phone, code, ...residencyFields(citizen, nationalId) }),
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Invalid OTP"));
@@ -85,6 +96,16 @@ function OtpForm() {
 
         <Reveal delay={1} className="flex flex-col gap-6">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
+            {askCitizenship ? (
+              <CitizenshipFields
+                id="otp-citizen"
+                citizen={citizen}
+                onCitizen={setCitizen}
+                nationalId={nationalId}
+                onNationalId={setNationalId}
+                hint="Used only if this phone number is new. An existing account is not changed."
+              />
+            ) : null}
             <OtpInput length={6} value={code} onChange={setCode} />
             {error ? <Alert tone="danger">{error}</Alert> : null}
             {info ? <Alert tone="success">{info}</Alert> : null}
@@ -93,7 +114,7 @@ function OtpForm() {
               size="lg"
               fullWidth
               busy={loading}
-              disabled={loading || resending || code.length < 6}
+              disabled={!ready || loading || resending || code.length < 6}
             >
               {loading ? "Verifying…" : "Verify & continue"}
             </Button>

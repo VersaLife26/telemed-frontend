@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import { CitizenshipFields } from "@/components/consumer/auth/CitizenshipFields";
 import { AuthDivider, GoogleButton } from "@/components/consumer/auth/GoogleButton";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Alert } from "@/components/consumer/ui/Alert";
@@ -12,6 +13,8 @@ import { Reveal } from "@/components/consumer/ui/Reveal";
 import { assets } from "@/lib/consumer/assets";
 import { problemMessage } from "@/lib/consumer/api/errors";
 import { safeNextPath } from "@/lib/consumer/auth/redirect";
+import { useRegistrationContext } from "@/lib/consumer/features/registration-context";
+import { residencyError, residencyFields } from "@/lib/consumer/features/residency";
 
 function LoginForm() {
   const router = useRouter();
@@ -20,8 +23,11 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
+  const [citizen, setCitizen] = useState<boolean | null>(null);
+  const [nationalId, setNationalId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"email" | "otp" | "google" | null>(null);
+  const { ready, askCitizenship } = useRegistrationContext();
 
   async function onEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -68,12 +74,17 @@ function LoginForm() {
 
   async function onGoogle(idToken: string) {
     setError(null);
+    const residency = residencyError(askCitizenship, citizen, nationalId);
+    if (residency) {
+      setError(residency);
+      return;
+    }
     setLoading("google");
     try {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, ...residencyFields(citizen, nationalId) }),
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Google sign-in failed"));
@@ -93,7 +104,17 @@ function LoginForm() {
         <AuthHeading title="Sign in" subtitle="Use Google, email, or your mobile number." />
 
         <Reveal delay={1} className="flex flex-col gap-7">
-          <GoogleButton onCredential={onGoogle} disabled={busy} />
+          {askCitizenship ? (
+            <CitizenshipFields
+              id="login-citizen"
+              citizen={citizen}
+              onCitizen={setCitizen}
+              nationalId={nationalId}
+              onNationalId={setNationalId}
+              hint="Answer this when Google is creating a new account. An existing account keeps its current rate."
+            />
+          ) : null}
+          <GoogleButton onCredential={onGoogle} disabled={busy || !ready} />
 
           <form onSubmit={onEmail} className="flex w-full flex-col gap-4">
             <Input

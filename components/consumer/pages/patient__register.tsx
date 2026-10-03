@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CitizenshipFields } from "@/components/consumer/auth/CitizenshipFields";
 import { AuthDivider, GoogleButton } from "@/components/consumer/auth/GoogleButton";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
 import { Alert } from "@/components/consumer/ui/Alert";
@@ -12,6 +13,8 @@ import { Textarea } from "@/components/consumer/ui/Textarea";
 import { SexField } from "@/components/consumer/sex-field";
 import type { Sex } from "@/lib/consumer/api/types";
 import { problemMessage } from "@/lib/consumer/api/errors";
+import { useRegistrationContext } from "@/lib/consumer/features/registration-context";
+import { residencyError, residencyFields } from "@/lib/consumer/features/residency";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,8 +24,11 @@ export default function RegisterPage() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [sex, setSex] = useState<Sex | "">("");
   const [allergies, setAllergies] = useState("");
+  const [citizen, setCitizen] = useState<boolean | null>(null);
+  const [nationalId, setNationalId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"email" | "google" | null>(null);
+  const { ready, askCitizenship } = useRegistrationContext();
 
   async function onRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -35,12 +41,25 @@ export default function RegisterPage() {
       setError("Date of birth cannot be in the future.");
       return;
     }
+    const residency = residencyError(askCitizenship, citizen, nationalId);
+    if (residency) {
+      setError(residency);
+      return;
+    }
     setLoading("email");
     try {
       const res = await fetch("/api/auth/email/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, fullName: name, dateOfBirth, sex, allergies }),
+        body: JSON.stringify({
+          email,
+          password,
+          fullName: name,
+          dateOfBirth,
+          sex,
+          allergies,
+          ...residencyFields(citizen, nationalId),
+        }),
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Could not create account"));
@@ -54,12 +73,17 @@ export default function RegisterPage() {
 
   async function onGoogle(idToken: string) {
     setError(null);
+    const residency = residencyError(askCitizenship, citizen, nationalId);
+    if (residency) {
+      setError(residency);
+      return;
+    }
     setLoading("google");
     try {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, ...residencyFields(citizen, nationalId) }),
       });
       const json: unknown = await res.json();
       if (!res.ok) throw new Error(problemMessage(json, "Google sign-in failed"));
@@ -82,7 +106,16 @@ export default function RegisterPage() {
         />
 
         <Reveal delay={1} className="flex flex-col gap-7">
-          <GoogleButton onCredential={onGoogle} disabled={busy} />
+          {askCitizenship ? (
+            <CitizenshipFields
+              id="register-citizen"
+              citizen={citizen}
+              onCitizen={setCitizen}
+              nationalId={nationalId}
+              onNationalId={setNationalId}
+            />
+          ) : null}
+          <GoogleButton onCredential={onGoogle} disabled={busy || !ready} />
           <AuthDivider />
 
           <form onSubmit={onRegister} className="flex w-full flex-col gap-4">
@@ -138,7 +171,7 @@ export default function RegisterPage() {
               placeholder="••••••••"
             />
             {error ? <Alert tone="danger">{error}</Alert> : null}
-            <Button type="submit" size="lg" fullWidth busy={loading === "email"} disabled={busy}>
+            <Button type="submit" size="lg" fullWidth busy={loading === "email"} disabled={busy || !ready}>
               {loading === "email" ? "Creating…" : "Create account"}
             </Button>
           </form>

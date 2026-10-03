@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { API_BASE_URL, TEST_SECRET } from "@/lib/consumer/env";
+import { countryHeaders } from "@/lib/consumer/auth/country";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { gatewayUnreachable, refreshAuthCookies } from "@/lib/consumer/auth/session";
 import { gatewayUrl, isNullBodyStatus, shouldForwardBody } from "@/lib/consumer/proxy";
@@ -32,8 +33,9 @@ async function forward(req: Request, ctx: Ctx) {
 
   const uploadToken = req.headers.get("x-upload-token");
   const testSecret = path[0] === "test" ? TEST_SECRET : "";
+  const country = countryHeaders(req);
   const run = (bearer?: string) =>
-    fetchUpstream(target, req.method, contentType, bearer, body, streamMultipart, uploadToken, testSecret);
+    fetchUpstream(target, req.method, contentType, bearer, body, streamMultipart, uploadToken, testSecret, country);
 
   try {
     let upstream = await run(token);
@@ -83,6 +85,7 @@ async function fetchUpstream(
   streamMultipart: boolean,
   uploadToken: string | null,
   testSecret: string,
+  country: Record<string, string>,
 ) {
   const headers = new Headers();
   headers.set("Accept", "application/json");
@@ -90,6 +93,7 @@ async function fetchUpstream(
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (uploadToken) headers.set("X-Upload-Token", uploadToken);
   if (testSecret) headers.set("X-Test-Secret", testSecret);
+  for (const [name, value] of Object.entries(country)) headers.set(name, value);
 
   const init: RequestInit = {
     method,

@@ -7,7 +7,7 @@ import { Card } from "@/components/consumer/ui/Card";
 import { EmptyState } from "@/components/consumer/ui/EmptyState";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { apiFetch } from "@/lib/consumer/api/client";
-import type { Doctor, Slots, Specialty } from "@/lib/consumer/api/types";
+import type { Doctor, Slots, Specialty, TelemedUser } from "@/lib/consumer/api/types";
 import { fallbackPortrait } from "@/lib/consumer/assets";
 import { getAccessToken } from "@/lib/consumer/auth/cookies";
 import { upcomingDayKeys } from "@/lib/consumer/features/calendar";
@@ -15,7 +15,7 @@ import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { profilePhotoSrc } from "@/lib/consumer/features/profile";
 import { slotsByDay, slotsPath, type SlotDay } from "@/lib/consumer/features/slots";
 import { HEROES } from "@/lib/consumer/heroes";
-import { formatMoney } from "@/lib/consumer/money";
+import { formatMoney, quotedFee } from "@/lib/consumer/money";
 
 const SLOT_WINDOW_DAYS = 14;
 
@@ -26,6 +26,10 @@ export default async function DoctorDetailPage({ params }: { params: Promise<{ i
   const from = dates[0] ?? "";
   const to = dates[dates.length - 1] ?? from;
 
+  const me = token
+    ? await apiFetch<TelemedUser>("/api/v1/me", { token }).catch(() => null)
+    : null;
+  const international = me != null && me.isSriLankanCitizen === false;
   const [doctorResult, slotsResult, specialties] = await Promise.all([
     apiFetch<Doctor>(`/api/v1/doctors/${id}`).then(
       (doctor) => ({ doctor, error: null }),
@@ -58,6 +62,7 @@ export default async function DoctorDetailPage({ params }: { params: Promise<{ i
   const name = doctor.displayName || "Doctor";
   const photo = profilePhotoSrc(doctor.photoUrl) ?? fallbackPortrait(doctor.id ?? id);
   const specialty = specialtyLabel(doctor.specialtyCode, specialties);
+  const quote = quotedFee(doctor, international);
 
   return (
     <div className="flex flex-col gap-6">
@@ -73,8 +78,8 @@ export default async function DoctorDetailPage({ params }: { params: Promise<{ i
           <>
             <HeroChip
               icon={<Wallet className="size-5" />}
-              value={formatMoney(doctor.feeCents, doctor.currency)}
-              label="Consultation fee"
+              value={quote.available ? formatMoney(quote.cents, quote.currency) : "Not set"}
+              label={international ? "International fee" : "Consultation fee"}
             />
             {doctor.experienceYears ? (
               <HeroChip

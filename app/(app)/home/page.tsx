@@ -151,6 +151,7 @@ export default async function HomePage() {
     (next ? visitDoctors[next.doctorId] : undefined) ||
     (next ? doctors.find((d) => d.id === next.doctorId) : undefined);
   const name = firstName(me?.fullName);
+  const international = me != null && me.isSriLankanCitizen === false;
   const hello = greetingForHour(colomboHour());
   const later = appointments.filter((a) => a.id !== next?.id).slice(0, 4);
 
@@ -242,7 +243,7 @@ export default async function HomePage() {
         ) : (
           <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {doctors.map((d) => (
-              <DoctorCard key={d.id} doctor={d} specialties={specialties} />
+              <DoctorCard key={d.id} doctor={d} specialties={specialties} international={international} />
             ))}
           </div>
         )}

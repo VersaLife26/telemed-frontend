@@ -2772,6 +2772,11 @@ export interface components {
             /** Format: int32 */
             commissionBps?: null | number;
             currency?: string;
+            /** Format: double */
+            foreignMultiplier?: null | number;
+            /** Format: int64 */
+            foreignFeeCents?: null | number;
+            foreignCurrency?: null | string;
             acceptsNewPatients?: boolean;
             bankName?: string;
             bankBranch?: string;
@@ -2804,6 +2809,8 @@ export interface components {
             feeCents: number;
             /** Format: int32 */
             commissionBps: null | number;
+            /** Format: double */
+            foreignMultiplier: null | number;
             /** Format: date-time */
             createdAt: string;
         };
@@ -3029,6 +3036,10 @@ export interface components {
             branchName: string;
             accountNumber: string;
             accountName: string;
+        };
+        BillingSettingsDto: {
+            /** Format: double */
+            lkrPerUsd: null | number;
         };
         BookAppointmentRequest: {
             /** Format: uuid */
@@ -3656,6 +3667,8 @@ export interface components {
         };
         GoogleLoginRequest: {
             idToken: string;
+            isSriLankanCitizen?: null | boolean;
+            nationalId?: null | string;
         };
         HolidayDto: {
             /** Format: uuid */
@@ -3859,6 +3872,7 @@ export interface components {
             allergies?: null | string;
             photoUrl?: null | string;
             hasPassword?: boolean;
+            isSriLankanCitizen?: boolean;
             version?: string;
         };
         /** @enum {string} */
@@ -3911,6 +3925,8 @@ export interface components {
             email: null | string;
             code: string;
             language: null | components["schemas"]["Language"];
+            isSriLankanCitizen?: null | boolean;
+            nationalId?: null | string;
         };
         PagedResultOfAdminDoctorListItemDto: {
             items: components["schemas"]["AdminDoctorListItemDto"][];
@@ -4259,6 +4275,11 @@ export interface components {
             anonymizedAt: null | string;
             /** Format: uuid */
             doctorId: null | string;
+            isSriLankanCitizen: boolean;
+            hasNationalId: boolean;
+            registrationCountry: null | string;
+            /** Format: double */
+            foreignMultiplier: null | number;
             /** Format: date-time */
             createdAt: string;
         };
@@ -4412,6 +4433,9 @@ export interface components {
             /** Format: int64 */
             feeCents?: number;
             currency?: string;
+            /** Format: int64 */
+            foreignFeeCents?: null | number;
+            foreignCurrency?: null | string;
             acceptsNewPatients?: boolean;
             photoUrl?: null | string;
         };
@@ -4470,6 +4494,12 @@ export interface components {
             password: string;
             fullName: string;
             language: null | components["schemas"]["Language"];
+            isSriLankanCitizen?: null | boolean;
+            nationalId?: null | string;
+        };
+        RegistrationContextDto: {
+            countryCode: null | string;
+            askCitizenship: boolean;
         };
         RejectApplicationRequest: {
             reason: string;
@@ -4602,6 +4632,10 @@ export interface components {
             /** Format: int32 */
             commissionBps: null | number;
         };
+        SetForeignMultiplierRequest: {
+            /** Format: double */
+            multiplier: number;
+        };
         /** @enum {string} */
         Sex: "female" | "male" | "other";
         SignedUrlDto: {
@@ -4668,6 +4702,10 @@ export interface components {
             displayName: null | string;
             role: null | components["schemas"]["AdminRole"];
             isActive: null | boolean;
+        };
+        UpdateBillingSettingsRequest: {
+            /** Format: double */
+            lkrPerUsd: number;
         };
         UpdateChecklistRequest: {
             slmcFormat: null | boolean;

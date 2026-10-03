@@ -1,10 +1,12 @@
 import { apiFetch } from "@/lib/consumer/api/client";
+import { countryHeaders } from "@/lib/consumer/auth/country";
 import {
   completeEmailRegister,
   finishAuth,
   problem,
   toClientError,
 } from "@/lib/consumer/auth/session";
+import { residencyFields } from "@/lib/consumer/features/residency";
 import type { AuthResponse, Sex, TelemedUser } from "@/lib/consumer/api/types";
 
 const SEXES: Sex[] = ["female", "male", "other"];
@@ -18,6 +20,8 @@ export async function POST(req: Request) {
       dateOfBirth?: string;
       sex?: string;
       allergies?: string;
+      isSriLankanCitizen?: boolean;
+      nationalId?: string;
     };
     if (!body.email?.trim() || !body.password) {
       return problem(400, "Email and password are required");
@@ -31,23 +35,29 @@ export async function POST(req: Request) {
       return problem(400, "Date of birth must be YYYY-MM-DD.");
     }
 
+    const headers = countryHeaders(req);
     const payload = {
       email: body.email.trim(),
       password: body.password,
       fullName,
       language: "en",
+      ...residencyFields(
+        typeof body.isSriLankanCitizen === "boolean" ? body.isSriLankanCitizen : null,
+        body.nationalId ?? "",
+      ),
     };
 
     const sex = SEXES.find((s) => s === body.sex) ?? null;
     const allergies = body.allergies?.trim().slice(0, 1000) || null;
 
     if (!dob && !sex && !allergies) {
-      return await completeEmailRegister(payload);
+      return await completeEmailRegister(payload, headers);
     }
 
     // Register takes identity only; the clinical profile is a follow-up PUT /me.
     const tokens = await apiFetch<AuthResponse>("/api/v1/auth/register/email", {
       method: "POST",
+      headers,
       body: payload,
     });
     const user = tokens.user;
