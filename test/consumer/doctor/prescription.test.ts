@@ -59,21 +59,27 @@ test("issueError needs at least one complete line", () => {
   assert.equal(issueError([line]), null);
 });
 
-test("issuePayload sends only drug lines; the server snapshots doctor and patient", () => {
-  const body = issuePayload([
-    {
-      ...blankItem("a"),
-      drugId: "drug-1",
-      drugName: " Para ",
-      strength: "500mg",
-      dosage: "500mg",
-      frequency: "TDS",
-      durationDays: 5,
-      quantity: 10,
-    },
-    blankItem("b"),
-  ]);
-  assert.deepEqual(Object.keys(body), ["items"]);
+test("issuePayload sends drug lines and investigations; the server snapshots doctor and patient", () => {
+  const body = issuePayload(
+    [
+      {
+        ...blankItem("a"),
+        drugId: "drug-1",
+        drugName: " Para ",
+        strength: "500mg",
+        dosage: "500mg",
+        frequency: "TDS",
+        durationDays: 5,
+        quantity: 10,
+      },
+      blankItem("b"),
+    ],
+    [
+      { key: "i1", name: " Full/Complete Urine Report " },
+      { key: "i2", name: "   " },
+    ],
+  );
+  assert.deepEqual(Object.keys(body), ["items", "investigations"]);
   assert.deepEqual(body.items, [
     {
       drugId: "drug-1",
@@ -88,6 +94,7 @@ test("issuePayload sends only drug lines; the server snapshots doctor and patien
       isGeneric: false,
     },
   ]);
+  assert.deepEqual(body.investigations, ["Full/Complete Urine Report"]);
 });
 
 test("formulary search needs two characters and copies id, strength and form", () => {

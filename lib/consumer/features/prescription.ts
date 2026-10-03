@@ -57,8 +57,28 @@ export function fromIssued(items: PrescriptionItem[] | undefined): ItemDraft[] {
     }));
 }
 
+export type InvestigationDraft = {
+  key: string;
+  name: string;
+};
+
+export const MAX_INVESTIGATIONS = 20;
+
+export function blankInvestigation(key = "inv-1"): InvestigationDraft {
+  return { key, name: "" };
+}
+
+export function fromIssuedInvestigations(lines: string[] | undefined): InvestigationDraft[] {
+  if (!lines?.length) return [];
+  return lines.map((name, i) => ({ key: `issued-inv-${i}`, name }));
+}
+
 export function completeLines(items: ItemDraft[]): ItemDraft[] {
   return items.filter((it) => it.drugName.trim() && it.dosage.trim() && it.frequency.trim());
+}
+
+export function completeInvestigations(lines: InvestigationDraft[]): string[] {
+  return lines.map((it) => it.name.trim()).filter((name) => name.length > 0);
 }
 
 export function issueError(items: ItemDraft[]): string | null {
@@ -82,8 +102,11 @@ export function canSearchFormulary(query: string): boolean {
   return query.trim().length >= 2;
 }
 
-/** The server snapshots the prescriber and patient; only the drug lines are sent. */
-export function issuePayload(items: ItemDraft[]): { items: PrescriptionItemRequest[] } {
+/** The server snapshots the prescriber and patient; only the drug lines and investigations are sent. */
+export function issuePayload(
+  items: ItemDraft[],
+  investigations: InvestigationDraft[] = [],
+): { items: PrescriptionItemRequest[]; investigations: string[] } {
   return {
     items: completeLines(items).map((it) => ({
       drugId: it.drugId,
@@ -97,6 +120,7 @@ export function issuePayload(items: ItemDraft[]): { items: PrescriptionItemReque
       instructions: it.instructions.trim() || null,
       isGeneric: it.isGeneric,
     })),
+    investigations: completeInvestigations(investigations),
   };
 }
 

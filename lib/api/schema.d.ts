@@ -3470,6 +3470,7 @@ export interface components {
         };
         IssuePrescriptionRequest: {
             items: components["schemas"]["PrescriptionItemRequest"][];
+            investigations?: null | string[];
         };
         JoinConsultationDto: {
             /** Format: uuid */
@@ -3994,6 +3995,7 @@ export interface components {
             cancellationReason: null | string;
             isTest: boolean;
             items: components["schemas"]["PrescriptionItemDto"][];
+            investigations: string[];
         };
         PrescriptionItemDto: {
             /** Format: uuid */
@@ -4038,6 +4040,7 @@ export interface components {
             doctorSlmc: null | string;
             patientInitials: null | string;
             items: null | components["schemas"]["VerifiedItemDto"][];
+            investigations: null | string[];
         };
         /** @description RFC 9457 problem details. `code` is a stable machine-readable reason (e.g. slot_unavailable); `errors` maps camelCase field paths to messages on validation failures; other extension members may appear. */
         ProblemDetails: {

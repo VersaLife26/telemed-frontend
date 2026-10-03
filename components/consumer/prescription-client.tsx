@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/consumer/ui/Card";
 import { AlertTriangle, ArrowLeft, Download, Plus } from "lucide-react";
 
@@ -17,13 +17,17 @@ import type { Appointment, DoctorProfile, FormularyDrug, Prescription } from "@/
 import { ageAtVisitDate } from "@/lib/consumer/features/visit-patient";
 import {
   blankItem,
+  blankInvestigation,
   canSearchFormulary,
   downloadPrescriptionPdf,
   fieldsFromDrug,
   fromIssued,
+  fromIssuedInvestigations,
   issueError,
   issuePayload,
+  MAX_INVESTIGATIONS,
   prescriptionPath,
+  type InvestigationDraft,
   type ItemDraft,
 } from "@/lib/consumer/features/prescription";
 import { useStampImage } from "@/components/consumer/signature-card";
@@ -42,6 +46,7 @@ export function PrescriptionClient({
   const signatureSrc = useStampImage("signature", stampVersion);
   const sealSrc = useStampImage("seal", stampVersion);
   const [items, setItems] = useState<ItemDraft[]>([blankItem()]);
+  const [investigations, setInvestigations] = useState<InvestigationDraft[]>([]);
   const [issued, setIssued] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +61,7 @@ export function PrescriptionClient({
       const rx = await browserApi<Prescription>(prescriptionPath(appointmentId));
       setIssued(rx);
       setItems(fromIssued(rx.items));
+      setInvestigations(fromIssuedInvestigations(rx.investigations));
       return rx;
     } catch (e) {
       if (!isNotFound(e)) throw e;
@@ -141,10 +147,11 @@ export function PrescriptionClient({
     try {
       const created = await browserApi<Prescription>(prescriptionPath(appointmentId), {
         method: "POST",
-        body: issuePayload(items),
+        body: issuePayload(items, investigations),
       });
       setIssued(created);
       setItems(fromIssued(created.items));
+      setInvestigations(fromIssuedInvestigations(created.investigations));
     } catch (e) {
       if (hasCode(e, "stamps_required")) {
         setStampVersion((v) => v + 1);
@@ -246,7 +253,7 @@ export function PrescriptionClient({
       {items.map((item, index) => (
         <Card key={item.key} className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-h5 text-ink">Item {index + 1}</p>
+            <p className="text-h5 text-ink">M{index + 1}</p>
             {!issued && items.length > 1 ? (
               <Button
                 size="sm"
@@ -270,7 +277,8 @@ export function PrescriptionClient({
                 setActiveItem(item.key);
                 setDrugQuery(item.drugName);
               }}
-              placeholder="Drug name — type to search formulary"
+              placeholder="Medicine name — type to search formulary"
+              aria-label={`M${index + 1} medicine name`}
               disabled={Boolean(issued)}
             />
             {activeItem === item.key && drugHits.length ? (
@@ -291,54 +299,68 @@ export function PrescriptionClient({
             ) : null}
           </div>
           <div className="grid gap-3 @md:grid-cols-2">
-            <Input
-              value={item.strength}
-              onChange={(e) => patchItem(item.key, { strength: e.target.value })}
-              placeholder="Strength"
-              disabled={Boolean(issued)}
-            />
-            <Input
-              value={item.form}
-              onChange={(e) => patchItem(item.key, { form: e.target.value })}
-              placeholder="Form"
-              disabled={Boolean(issued)}
-            />
-            <Input
-              value={item.dosage}
-              onChange={(e) => patchItem(item.key, { dosage: e.target.value })}
-              placeholder="Dosage (1 capsule)"
-              disabled={Boolean(issued)}
-            />
-            <Input
-              value={item.frequency}
-              onChange={(e) => patchItem(item.key, { frequency: e.target.value })}
-              placeholder="Frequency (3x daily)"
-              disabled={Boolean(issued)}
-            />
-            <Input
-              type="number"
-              min={1}
-              max={365}
-              value={item.durationDays}
-              onChange={(e) => patchItem(item.key, { durationDays: Number(e.target.value) || 1 })}
-              placeholder="Duration days"
-              disabled={Boolean(issued)}
-            />
-            <Input
-              type="number"
-              min={1}
-              value={item.quantity}
-              onChange={(e) => patchItem(item.key, { quantity: Number(e.target.value) || 1 })}
-              placeholder="Quantity"
-              disabled={Boolean(issued)}
-            />
+            <LabeledField label="Strength">
+              <Input
+                value={item.strength}
+                onChange={(e) => patchItem(item.key, { strength: e.target.value })}
+                placeholder="625 mg"
+                disabled={Boolean(issued)}
+              />
+            </LabeledField>
+            <LabeledField label="Form">
+              <Input
+                value={item.form}
+                onChange={(e) => patchItem(item.key, { form: e.target.value })}
+                placeholder="Tablet"
+                disabled={Boolean(issued)}
+              />
+            </LabeledField>
+            <LabeledField label="Take">
+              <Input
+                value={item.dosage}
+                onChange={(e) => patchItem(item.key, { dosage: e.target.value })}
+                placeholder="1 tablet"
+                disabled={Boolean(issued)}
+              />
+            </LabeledField>
+            <LabeledField label="Frequency">
+              <Input
+                value={item.frequency}
+                onChange={(e) => patchItem(item.key, { frequency: e.target.value })}
+                placeholder="Twice a day"
+                disabled={Boolean(issued)}
+              />
+            </LabeledField>
+            <LabeledField label="Duration (days)">
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={item.durationDays}
+                onChange={(e) => patchItem(item.key, { durationDays: Number(e.target.value) || 1 })}
+                placeholder="3"
+                disabled={Boolean(issued)}
+              />
+            </LabeledField>
+            <LabeledField label="Quantity">
+              <Input
+                type="number"
+                min={1}
+                value={item.quantity}
+                onChange={(e) => patchItem(item.key, { quantity: Number(e.target.value) || 1 })}
+                placeholder="6"
+                disabled={Boolean(issued)}
+              />
+            </LabeledField>
           </div>
-          <Input
-            value={item.instructions}
-            onChange={(e) => patchItem(item.key, { instructions: e.target.value })}
-            placeholder="Instructions (after meals)"
-            disabled={Boolean(issued)}
-          />
+          <LabeledField label="Extra directions">
+            <Input
+              value={item.instructions}
+              onChange={(e) => patchItem(item.key, { instructions: e.target.value })}
+              placeholder="Orally; after meals"
+              disabled={Boolean(issued)}
+            />
+          </LabeledField>
         </Card>
       ))}
 
@@ -350,6 +372,49 @@ export function PrescriptionClient({
           onClick={() => setItems((prev) => [...prev, blankItem(`item-${prev.length + 1}`)])}
         >
           Add another drug
+        </Button>
+      ) : null}
+
+      {investigations.map((investigation, index) => (
+        <Card key={investigation.key} className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-h5 text-ink">I{index + 1}</p>
+            {!issued ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-danger"
+                onClick={() => setInvestigations((prev) => prev.filter((it) => it.key !== investigation.key))}
+              >
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <LabeledField label="Investigation">
+            <Input
+              value={investigation.name}
+              onChange={(e) =>
+                setInvestigations((prev) =>
+                  prev.map((it) => (it.key === investigation.key ? { ...it, name: e.target.value } : it)),
+                )
+              }
+              placeholder="Full/Complete Urine Report (FUR/CUR)"
+              disabled={Boolean(issued)}
+            />
+          </LabeledField>
+        </Card>
+      ))}
+
+      {!issued && investigations.length < MAX_INVESTIGATIONS ? (
+        <Button
+          variant="outline"
+          className="self-start"
+          leading={<Plus className="size-4" />}
+          onClick={() =>
+            setInvestigations((prev) => [...prev, blankInvestigation(`inv-${prev.length + 1}`)])
+          }
+        >
+          Add investigation
         </Button>
       ) : null}
 
@@ -400,6 +465,15 @@ export function PrescriptionClient({
         }
       />
     </div>
+  );
+}
+
+function LabeledField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-label text-muted">{label}</span>
+      {children}
+    </label>
   );
 }
 
