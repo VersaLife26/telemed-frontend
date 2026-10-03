@@ -105,3 +105,9 @@ export type DoctorApplicationCreated = S["DoctorApplicationCreatedDto"];
 export type Icd10Code = S["Icd10CodeDto"];
 export type FormularyDrug = S["DrugDto"];
 export type SignedUrl = S["SignedUrlDto"];
+
+export type CustomerCareCategory = S["DisputeCategory"];
+export type CustomerCareStatus = S["DisputeStatus"];
+export type CustomerCareSummary = S["CustomerCareSummaryDto"];
+export type CustomerCareMessage = S["CustomerCareMessageDto"];
+export type CustomerCareThread = S["CustomerCareThreadDto"];

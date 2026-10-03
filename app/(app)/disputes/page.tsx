@@ -13,7 +13,7 @@ import { adminRoles } from "@/lib/admin/auth/current";
 import { can } from "@/lib/admin/rbac";
 import { filterValues, pageQuery } from "@/lib/admin/url-query";
 
-export const metadata: Metadata = { title: "Disputes" };
+export const metadata: Metadata = { title: "Customer care" };
 
 const PER_PAGE = 25;
 
@@ -31,14 +31,12 @@ export default async function DisputesPage({
       endpoints.disputes.list(
         query({
           status: params.status ?? "open",
+          category: params.category,
           page,
           pageSize: PER_PAGE,
         }),
       ),
     ),
-    // Names for assignees and the assignment dropdown. The roster is
-    // superAdmin-only, so every other role sees admin ids instead; failing to
-    // load it must not take the queue down with it.
     can(roles, "adminUsers")
       ? tryGetServer<AdminAccount[]>(endpoints.adminUsers.list())
       : Promise.resolve(null),
@@ -56,12 +54,25 @@ export default async function DisputesPage({
         { value: "closed", label: "Closed" },
       ],
     },
+    {
+      name: "category",
+      label: "Type",
+      kind: "select" as const,
+      options: [
+        { value: "refund", label: "Refund / payment" },
+        { value: "appointment", label: "Appointment" },
+        { value: "consultation", label: "Consultation" },
+        { value: "prescription", label: "Prescription" },
+        { value: "account", label: "Account" },
+        { value: "technical", label: "Technical" },
+      ],
+    },
   ];
 
   const header = (
     <PageHeader
-      title="Disputes"
-      description="Patient complaints and refund requests. A refund recorded with a resolution still has to be approved on the Payments screen, so the money decision is never implicit."
+      title="Customer care"
+      description="Messages from patients and doctors. Replies here appear in their chat. A refund recorded with a resolution still has to be approved on Payments."
     />
   );
 
@@ -72,8 +83,8 @@ export default async function DisputesPage({
     return (
       <>
         {header}
-        <FilterBar filters={filters} legend="Filter disputes" values={values} />
-        <ErrorState error={routeFatal(disputes.error)} what="the dispute queue" />
+        <FilterBar filters={filters} legend="Filter conversations" values={values} />
+        <ErrorState error={routeFatal(disputes.error)} what="the customer care queue" />
       </>
     );
   }
@@ -81,13 +92,13 @@ export default async function DisputesPage({
   return (
     <>
       {header}
-      <FilterBar filters={filters} legend="Filter disputes" values={values} />
+      <FilterBar filters={filters} legend="Filter conversations" values={values} />
       <DisputesBoard
         disputes={disputes.page.items}
         admins={admins?.ok ? admins.data : []}
-        filtered={(params.status ?? "open") !== "open"}
+        filtered={(params.status ?? "open") !== "open" || Boolean(params.category)}
       />
-      <Pagination meta={disputes.page} label="Disputes" query={queryString} />
+      <Pagination meta={disputes.page} label="Conversations" query={queryString} />
     </>
   );
 }

@@ -92,7 +92,6 @@ export const endpoints = {
 
   disputes: {
     list: (q: URLSearchParams) => `${ADMIN}/disputes?${q}`,
-    create: () => `${ADMIN}/disputes`,
     detail: (id: string) => `${ADMIN}/disputes/${id}`,
     comments: (id: string) => `${ADMIN}/disputes/${id}/comments`,
     assign: (id: string) => `${ADMIN}/disputes/${id}/assign`,

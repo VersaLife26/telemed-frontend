@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, Send } from "lucide-react";
+import { Headset, Send } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/admin/ui/alert";
 import { Badge } from "@/components/admin/ui/badge";
@@ -34,11 +34,9 @@ import { formatDateTime, formatMoney, humanise, shortId } from "@/lib/admin/form
 const MINIMUM_RESOLUTION = 25;
 
 /**
- * One dispute: assignment, mediation thread, resolution.
+ * One customer-care conversation: assignment, the shared thread, resolution.
  *
- * The mediation thread is internal. Nothing typed here is shown to the patient
- * or the doctor — it is the case file, and it is loaded on demand rather than
- * with the queue because forty case files is forty queries nobody asked for.
+ * Replies typed here are shown to the patient or doctor in their chat widget.
  */
 export function DisputeDrawer({
   dispute,
@@ -46,7 +44,6 @@ export function DisputeDrawer({
   onClose,
 }: {
   dispute: Dispute | null;
-  /** Empty when the caller may not read the admin roster; ids are then shown instead of names. */
   admins: AdminAccount[];
   onClose: () => void;
 }) {
@@ -90,7 +87,7 @@ export function DisputeDrawer({
     method: "POST",
     path: () => endpoints.disputes.comments(dispute?.id ?? ""),
     body: () => ({ body: comment.trim() }),
-    successMessage: () => "Comment added to the case file.",
+    successMessage: () => "Reply sent to the user.",
     invalidate: [detailKey],
     onSuccess: () => setComment(""),
   });
@@ -104,28 +101,29 @@ export function DisputeDrawer({
     body: () => ({ resolution: resolution.trim(), refundAmountCents: refundCents }),
     successMessage: () =>
       refundCents === null
-        ? "Dispute resolved."
-        : "Dispute resolved. The refund is waiting for approval on Payments.",
+        ? "Conversation resolved."
+        : "Conversation resolved. The refund is waiting for approval on Payments.",
     onSuccess: onClose,
   });
 
   const close = useApiMutation<DisputeDetail, void>({
     method: "POST",
     path: () => endpoints.disputes.close(dispute?.id ?? ""),
-    successMessage: () => "Dispute closed.",
+    successMessage: () => "Conversation closed.",
     onSuccess: onClose,
   });
 
   const resolutionTooShort = resolution.trim().length < MINIMUM_RESOLUTION;
   const status = view?.status;
   const settled = status === "resolved" || status === "closed";
+  const canRefund = Boolean(view?.appointmentId);
 
   return (
     <Dialog open={enabled} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            {view ? view.subject : "Dispute"}
+            {view ? view.subject : "Customer care"}
             {view ? (
               <Badge className="ml-2" variant="outline">
                 {humanise(view.status)}
@@ -133,8 +131,12 @@ export function DisputeDrawer({
             ) : null}
           </DialogTitle>
           <DialogDescription>
-            Appointment{" "}
-            <span className="font-mono">{view ? shortId(view.appointmentId) : ""}</span>
+            {view ? `${humanise(view.category)} · ${humanise(view.openedBy)}` : ""}
+            {view?.appointmentId
+              ? ` · appointment ${shortId(view.appointmentId)}`
+              : view
+                ? " · no appointment attached"
+                : ""}
             {view ? ` · raised ${formatDateTime(view.createdAt)}` : ""}
           </DialogDescription>
         </DialogHeader>
@@ -143,13 +145,11 @@ export function DisputeDrawer({
           <div className="space-y-5">
             <section>
               <h3 className="mb-1 text-sm font-medium">What was reported</h3>
-              <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-                {view.description}
-              </p>
+              <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">{view.description}</p>
               {detail.data && detail.data.refunds.length > 0 ? (
                 <Alert variant="warning" className="mt-3">
-                  <MessageSquare aria-hidden="true" />
-                  <AlertTitle>Refunds from this dispute</AlertTitle>
+                  <Headset aria-hidden="true" />
+                  <AlertTitle>Refunds from this conversation</AlertTitle>
                   <AlertDescription>
                     <ul className="space-y-0.5">
                       {detail.data.refunds.map((r) => (
@@ -214,41 +214,37 @@ export function DisputeDrawer({
             <Separator />
 
             <section className="space-y-2">
-              <h3 className="text-sm font-medium">Internal case notes</h3>
+              <h3 className="text-sm font-medium">Conversation</h3>
               {detail.isPending ? (
                 <div className="space-y-2" aria-busy="true">
-                  <span className="sr-only">Loading case notes</span>
+                  <span className="sr-only">Loading messages</span>
                   <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
                 </div>
               ) : detail.isError ? (
                 <Alert variant="destructive">
-                  <MessageSquare aria-hidden="true" />
-                  <AlertTitle>Could not load case notes</AlertTitle>
+                  <Headset aria-hidden="true" />
+                  <AlertTitle>Could not load messages</AlertTitle>
                   <AlertDescription>
                     {detail.error.userMessage}
                     {detail.error.traceId ? (
-                      <span className="ml-1 font-mono text-xs">
-                        Trace ID: {detail.error.traceId}
-                      </span>
+                      <span className="ml-1 font-mono text-xs">Trace ID: {detail.error.traceId}</span>
                     ) : null}
                   </AlertDescription>
                 </Alert>
               ) : detail.data.comments.length === 0 ? (
-                <EmptyState
-                  icon={MessageSquare}
-                  title="No case notes yet"
-                  description="Notes are internal. Neither the patient nor the doctor sees them."
-                />
+                <EmptyState icon={Headset} title="No messages yet" description="Replies here are sent to the user." />
               ) : (
                 <ol className="max-h-60 space-y-2 overflow-y-auto pr-1">
                   {detail.data.comments.map((entry) => (
                     <li key={entry.id} className="rounded-md border border-border p-3 text-sm">
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="font-medium">{adminName(entry.authorAdminId)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDateTime(entry.createdAt)}
+                        <p className="font-medium">
+                          {entry.fromSupport
+                            ? (adminName(entry.authorAdminId) ?? "Customer care")
+                            : "User"}
                         </p>
+                        <p className="text-xs text-muted-foreground">{formatDateTime(entry.createdAt)}</p>
                       </div>
                       <p className="mt-1 whitespace-pre-wrap">{entry.body}</p>
                     </li>
@@ -259,11 +255,11 @@ export function DisputeDrawer({
               {status !== "closed" ? (
                 <div className="flex gap-2">
                   <Textarea
-                    aria-label="Add a case note"
+                    aria-label="Reply to the user"
                     rows={2}
                     value={comment}
                     onChange={(event) => setComment(event.target.value)}
-                    placeholder="What you did, who you spoke to, what they said."
+                    placeholder="This reply is visible to the patient or doctor."
                   />
                   <Button
                     className="self-end"
@@ -271,7 +267,7 @@ export function DisputeDrawer({
                     onClick={() => addComment.mutate()}
                   >
                     <Send className="size-4" aria-hidden="true" />
-                    Add
+                    Send
                   </Button>
                 </div>
               ) : null}
@@ -294,38 +290,44 @@ export function DisputeDrawer({
                     onBlur={() => setTouched(true)}
                     aria-invalid={touched && resolutionTooShort}
                     aria-describedby="dispute-resolution-help"
-                    placeholder="What was decided, and what the patient was told."
+                    placeholder="What was decided, and what the user was told."
                   />
                   <p
                     id="dispute-resolution-help"
                     className={
-                      touched && resolutionTooShort
-                        ? "text-xs text-destructive"
-                        : "text-xs text-muted-foreground"
+                      touched && resolutionTooShort ? "text-xs text-destructive" : "text-xs text-muted-foreground"
                     }
                   >
                     {touched && resolutionTooShort
                       ? `At least ${MINIMUM_RESOLUTION} characters.`
                       : "Recorded in the audit log."}
                   </p>
-                  <Label htmlFor="dispute-refund">Refund amount (LKR, optional)</Label>
-                  <Input
-                    id="dispute-refund"
-                    inputMode="decimal"
-                    className="max-w-xs"
-                    value={refund}
-                    onChange={(event) => setRefund(event.target.value)}
-                    aria-invalid={refundInvalid}
-                    aria-describedby="dispute-refund-help"
-                  />
-                  <p
-                    id="dispute-refund-help"
-                    className={refundInvalid ? "text-xs text-destructive" : "text-xs text-muted-foreground"}
-                  >
-                    {refundInvalid
-                      ? "Enter a positive amount, or leave it blank."
-                      : "Creates a refund request that still needs approval on the Payments screen."}
-                  </p>
+                  {canRefund ? (
+                    <>
+                      <Label htmlFor="dispute-refund">Refund amount (LKR, optional)</Label>
+                      <Input
+                        id="dispute-refund"
+                        inputMode="decimal"
+                        className="max-w-xs"
+                        value={refund}
+                        onChange={(event) => setRefund(event.target.value)}
+                        aria-invalid={refundInvalid}
+                        aria-describedby="dispute-refund-help"
+                      />
+                      <p
+                        id="dispute-refund-help"
+                        className={refundInvalid ? "text-xs text-destructive" : "text-xs text-muted-foreground"}
+                      >
+                        {refundInvalid
+                          ? "Enter a positive amount, or leave it blank."
+                          : "Creates a refund request that still needs approval on the Payments screen."}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This conversation is not tied to an appointment, so a refund cannot be requested here.
+                    </p>
+                  )}
                   <Button
                     disabled={resolutionTooShort || refundInvalid || resolve.isPending}
                     onClick={() => {
@@ -340,18 +342,13 @@ export function DisputeDrawer({
               </>
             ) : (
               <Alert variant="success">
-                <MessageSquare aria-hidden="true" />
+                <Headset aria-hidden="true" />
                 <AlertTitle>{humanise(view.status)}</AlertTitle>
                 <AlertDescription className="space-y-2">
                   <p>{view.resolution ?? "No resolution text was recorded."}</p>
                   {status === "resolved" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={close.isPending}
-                      onClick={() => close.mutate()}
-                    >
-                      {close.isPending ? "Closing…" : "Close dispute"}
+                    <Button size="sm" variant="outline" disabled={close.isPending} onClick={() => close.mutate()}>
+                      {close.isPending ? "Closing…" : "Close conversation"}
                     </Button>
                   ) : null}
                 </AlertDescription>

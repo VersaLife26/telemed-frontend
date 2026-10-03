@@ -27,7 +27,7 @@ const PERMISSION_LABELS: Record<AdminPermission, { label: string; detail: string
   users: { label: "Users", detail: "Search, suspend and reinstate patients and doctors." },
   appointments: { label: "Appointments", detail: "All bookings, cancellations and reschedule requests." },
   content: { label: "Content", detail: "Specialties, the drug formulary, and waiting-room articles and ads." },
-  disputes: { label: "Disputes", detail: "Patient complaints and refund mediation." },
+  disputes: { label: "Customer care", detail: "Patient and doctor complaints and refund mediation." },
   analytics: { label: "Analytics", detail: "The dashboard." },
   audit: { label: "Audit log", detail: "Read the record of admin actions." },
   finance: { label: "Finance", detail: "Ledger, payouts, refunds and promo codes." },

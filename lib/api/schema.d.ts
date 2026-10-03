@@ -580,6 +580,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-care": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerCare_List"];
+        put?: never;
+        post: operations["CustomerCare_Open"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-care/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerCare_Get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-care/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerCare_Reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/doctor-applications/eligibility": {
         parameters: {
             query?: never;
@@ -1661,7 +1709,7 @@ export interface paths {
         };
         get: operations["AdminDisputes_List"];
         put?: never;
-        post: operations["AdminDisputes_Create"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2795,7 +2843,7 @@ export interface components {
             readAt: null | string;
         };
         /** @enum {string} */
-        AdminNotificationKind: "doctorApplicationSubmitted" | "doctorNoShow" | "refundManualRequired" | "paymentCaptureFailed";
+        AdminNotificationKind: "doctorApplicationSubmitted" | "doctorNoShow" | "refundManualRequired" | "paymentCaptureFailed" | "customerCare";
         /** @enum {string} */
         AdminPermission: "credentialing" | "doctors" | "users" | "appointments" | "content" | "disputes" | "analytics" | "audit" | "finance" | "auditExport" | "adminUsers";
         AdminRefundDto: {
@@ -3164,12 +3212,6 @@ export interface components {
             displayName: string;
             role: components["schemas"]["AdminRole"];
         };
-        CreateDisputeRequest: {
-            /** Format: uuid */
-            appointmentId: string;
-            subject: string;
-            description: string;
-        };
         CreateHolidayRequest: {
             /** Format: date */
             date: string;
@@ -3239,6 +3281,43 @@ export interface components {
             /** Format: uuid */
             parentId: null | string;
         };
+        CustomerCareMessageDto: {
+            /** Format: uuid */
+            id: string;
+            body: string;
+            fromSupport: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CustomerCareMessageRequest: {
+            body: string;
+        };
+        CustomerCareSummaryDto: {
+            /** Format: uuid */
+            id: string;
+            category: components["schemas"]["DisputeCategory"];
+            status: components["schemas"]["DisputeStatus"];
+            /** Format: uuid */
+            appointmentId: null | string;
+            subject: string;
+            lastMessage: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CustomerCareThreadDto: {
+            /** Format: uuid */
+            id: string;
+            category: components["schemas"]["DisputeCategory"];
+            status: components["schemas"]["DisputeStatus"];
+            /** Format: uuid */
+            appointmentId: null | string;
+            subject: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            messages: components["schemas"]["CustomerCareMessageDto"][];
+        };
         DashboardDto: {
             /** Format: date */
             from: string;
@@ -3271,11 +3350,16 @@ export interface components {
             code: string;
             isPrimary: boolean;
         };
+        /** @enum {string} */
+        DisputeCategory: "refund" | "appointment" | "consultation" | "prescription" | "account" | "technical";
         DisputeCommentDto: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            authorAdminId: string;
+            authorAdminId: null | string;
+            /** Format: uuid */
+            authorUserId: null | string;
+            fromSupport: boolean;
             body: string;
             /** Format: date-time */
             createdAt: string;
@@ -3289,16 +3373,20 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            appointmentId: string;
+            appointmentId: null | string;
             /** Format: uuid */
-            patientId: string;
+            patientId: null | string;
             /** Format: uuid */
-            doctorId: string;
+            doctorId: null | string;
+            category: components["schemas"]["DisputeCategory"];
+            openedBy: components["schemas"]["DisputeOpener"];
             subject: string;
             description: string;
             status: components["schemas"]["DisputeStatus"];
             /** Format: uuid */
-            openedByAdminId: string;
+            openedByAdminId: null | string;
+            /** Format: uuid */
+            openedByUserId: null | string;
             /** Format: uuid */
             assignedAdminId: null | string;
             resolution: null | string;
@@ -3313,6 +3401,8 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @enum {string} */
+        DisputeOpener: "admin" | "patient" | "doctor";
         /** @enum {string} */
         DisputeStatus: "open" | "investigating" | "resolved" | "closed";
         DoctorAnalyticsDto: {
@@ -3778,6 +3868,12 @@ export interface components {
         };
         /** @enum {string} */
         MockOutcome: "succeed" | "fail";
+        OpenCustomerCareRequest: {
+            category: components["schemas"]["DisputeCategory"];
+            body: string;
+            /** Format: uuid */
+            appointmentId: null | string;
+        };
         OrderSummaryDto: {
             /** Format: uuid */
             paymentId: string;
@@ -3881,6 +3977,15 @@ export interface components {
         };
         PagedResultOfConsultationMessageDto: {
             items: components["schemas"]["ConsultationMessageDto"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        PagedResultOfCustomerCareSummaryDto: {
+            items: components["schemas"]["CustomerCareSummaryDto"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -7023,6 +7128,236 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EarlyJoinDto"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The current state does not allow this; see `code`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerCare_List: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfCustomerCareSummaryDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerCare_Open: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenCustomerCareRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCareThreadDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The current state does not allow this; see `code`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerCare_Get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCareThreadDto"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerCare_Reply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCareMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCareMessageDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Missing, expired or revoked credentials. */
@@ -11552,6 +11887,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["DisputeStatus"];
+                category?: components["schemas"]["DisputeCategory"];
                 assignedAdminId?: string;
                 appointmentId?: string;
                 page?: number;
@@ -11592,66 +11928,6 @@ export interface operations {
             };
             /** @description The caller may not do this. */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    AdminDisputes_Create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateDisputeRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DisputeDetailDto"];
-                };
-            };
-            /** @description Validation failed or the request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Missing, expired or revoked credentials. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description The caller may not do this. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description The current state does not allow this; see `code`. */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

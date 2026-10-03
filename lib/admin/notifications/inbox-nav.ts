@@ -6,6 +6,7 @@ export const NAV_INBOX_BADGE_HREFS = new Set([
   "/users",
   "/appointments",
   "/payments",
+  "/disputes",
 ]);
 
 /**
@@ -23,6 +24,8 @@ export function navHrefForNotification(
     case "doctorNoShow":
     case "paymentCaptureFailed":
       return "/appointments";
+    case "customerCare":
+      return "/disputes";
     default:
       return null;
   }

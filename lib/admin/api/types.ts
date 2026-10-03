@@ -146,6 +146,7 @@ export type WaitingRoomItem = {
 // ---------------------------------------------------------------------------
 
 export type DisputeStatus = S["DisputeStatus"];
+export type DisputeCategory = S["DisputeCategory"];
 export type Dispute = S["DisputeDto"];
 export type DisputeDetail = S["DisputeDetailDto"];
 export type DisputeComment = S["DisputeCommentDto"];

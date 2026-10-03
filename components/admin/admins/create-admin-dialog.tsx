@@ -34,7 +34,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
 };
 
 const ROLE_HINTS: Record<AdminRole, string> = {
-  support: "Patient support and disputes. Cannot move money or change settings.",
+  support: "Patient support and customer care. Cannot move money or change settings.",
   ops: "Day-to-day operations. No finance, no admin accounts.",
   finance: "Refunds, payouts, the ledger and the audit export.",
   admin: "General administration. No finance, no admin accounts.",

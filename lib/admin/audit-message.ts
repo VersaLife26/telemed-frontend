@@ -20,7 +20,7 @@ const SUBJECTS: Record<string, string> = {
   vault_folders: "Vault folder",
   payouts: "Payout",
   payout_batches: "Payout batch",
-  disputes: "Dispute",
+  disputes: "Customer care",
   promo_codes: "Promo code",
   promo_redemptions: "Promo redemption",
   sessions: "Session",

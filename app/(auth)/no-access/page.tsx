@@ -24,7 +24,7 @@ const AREA_NAMES: Record<RbacGroup, string> = {
   appointments: "appointments",
   finance: "payments and finance",
   content: "content management",
-  disputes: "disputes",
+  disputes: "customer care",
   analytics: "the dashboard",
   audit: "audit logs",
   auditExport: "the audit log export",

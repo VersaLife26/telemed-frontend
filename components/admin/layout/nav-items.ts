@@ -2,8 +2,8 @@ import {
   BadgeCheck,
   CalendarClock,
   FileText,
+  Headset,
   LayoutDashboard,
-  MessageSquareWarning,
   ScrollText,
   ShieldUser,
   Users,
@@ -74,9 +74,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     href: "/disputes",
-    label: "Disputes",
-    description: "Patient complaints and refund mediation",
-    icon: MessageSquareWarning,
+    label: "Customer care",
+    description: "Patient and doctor complaints",
+    icon: Headset,
     group: "disputes",
   },
   {

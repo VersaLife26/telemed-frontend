@@ -99,7 +99,7 @@ export function RefundsPanel({ refunds }: { refunds: AdminRefund[] }) {
           <EmptyState
             icon={HandCoins}
             title="No refunds"
-            description="Refunds are raised by cancellations, disputes, or directly by support."
+            description="Refunds are raised by cancellations, customer care, or directly by support."
           />
         ) : (
           <ul className="space-y-3">
