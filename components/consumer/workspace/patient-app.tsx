@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Pill, StickyNote } from "lucide-react";
+import { AlertTriangle, Pill, ScrollText, StickyNote } from "lucide-react";
 
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { browserApi } from "@/lib/consumer/api/client";
@@ -17,7 +17,7 @@ export function PatientApp({
   onOpen,
 }: {
   appointmentId: string;
-  onOpen: (app: "notes" | "rx") => void;
+  onOpen: (app: "notes" | "rx" | "report") => void;
 }) {
   const [appt, setAppt] = useState<Appointment | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,14 +99,14 @@ export function PatientApp({
         </p>
       </section>
 
-      <div className="mt-auto grid gap-2 @xs:grid-cols-2">
+      <div className="mt-auto grid gap-2 @xs:grid-cols-3">
         <button
           type="button"
           onClick={() => onOpen("notes")}
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-pill bg-white/10 font-semibold transition-[background-color,scale] duration-[140ms] ease-out active:scale-[0.97] can-hover:hover:bg-white/20"
         >
           <StickyNote className="size-4" />
-          Clinical notes
+          Notes
         </button>
         <button
           type="button"
@@ -114,7 +114,15 @@ export function PatientApp({
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-pill bg-brand font-semibold transition-[background-color,scale] duration-[140ms] ease-out active:scale-[0.97] can-hover:hover:bg-brand-hover"
         >
           <Pill className="size-4" />
-          Prescription
+          Rx
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpen("report")}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-pill bg-white/10 font-semibold transition-[background-color,scale] duration-[140ms] ease-out active:scale-[0.97] can-hover:hover:bg-white/20"
+        >
+          <ScrollText className="size-4" />
+          Report
         </button>
       </div>
     </div>

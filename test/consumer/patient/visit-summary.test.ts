@@ -5,6 +5,7 @@ import type { ClinicalNote } from "@/lib/consumer/api/types";
 import {
   SUMMARY_POLL_MAX_ATTEMPTS,
   clinicalNotePath,
+  medicalReportLookupPath,
   noteVisibleToPatient,
   prescriptionLookupPath,
   shouldStopPolling,
@@ -45,7 +46,8 @@ test("polling stops after a signed note plus prescription, or after 30 attempts"
   assert.equal(shouldStopPolling({ noteFinalised: false, haveRx: false, attempts: 30 }), false);
 });
 
-test("summary looks up notes and prescription by appointment", () => {
+test("summary looks up notes, prescription, and medical report by appointment", () => {
   assert.equal(clinicalNotePath("appt-1"), "/appointments/appt-1/clinical-note");
   assert.equal(prescriptionLookupPath("appt-1"), "/appointments/appt-1/prescription");
+  assert.equal(medicalReportLookupPath("appt-1"), "/appointments/appt-1/medical-report");
 });

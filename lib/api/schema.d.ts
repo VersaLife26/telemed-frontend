@@ -1108,6 +1108,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/appointments/{appointmentId}/medical-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MedicalReports_GetForAppointment"];
+        put?: never;
+        post: operations["MedicalReports_Issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/medical-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MedicalReports_List"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/medical-reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MedicalReports_Get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/medical-reports/{id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MedicalReports_Pdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/medical-reports/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MedicalReports_Cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/medical-reports/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MedicalReports_Verify"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/specialties": {
         parameters: {
             query?: never;
@@ -2898,6 +2994,9 @@ export interface components {
         CancelPrescriptionRequest: {
             reason: null | string;
         };
+        CancelMedicalReportRequest: {
+            reason: null | string;
+        };
         CapturedMessageDto: {
             /** Format: uuid */
             id: string;
@@ -3470,7 +3569,21 @@ export interface components {
         };
         IssuePrescriptionRequest: {
             items: components["schemas"]["PrescriptionItemRequest"][];
-            investigations?: null | string[];
+            investigations: null | string[];
+        };
+        IssueMedicalReportRequest: {
+            addressee: null | string;
+            clinicalImpression: string;
+            findings: null | string;
+            advice: null | string;
+            fitness: components["schemas"]["FitnessForWork"];
+            /** Format: date */
+            leaveFrom: null | string;
+            /** Format: date */
+            leaveUntil: null | string;
+            /** Format: date */
+            returnToWorkOn: null | string;
+            fitnessNotes: null | string;
         };
         JoinConsultationDto: {
             /** Format: uuid */
@@ -3489,6 +3602,8 @@ export interface components {
         JsonElement: unknown;
         /** @enum {string} */
         Language: "en" | "si" | "ta";
+        /** @enum {string} */
+        FitnessForWork: "notAssessed" | "fit" | "unfit" | "restricted";
         LastVisitDetailsDto: {
             name: null | string;
             /** Format: date */
@@ -3564,6 +3679,51 @@ export interface components {
         };
         MarkRefundedRequest: {
             reference: string;
+        };
+        MedicalReportDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            appointmentId: string;
+            /** Format: uuid */
+            doctorId: string;
+            /** Format: uuid */
+            patientId: string;
+            doctorName: string;
+            doctorSlmc: string;
+            doctorQualifications: string;
+            /** Format: date-time */
+            issuedAt: string;
+            status: components["schemas"]["MedicalReportStatus"];
+            /** Format: date-time */
+            cancelledAt: null | string;
+            cancellationReason: null | string;
+            isTest: boolean;
+            addressee: string;
+            clinicalImpression: string;
+            findings: null | string;
+            advice: null | string;
+            fitness: components["schemas"]["FitnessForWork"];
+            /** Format: date */
+            leaveFrom: null | string;
+            /** Format: date */
+            leaveUntil: null | string;
+            /** Format: date */
+            returnToWorkOn: null | string;
+            fitnessNotes: null | string;
+        };
+        /** @enum {string} */
+        MedicalReportStatus: "issued" | "cancelled";
+        MedicalReportVerificationDto: {
+            valid: boolean;
+            reason: null | string;
+            /** Format: date-time */
+            issuedAt: null | string;
+            doctorName: null | string;
+            doctorSlmc: null | string;
+            patientInitials: null | string;
+            clinicalImpression: null | string;
+            fitness: null | components["schemas"]["FitnessForWork"];
         };
         MeDto: {
             /** Format: uuid */
@@ -3755,6 +3915,15 @@ export interface components {
         };
         PagedResultOfPrescriptionDto: {
             items: components["schemas"]["PrescriptionDto"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        PagedResultOfMedicalReportDto: {
+            items: components["schemas"]["MedicalReportDto"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -4144,10 +4313,6 @@ export interface components {
         RefreshRequest: {
             refreshToken: string;
         };
-        ResetPasswordRequest: {
-            token: string;
-            newPassword: string;
-        };
         RefundDto: {
             /** Format: uuid */
             id: string;
@@ -4163,7 +4328,7 @@ export interface components {
             createdAt: string;
         };
         /** @enum {string} */
-        RefundReason: "patientCancellation" | "doctorCancellation" | "adminCancellation" | "systemCancellation" | "latePayment" | "rescheduleDeclined" | "doctorNoShow" | "adminRequest" | "dispute";
+        RefundReason: "patientCancellation" | "doctorCancellation" | "adminCancellation" | "systemCancellation" | "latePayment" | "rescheduleDeclined" | "doctorNoShow" | "patientNoShow" | "adminRequest" | "dispute";
         /** @enum {string} */
         RefundStatus: "requested" | "approved" | "processing" | "succeeded" | "failed" | "manualRequired" | "rejected";
         RegisterEmailRequest: {
@@ -4209,6 +4374,10 @@ export interface components {
         };
         /** @enum {string} */
         RescheduleStatus: "pending" | "accepted" | "declined" | "expired";
+        ResetPasswordRequest: {
+            token: string;
+            newPassword: string;
+        };
         ResetUserPasswordRequest: {
             newPassword: string;
         };
@@ -9111,6 +9280,396 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PrescriptionVerificationDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limited. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_GetForAppointment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalReportDto"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_Issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueMedicalReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalReportDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The current state does not allow this; see `code`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_List: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfMedicalReportDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_Get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalReportDto"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_Pdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_Cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": null | components["schemas"]["CancelMedicalReportRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalReportDto"];
+                };
+            };
+            /** @description Validation failed or the request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Missing, expired or revoked credentials. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller may not do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not found, or not visible to the caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The current state does not allow this; see `code`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MedicalReports_Verify: {
+        parameters: {
+            query?: {
+                h?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalReportVerificationDto"];
                 };
             };
             /** @description Validation failed or the request is malformed. */

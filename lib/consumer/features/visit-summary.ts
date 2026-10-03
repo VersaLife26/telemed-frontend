@@ -21,6 +21,10 @@ export function prescriptionLookupPath(appointmentId: string): string {
   return `/appointments/${appointmentId}/prescription`;
 }
 
+export function medicalReportLookupPath(appointmentId: string): string {
+  return `/appointments/${appointmentId}/medical-report`;
+}
+
 export function clinicalNotePath(appointmentId: string): string {
   return `/appointments/${appointmentId}/clinical-note`;
 }

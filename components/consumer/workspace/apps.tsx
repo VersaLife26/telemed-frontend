@@ -5,6 +5,7 @@ import {
   FolderClosed,
   MessageSquare,
   Pill,
+  ScrollText,
   StickyNote,
   UserRound,
   Video,
@@ -19,7 +20,8 @@ export type WorkspaceApp =
   | "visits"
   | "patient"
   | "notes"
-  | "rx";
+  | "rx"
+  | "report";
 
 type AppMeta = {
   label: string;
@@ -40,13 +42,14 @@ export const APPS: Record<WorkspaceApp, AppMeta> = {
   patient: { label: "Patient", color: "#0891b2", Icon: UserRound, size: { w: 400, h: 520 }, min: { w: 280, h: 280 }, launcher: false },
   notes: { label: "Notes", color: "#16a34a", Icon: StickyNote, size: { w: 640, h: 680 }, min: { w: 320, h: 320 }, launcher: false },
   rx: { label: "Prescription", color: "#db2777", Icon: Pill, size: { w: 680, h: 700 }, min: { w: 320, h: 320 }, launcher: false },
+  report: { label: "Report", color: "#015591", Icon: ScrollText, size: { w: 680, h: 700 }, min: { w: 320, h: 320 }, launcher: false },
   viewer: { label: "Preview", color: "#64748b", Icon: FileText, size: { w: 740, h: 560 }, min: { w: 300, h: 240 }, launcher: false },
 };
 
 export const LAUNCHER_APPS = (Object.keys(APPS) as WorkspaceApp[]).filter((app) => APPS[app].launcher);
 
 /** Apps opened per visit get one window per appointment. */
-export function visitWindowId(app: "patient" | "notes" | "rx", appointmentId: string): string {
+export function visitWindowId(app: "patient" | "notes" | "rx" | "report", appointmentId: string): string {
   return `${app}:${appointmentId}`;
 }
 

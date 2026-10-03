@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, ListOrdered, Pill, User, Video } from "lucide-react";
+import { CalendarDays, FileText, ListOrdered, Pill, ScrollText, User, Video } from "lucide-react";
 
 import { EndConsultationButton } from "@/components/consumer/end-consultation-button";
 import { RescheduleRequestForm } from "@/components/consumer/reschedule-request-form";
@@ -14,6 +14,7 @@ import { afterEndPath } from "@/lib/consumer/features/consult";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import { formatMoney } from "@/lib/consumer/money";
 import { prescriptionPagePath } from "@/lib/consumer/features/prescription";
+import { medicalReportPagePath } from "@/lib/consumer/features/medical-report";
 import { HeroChip, PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
@@ -165,6 +166,14 @@ export default async function QueuePage() {
                       leading={<Pill className="size-4" />}
                     >
                       Prescription
+                    </ButtonLink>
+                    <ButtonLink
+                      href={medicalReportPagePath(a.id)}
+                      size="sm"
+                      variant="secondary"
+                      leading={<ScrollText className="size-4" />}
+                    >
+                      Report
                     </ButtonLink>
                     <EndConsultationButton appointmentId={a.id} />
                   </div>

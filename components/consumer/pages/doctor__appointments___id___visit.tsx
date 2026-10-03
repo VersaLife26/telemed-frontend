@@ -88,6 +88,9 @@ export default function DoctorVisitDetailPage({ appointmentId }: { appointmentId
         <ButtonLink href={`/appointments/${appointmentId}/prescription`} variant="outline">
           Prescription
         </ButtonLink>
+        <ButtonLink href={`/appointments/${appointmentId}/medical-report`} variant="outline">
+          Medical report
+        </ButtonLink>
       </div>
     </div>
   );

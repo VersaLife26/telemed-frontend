@@ -82,6 +82,10 @@ export type PrescriptionItem = S["PrescriptionItemDto"];
 export type PrescriptionItemRequest = S["PrescriptionItemRequest"];
 export type Prescription = S["PrescriptionDto"];
 
+export type FitnessForWork = S["FitnessForWork"];
+export type MedicalReportStatus = S["MedicalReportStatus"];
+export type MedicalReport = S["MedicalReportDto"];
+
 export type VaultDocumentType = S["VaultDocumentType"];
 export type VaultDocument = S["VaultDocumentDto"];
 export type VaultFolder = S["VaultFolderDto"];

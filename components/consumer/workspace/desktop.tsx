@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useState, type ReactNode } from "reac
 
 import { CALL_EXPAND_EVENT, useCall, useCallScreen } from "@/components/consumer/call/call-provider";
 import { ClinicalNotesClient } from "@/components/consumer/clinical-notes-client";
+import { MedicalReportClient } from "@/components/consumer/medical-report-client";
 import { PrescriptionClient } from "@/components/consumer/prescription-client";
 import { visitWindowId } from "@/components/consumer/workspace/apps";
 import { CalendarApp } from "@/components/consumer/workspace/calendar-app";
@@ -65,8 +66,11 @@ function WorkspaceInner() {
   }, [activeId, paramId, start]);
 
   const openVisit = useCallback(
-    (appointmentId: string, app: "patient" | "notes" | "rx", label: string, background = false) => {
-      const title = app === "patient" ? label : `${app === "notes" ? "Notes" : "Prescription"} · ${label}`;
+    (appointmentId: string, app: "patient" | "notes" | "rx" | "report", label: string, background = false) => {
+      const title =
+        app === "patient"
+          ? label
+          : `${app === "notes" ? "Notes" : app === "rx" ? "Prescription" : "Report"} · ${label}`;
       open(app, { id: visitWindowId(app, appointmentId), title, props: { appointmentId }, background });
     },
     [open],
@@ -89,6 +93,7 @@ function WorkspaceInner() {
         openVisit(callId, "patient", label, true);
         openVisit(callId, "notes", label, true);
         openVisit(callId, "rx", label, true);
+        openVisit(callId, "report", label, true);
       })
       .catch(() => {
         if (!cancelled) setPatientId(null);
@@ -118,7 +123,7 @@ function WorkspaceInner() {
     stop();
     if (paramId) router.replace("/workspace");
     if (!id) return;
-    for (const app of ["rx", "notes"] as const) {
+    for (const app of ["rx", "notes", "report"] as const) {
       const win = windows.find((w) => w.id === visitWindowId(app, id));
       if (win) restore(win.id);
     }
@@ -193,6 +198,12 @@ function WorkspaceInner() {
         return appointmentId ? (
           <div className="ws-body-light">
             <PrescriptionClient appointmentId={appointmentId} embedded />
+          </div>
+        ) : null;
+      case "report":
+        return appointmentId ? (
+          <div className="ws-body-light">
+            <MedicalReportClient appointmentId={appointmentId} embedded />
           </div>
         ) : null;
     }

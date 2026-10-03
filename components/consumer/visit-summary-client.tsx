@@ -10,21 +10,24 @@ import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { browserApi } from "@/lib/consumer/api/client";
 import { isNotFound } from "@/lib/consumer/api/errors";
-import type { Appointment, ClinicalNote, Doctor, Prescription } from "@/lib/consumer/api/types";
+import type { Appointment, ClinicalNote, Doctor, MedicalReport, Prescription } from "@/lib/consumer/api/types";
 import { formatVisitClock, formatVisitDate } from "@/lib/consumer/features/patient-appointment";
 import {
   clinicalNotePath,
+  medicalReportLookupPath,
   noteVisibleToPatient,
   prescriptionLookupPath,
   shouldStopPolling,
 } from "@/lib/consumer/features/visit-summary";
 import { downloadPrescriptionPdf } from "@/lib/consumer/features/prescription";
+import { downloadMedicalReportPdf } from "@/lib/consumer/features/medical-report";
 
 export function VisitSummaryClient({ appointmentId }: { appointmentId: string }) {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [doctorName, setDoctorName] = useState<string | null>(null);
   const [note, setNote] = useState<ClinicalNote | null>(null);
   const [rx, setRx] = useState<Prescription | null>(null);
+  const [report, setReport] = useState<MedicalReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +36,7 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
     let attempts = 0;
     let haveNote = false;
     let haveRx = false;
+    let haveReport = false;
     let haveAppointment = false;
 
     async function tick(first: boolean) {
@@ -74,6 +78,18 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
               }),
           );
         }
+        if (!haveReport) {
+          jobs.push(
+            browserApi<MedicalReport>(medicalReportLookupPath(appointmentId))
+              .then((r) => {
+                haveReport = true;
+                if (!cancelled) setReport(r);
+              })
+              .catch((e) => {
+                if (!isNotFound(e)) throw e;
+              }),
+          );
+        }
         await Promise.all(jobs);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not load summary");
@@ -105,6 +121,16 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
       await downloadPrescriptionPdf(rx.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not download the prescription PDF.");
+    }
+  }
+
+  async function downloadReport() {
+    if (!report) return;
+    setError(null);
+    try {
+      await downloadMedicalReportPdf(report.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not download the medical report PDF.");
     }
   }
 
@@ -184,6 +210,32 @@ export function VisitSummaryClient({ appointmentId }: { appointmentId: string })
         ) : (
           <p className="text-body-sm text-muted">
             No prescription yet. This updates when the doctor issues one.
+          </p>
+        )}
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <h2 className="text-h5 text-ink">Medical report</h2>
+        {report ? (
+          <>
+            <p className="text-body-sm text-ink">{report.clinicalImpression}</p>
+            {report.fitness !== "notAssessed" ? (
+              <p className="text-body-sm text-muted">
+                {report.fitness === "unfit"
+                  ? "Medical leave issued"
+                  : report.fitness === "restricted"
+                    ? "Fit for work with restrictions"
+                    : "Fit for usual work"}
+                {report.leaveFrom && report.leaveUntil ? ` · ${report.leaveFrom} to ${report.leaveUntil}` : ""}
+              </p>
+            ) : null}
+            <Button fullWidth leading={<Download className="size-4" />} onClick={() => void downloadReport()}>
+              Download medical report PDF
+            </Button>
+          </>
+        ) : (
+          <p className="text-body-sm text-muted">
+            No medical report yet. This updates if the doctor issues one.
           </p>
         )}
       </Card>

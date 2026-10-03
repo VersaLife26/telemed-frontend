@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Pill, Search, StickyNote, UserRound, Video } from "lucide-react";
+import { Pill, ScrollText, Search, StickyNote, UserRound, Video } from "lucide-react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
 import { StatusBadge } from "@/components/consumer/ui/StatusBadge";
@@ -30,7 +30,7 @@ export function VisitsApp({
   onOpen,
   onJoin,
 }: {
-  onOpen: (appointment: Appointment, app: "patient" | "notes" | "rx") => void;
+  onOpen: (appointment: Appointment, app: "patient" | "notes" | "rx" | "report") => void;
   onJoin: (appointmentId: string) => void;
 }) {
   const [items, setItems] = useState<Appointment[]>([]);
@@ -172,6 +172,9 @@ export function VisitsApp({
                   </RowButton>
                   <RowButton onClick={() => onOpen(a, "rx")} icon={<Pill className="size-4" />}>
                     Prescription
+                  </RowButton>
+                  <RowButton onClick={() => onOpen(a, "report")} icon={<ScrollText className="size-4" />}>
+                    Report
                   </RowButton>
                 </div>
               </li>

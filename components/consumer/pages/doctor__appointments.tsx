@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, FileText, Pill, StickyNote } from "lucide-react";
+import { CalendarDays, FileText, Pill, ScrollText, StickyNote } from "lucide-react";
 
 import { Alert } from "@/components/consumer/ui/Alert";
 import { ButtonLink } from "@/components/consumer/ui/Button";
@@ -126,6 +126,14 @@ export default function DoctorAppointmentsPage() {
                         leading={<Pill className="size-4" />}
                       >
                         Prescription
+                      </ButtonLink>
+                      <ButtonLink
+                        href={`/appointments/${a.id}/medical-report`}
+                        size="sm"
+                        variant="outline"
+                        leading={<ScrollText className="size-4" />}
+                      >
+                        Report
                       </ButtonLink>
                       <ButtonLink
                         href={`/appointments/${a.id}/visit`}
