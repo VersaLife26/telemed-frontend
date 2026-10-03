@@ -7,7 +7,15 @@ export const DASHBOARD_PRESET_DAYS = [7, 30, 90] as const;
 
 export type DashboardPresetDays = (typeof DASHBOARD_PRESET_DAYS)[number];
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isoParts(iso: string): [year: number, month: number, day: number] {
+  const match = ISO_DATE.exec(iso);
+  if (!match) {
+    throw new Error(`Invalid ISO date: ${iso}`);
+  }
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
 
 /** Calendar date for “today” in the platform zone (Asia/Colombo). */
 export function colomboToday(now = new Date()): string {
@@ -16,7 +24,7 @@ export function colomboToday(now = new Date()): string {
 
 export function parseIsoDateOnly(value: string | undefined): string | null {
   if (!value || !ISO_DATE.test(value)) return null;
-  const [y, m, d] = value.split("-").map(Number);
+  const [y, m, d] = isoParts(value);
   const utc = Date.UTC(y, m - 1, d);
   const check = new Date(utc);
   if (
@@ -30,7 +38,7 @@ export function parseIsoDateOnly(value: string | undefined): string | null {
 }
 
 export function addDaysIso(iso: string, delta: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y, m, d] = isoParts(iso);
   const utc = Date.UTC(y, m - 1, d + delta);
   const dt = new Date(utc);
   const yy = dt.getUTCFullYear();
@@ -41,8 +49,8 @@ export function addDaysIso(iso: string, delta: number): string {
 
 /** Inclusive day count between two ISO dates. */
 export function inclusiveDayCount(from: string, to: string): number {
-  const [y1, m1, d1] = from.split("-").map(Number);
-  const [y2, m2, d2] = to.split("-").map(Number);
+  const [y1, m1, d1] = isoParts(from);
+  const [y2, m2, d2] = isoParts(to);
   const start = Date.UTC(y1, m1 - 1, d1);
   const end = Date.UTC(y2, m2 - 1, d2);
   return Math.floor((end - start) / 86_400_000) + 1;
