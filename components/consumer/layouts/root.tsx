@@ -1,18 +1,5 @@
-import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
-
 import { SURFACE } from "@/lib/consumer/surface";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  weight: ["200", "300", "400", "500", "600", "700"],
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-jakarta",
-  weight: ["500", "600", "700", "800"],
-});
+import { fontVariables } from "@/lib/shared/fonts";
 
 /**
  * The html/body frame for the patient and doctor surfaces.
@@ -26,7 +13,7 @@ const jakarta = Plus_Jakarta_Sans({
  */
 export default function ConsumerRootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${jakarta.variable}`}>
+    <html lang="en" className={fontVariables}>
       <body className="antialiased" data-surface={SURFACE}>
         {children}
       </body>
