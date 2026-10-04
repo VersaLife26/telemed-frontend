@@ -132,8 +132,23 @@ export function schedulePutBody(
   };
 }
 
+/** Matches TeleMed.Domain.Rules.PlatformPolicy fee bounds, in rupees. */
+export const MIN_CONSULTATION_FEE_RUPEES = 100;
+export const MAX_CONSULTATION_FEE_RUPEES = 50_000;
+
 export function rupeesToCents(rupees: number): number {
   return Math.round(rupees * 100);
+}
+
+export function consultationFeeError(rupees: number): string | null {
+  if (
+    !Number.isFinite(rupees) ||
+    rupees < MIN_CONSULTATION_FEE_RUPEES ||
+    rupees > MAX_CONSULTATION_FEE_RUPEES
+  ) {
+    return `Consultation fee must be between LKR ${MIN_CONSULTATION_FEE_RUPEES} and LKR ${MAX_CONSULTATION_FEE_RUPEES.toLocaleString("en-LK")}.`;
+  }
+  return null;
 }
 
 export function doctorFeeCents(doctor: Pick<DoctorProfile, "feeCents">): number {

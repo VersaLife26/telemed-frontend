@@ -8,6 +8,7 @@ import {
   busiestLabel,
   cancellationRate,
   consultLanguages,
+  consultationFeeError,
   credentialDocumentError,
   doctorFeeCents,
   flattenWorkingHours,
@@ -132,6 +133,12 @@ test("practiceProfileBody sends feeCents and round-trips the profile", () => {
       version: 4,
     },
   );
+});
+
+test("consultation fee allows LKR 100 and rejects less", () => {
+  assert.equal(consultationFeeError(100), null);
+  assert.equal(consultationFeeError(50_000), null);
+  assert.match(consultationFeeError(99) ?? "", /LKR 100/);
 });
 
 test("consultLanguages keeps only en/si/ta/other", () => {

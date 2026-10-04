@@ -21,6 +21,10 @@ import {
   type ApplyDocumentType,
   type DoctorApplyForm,
 } from "@/lib/consumer/features/doctor-apply";
+import {
+  MAX_CONSULTATION_FEE_RUPEES,
+  MIN_CONSULTATION_FEE_RUPEES,
+} from "@/lib/consumer/features/practice";
 
 // The application form's own controls, held to the same field chrome as the
 // design system's Input so a long form does not read as assembled parts.
@@ -387,11 +391,12 @@ export default function RegisterPage() {
                 <Input
                   type="number"
                   required
-                  min={0}
+                  min={MIN_CONSULTATION_FEE_RUPEES}
+                  max={MAX_CONSULTATION_FEE_RUPEES}
                   step={1}
                   value={form.feeLkr}
                   onChange={(e) => patch({ feeLkr: e.target.value })}
-                  placeholder="How much you like to charge per consultation (LKR)"
+                  placeholder={`Consultation fee, LKR ${MIN_CONSULTATION_FEE_RUPEES}–${MAX_CONSULTATION_FEE_RUPEES.toLocaleString("en-LK")}`}
                 />
                 <fieldset className="flex w-full flex-col gap-2">
                   <legend className="text-label text-ink">

@@ -26,7 +26,10 @@ import {
   consultLanguages,
   doctorFeeCents,
   credentialDocumentError,
+  consultationFeeError,
   practiceProfileBody,
+  MIN_CONSULTATION_FEE_RUPEES,
+  MAX_CONSULTATION_FEE_RUPEES,
 } from "@/lib/consumer/features/practice";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatMoney } from "@/lib/consumer/money";
@@ -119,6 +122,11 @@ export default function ProfilePage() {
     if (!me) return;
     if (languages.length === 0) {
       setError("Select at least one consultation language.");
+      return;
+    }
+    const feeError = consultationFeeError(Number(feeRupees));
+    if (feeError) {
+      setError(feeError);
       return;
     }
     setSaving("practice");
@@ -352,8 +360,10 @@ export default function ProfilePage() {
           <Input
             id="doctor-fee"
             label="Consultation fee (LKR)"
+            hint={`Between LKR ${MIN_CONSULTATION_FEE_RUPEES} and LKR ${MAX_CONSULTATION_FEE_RUPEES.toLocaleString("en-LK")}.`}
             type="number"
-            min={0}
+            min={MIN_CONSULTATION_FEE_RUPEES}
+            max={MAX_CONSULTATION_FEE_RUPEES}
             step="0.01"
             value={feeRupees}
             onChange={(e) => setFeeRupees(e.target.value)}

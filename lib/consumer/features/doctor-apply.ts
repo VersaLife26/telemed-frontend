@@ -1,4 +1,5 @@
 import type { ProblemDetails } from "@/lib/consumer/api/errors";
+import { consultationFeeError } from "@/lib/consumer/features/practice";
 import type { ConsultationLanguage, DoctorApplicationRequest, DoctorDocumentType } from "@/lib/consumer/api/types";
 
 export const TERMS_HREF = "/legal/service-retention-agreement";
@@ -158,9 +159,12 @@ export function doctorApplyError(form: DoctorApplyForm): string | null {
   if (parseConsultationMinutes(form.consultationMinutes) === null) {
     return "Enter how long each consultation takes, in minutes (5–240).";
   }
-  if (rupeesToCents(form.feeLkr) === null) {
+  const feeCents = rupeesToCents(form.feeLkr);
+  if (feeCents === null) {
     return "Enter how much you like to charge per consultation, in LKR.";
   }
+  const feeError = consultationFeeError(feeCents / 100);
+  if (feeError) return feeError;
   if (
     !formatAvailabilityNotes(
       form.availableDays,
