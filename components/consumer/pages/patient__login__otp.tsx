@@ -12,8 +12,7 @@ import { OtpInput } from "@/components/consumer/ui/OtpInput";
 import { FormSkeleton } from "@/components/consumer/ui/skeletons";
 import { problemMessage } from "@/lib/consumer/api/errors";
 import { safeNextPath } from "@/lib/consumer/auth/redirect";
-import { useRegistrationContext } from "@/lib/consumer/features/registration-context";
-import { residencyError, residencyFields } from "@/lib/consumer/features/residency";
+import { isCitizenshipRequired, residencyError, residencyFields } from "@/lib/consumer/features/residency";
 
 const RESEND_COOLDOWN_SEC = 30;
 
@@ -24,8 +23,8 @@ function OtpForm() {
   const [code, setCode] = useState("");
   const [citizen, setCitizen] = useState<boolean | null>(null);
   const [nationalId, setNationalId] = useState("");
+  const [needCitizenship, setNeedCitizenship] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { ready, askCitizenship } = useRegistrationContext();
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -41,10 +40,12 @@ function OtpForm() {
     e.preventDefault();
     setError(null);
     setInfo(null);
-    const residency = residencyError(askCitizenship, citizen, nationalId);
-    if (residency) {
-      setError(residency);
-      return;
+    if (needCitizenship) {
+      const residency = residencyError(true, citizen, nationalId);
+      if (residency) {
+        setError(residency);
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -54,7 +55,14 @@ function OtpForm() {
         body: JSON.stringify({ phone, code, ...residencyFields(citizen, nationalId) }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(problemMessage(json, "Invalid OTP"));
+      if (!res.ok) {
+        if (isCitizenshipRequired(json)) {
+          setNeedCitizenship(true);
+          setError("This phone number is new. Answer below, then verify again. The same code still works.");
+          return;
+        }
+        throw new Error(problemMessage(json, "Invalid OTP"));
+      }
       router.replace(safeNextPath(params.get("next")));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid OTP");
@@ -96,14 +104,14 @@ function OtpForm() {
 
         <Reveal delay={1} className="flex flex-col gap-6">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            {askCitizenship ? (
+            {needCitizenship ? (
               <CitizenshipFields
                 id="otp-citizen"
                 citizen={citizen}
                 onCitizen={setCitizen}
                 nationalId={nationalId}
                 onNationalId={setNationalId}
-                hint="Used only if this phone number is new. An existing account is not changed."
+                hint="Only a new phone number needs this. An existing account is not asked."
               />
             ) : null}
             <OtpInput length={6} value={code} onChange={setCode} />
@@ -114,7 +122,7 @@ function OtpForm() {
               size="lg"
               fullWidth
               busy={loading}
-              disabled={!ready || loading || resending || code.length < 6}
+              disabled={loading || resending || code.length < 6}
             >
               {loading ? "Verifying…" : "Verify & continue"}
             </Button>

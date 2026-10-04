@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { countryHeaders } from "@/lib/consumer/auth/country";
 import { quotedFee } from "@/lib/consumer/money";
-import { residencyError, residencyFields } from "@/lib/consumer/features/residency";
+import { isCitizenshipRequired, residencyError, residencyFields } from "@/lib/consumer/features/residency";
 import { verifyOtpBody } from "@/lib/consumer/features/otp";
 
 test("patient app forwards a two-letter country and drops anything else", () => {
@@ -23,6 +23,12 @@ test("citizenship is required only when the question is asked", () => {
   assert.equal(residencyError(true, null, ""), "Say whether you are a Sri Lankan citizen.");
   assert.equal(residencyError(true, true, "  "), "Enter your National ID.");
   assert.equal(residencyError(true, false, ""), null);
+});
+
+test("sign-in asks for citizenship only when the account is new", () => {
+  assert.equal(isCitizenshipRequired({ code: "citizenship_required", detail: "Say whether you are a Sri Lankan citizen." }), true);
+  assert.equal(isCitizenshipRequired({ code: "invalid_otp" }), false);
+  assert.equal(isCitizenshipRequired(null), false);
 });
 
 test("a non-citizen does not send a national id", () => {

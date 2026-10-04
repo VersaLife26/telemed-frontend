@@ -15,6 +15,12 @@ export function residencyError(
   return null;
 }
 
+/** True when sign-in tried to create an account and the API still needs the citizenship answer. */
+export function isCitizenshipRequired(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  return (body as { code?: unknown }).code === "citizenship_required";
+}
+
 /** Omits the National ID unless the visitor said they are a citizen. */
 export function residencyFields(citizen: boolean | null, nationalId: string): ResidencyAnswer {
   if (citizen === null) return {};

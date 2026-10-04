@@ -13,8 +13,7 @@ import { Reveal } from "@/components/consumer/ui/Reveal";
 import { assets } from "@/lib/consumer/assets";
 import { problemMessage } from "@/lib/consumer/api/errors";
 import { safeNextPath } from "@/lib/consumer/auth/redirect";
-import { useRegistrationContext } from "@/lib/consumer/features/registration-context";
-import { residencyError, residencyFields } from "@/lib/consumer/features/residency";
+import { isCitizenshipRequired, residencyError, residencyFields } from "@/lib/consumer/features/residency";
 
 function LoginForm() {
   const router = useRouter();
@@ -25,9 +24,9 @@ function LoginForm() {
   const [phone, setPhone] = useState("");
   const [citizen, setCitizen] = useState<boolean | null>(null);
   const [nationalId, setNationalId] = useState("");
+  const [needCitizenship, setNeedCitizenship] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"email" | "otp" | "google" | null>(null);
-  const { ready, askCitizenship } = useRegistrationContext();
 
   async function onEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -74,10 +73,12 @@ function LoginForm() {
 
   async function onGoogle(idToken: string) {
     setError(null);
-    const residency = residencyError(askCitizenship, citizen, nationalId);
-    if (residency) {
-      setError(residency);
-      return;
+    if (needCitizenship) {
+      const residency = residencyError(true, citizen, nationalId);
+      if (residency) {
+        setError(residency);
+        return;
+      }
     }
     setLoading("google");
     try {
@@ -87,7 +88,14 @@ function LoginForm() {
         body: JSON.stringify({ idToken, ...residencyFields(citizen, nationalId) }),
       });
       const json: unknown = await res.json();
-      if (!res.ok) throw new Error(problemMessage(json, "Google sign-in failed"));
+      if (!res.ok) {
+        if (isCitizenshipRequired(json)) {
+          setNeedCitizenship(true);
+          setError("This Google account is new. Answer below, then continue with Google.");
+          return;
+        }
+        throw new Error(problemMessage(json, "Google sign-in failed"));
+      }
       router.replace(afterLogin);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
@@ -104,17 +112,18 @@ function LoginForm() {
         <AuthHeading title="Sign in" subtitle="Use Google, email, or your mobile number." />
 
         <Reveal delay={1} className="flex flex-col gap-7">
-          {askCitizenship ? (
+          {error ? <Alert tone="danger">{error}</Alert> : null}
+          {needCitizenship ? (
             <CitizenshipFields
               id="login-citizen"
               citizen={citizen}
               onCitizen={setCitizen}
               nationalId={nationalId}
               onNationalId={setNationalId}
-              hint="Answer this when Google is creating a new account. An existing account keeps its current rate."
+              hint="Only a new Google account needs this. An existing account is not asked."
             />
           ) : null}
-          <GoogleButton onCredential={onGoogle} disabled={busy || !ready} />
+          <GoogleButton onCredential={onGoogle} disabled={busy} />
 
           <form onSubmit={onEmail} className="flex w-full flex-col gap-4">
             <Input
@@ -146,7 +155,6 @@ function LoginForm() {
                 Forgot password?
               </Link>
             </p>
-            {error ? <Alert tone="danger">{error}</Alert> : null}
             <Button type="submit" size="lg" fullWidth busy={loading === "email"} disabled={busy}>
               {loading === "email" ? "Signing in…" : "Sign in with email"}
             </Button>
