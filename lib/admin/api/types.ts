@@ -110,6 +110,7 @@ export type LedgerTotals = S["LedgerTotalsDto"];
 export type Commission = S["CommissionDto"];
 export type BillingSettings = S["BillingSettingsDto"];
 export type UpdateBillingSettingsRequest = S["UpdateBillingSettingsRequest"];
+export type UpdateCardHoldRequest = S["UpdateCardHoldRequest"];
 export type DoctorCommission = S["DoctorCommissionDto"];
 export type UpdateCommissionRequest = S["UpdateCommissionRequest"];
 export type SetDoctorCommissionRequest = S["SetDoctorCommissionRequest"];

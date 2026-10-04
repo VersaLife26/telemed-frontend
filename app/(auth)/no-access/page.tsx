@@ -28,6 +28,7 @@ const AREA_NAMES: Record<RbacGroup, string> = {
   analytics: "the dashboard",
   audit: "audit logs",
   auditExport: "the audit log export",
+  cardHold: "card hold settings",
 };
 
 /**

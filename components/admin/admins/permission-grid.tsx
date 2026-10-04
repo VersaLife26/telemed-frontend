@@ -33,6 +33,7 @@ const PERMISSION_LABELS: Record<AdminPermission, { label: string; detail: string
   finance: { label: "Finance", detail: "Ledger, payouts, refunds and promo codes." },
   auditExport: { label: "Audit export", detail: "Download the whole audit trail as CSV." },
   adminUsers: { label: "Admin accounts", detail: "Create admins and change their roles." },
+  cardHold: { label: "Card hold", detail: "Choose whether LKR and USD visits inside 6 days hold the card." },
 };
 
 /**

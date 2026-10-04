@@ -24,6 +24,7 @@ export const RBAC_GROUPS = [
   "finance",
   "auditExport",
   "adminUsers",
+  "cardHold",
 ] as const satisfies readonly AdminPermission[];
 
 export type RbacGroup = (typeof RBAC_GROUPS)[number];
@@ -47,6 +48,7 @@ export const RBAC_MATRIX: Readonly<Record<RbacGroup, readonly AdminRole[]>> = {
   // Managing other admin accounts is superAdmin alone: any lesser role
   // granting itself or a peer more access is a privilege-escalation hole.
   adminUsers: ["superAdmin"],
+  cardHold: ["superAdmin"],
 };
 
 /** Route prefix → group. Longest prefix wins. */
@@ -118,6 +120,7 @@ const API_ROUTE_GROUPS: ReadonlyArray<readonly [string, RbacGroup]> = [
   ["/api/v1/admin/users", "users"],
   ["/api/v1/admin/reschedule-requests", "appointments"],
   ["/api/v1/admin/appointments", "appointments"],
+  ["/api/v1/admin/finance/card-hold", "cardHold"],
   ["/api/v1/admin/finance", "finance"],
   ["/api/v1/admin/payments", "finance"],
   ["/api/v1/admin/specialties", "content"],

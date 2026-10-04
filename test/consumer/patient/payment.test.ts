@@ -7,6 +7,7 @@ import {
   intentBody,
   intentPath,
   isPaymentAuthorized,
+  payHereNotice,
   mockCompletePath,
   orderPath,
   promoPath,
@@ -34,6 +35,11 @@ test("isPaymentAuthorized detects a card hold", () => {
   assert.equal(isPaymentAuthorized({ status: "authorized" }), true);
   assert.equal(isPaymentAuthorized({ status: "pending" }), false);
   assert.equal(isPaymentAuthorized(null), false);
+});
+
+test("the PayHere notice follows the card-hold switch", () => {
+  assert.match(payHereNotice(true), /held on the card/);
+  assert.match(payHereNotice(false), /charged now/);
 });
 
 test("afterPaymentPath is the appointments list, not the call lobby", () => {

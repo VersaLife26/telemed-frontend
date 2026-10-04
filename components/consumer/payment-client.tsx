@@ -19,6 +19,7 @@ import {
   isPaymentAuthorized,
   mockCompletePath,
   orderPath,
+  payHereNotice,
   promoPath,
 } from "@/lib/consumer/features/payment";
 import { formatMoney, paymentSettled } from "@/lib/consumer/money";
@@ -245,8 +246,7 @@ export function PaymentClient({ appointmentId }: { appointmentId: string }) {
           <div className="min-w-0">
             <p className="text-body font-semibold text-ink">Pay with card (PayHere)</p>
             <p className="mt-1 text-body-sm text-muted">
-              Visa and Mastercard supported. Funds are held on the card and charged once the doctor
-              completes your visit.
+              {payHereNotice(order?.cardHold === true)}
             </p>
           </div>
         </Card>

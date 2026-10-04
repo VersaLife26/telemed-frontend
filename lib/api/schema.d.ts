@@ -2852,7 +2852,7 @@ export interface components {
         /** @enum {string} */
         AdminNotificationKind: "doctorApplicationSubmitted" | "doctorNoShow" | "refundManualRequired" | "paymentCaptureFailed" | "customerCare";
         /** @enum {string} */
-        AdminPermission: "credentialing" | "doctors" | "users" | "appointments" | "content" | "disputes" | "analytics" | "audit" | "finance" | "auditExport" | "adminUsers";
+        AdminPermission: "credentialing" | "doctors" | "users" | "appointments" | "content" | "disputes" | "analytics" | "audit" | "finance" | "auditExport" | "adminUsers" | "cardHold";
         AdminRefundDto: {
             /** Format: uuid */
             id: string;
@@ -3040,6 +3040,8 @@ export interface components {
         BillingSettingsDto: {
             /** Format: double */
             lkrPerUsd: null | number;
+            holdLkrWithinSixDays: boolean;
+            holdUsdWithinSixDays: boolean;
         };
         BookAppointmentRequest: {
             /** Format: uuid */
@@ -3909,6 +3911,7 @@ export interface components {
             /** Format: date-time */
             paymentDueAt: null | string;
             availableProviders: components["schemas"]["PaymentProvider"][];
+            cardHold: boolean;
         };
         OtpSendRequest: {
             phone: null | string;
@@ -4706,6 +4709,10 @@ export interface components {
         UpdateBillingSettingsRequest: {
             /** Format: double */
             lkrPerUsd: number;
+        };
+        UpdateCardHoldRequest: {
+            holdLkrWithinSixDays: boolean;
+            holdUsdWithinSixDays: boolean;
         };
         UpdateChecklistRequest: {
             slmcFormat: null | boolean;

@@ -7,6 +7,7 @@ import { Pagination } from "@/components/admin/data-table/pagination";
 import { CommissionView } from "@/components/admin/payments/commission-view";
 import { LedgerTable } from "@/components/admin/payments/ledger-table";
 import { PayoutBatches } from "@/components/admin/payments/payout-batches";
+import { CardHoldForm } from "@/components/admin/payments/card-hold-form";
 import { InternationalRateForm } from "@/components/admin/payments/international-rate";
 import { PromoCodesPanel } from "@/components/admin/payments/promo-codes";
 import { RefundsPanel } from "@/components/admin/payments/refunds-panel";
@@ -14,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/admin/ui/
 import { endpoints, query } from "@/lib/admin/api/endpoints";
 import { routeFatal } from "@/lib/admin/api/guard";
 import { tryGetServer, tryListServer } from "@/lib/admin/api/server";
+import { adminRoles } from "@/lib/admin/auth/current";
+import { can } from "@/lib/admin/rbac";
 import type {
   AdminRefund,
   BillingSettings,
@@ -49,6 +52,8 @@ export default async function PaymentsPage({
     doctorId: params.doctorId,
   };
   const ledgerQuery = query({ ...exportFilter, page, pageSize: PER_PAGE });
+
+  const maySetCardHold = can(await adminRoles(), "cardHold");
 
   const [ledger, commission, batches, refunds, promos, billing] = await Promise.all([
     tryGetServer<LedgerPage>(endpoints.finance.ledger(ledgerQuery)),
@@ -87,6 +92,7 @@ export default async function PaymentsPage({
           <TabsTrigger value="refunds">Refunds</TabsTrigger>
           <TabsTrigger value="promos">Promo codes</TabsTrigger>
           <TabsTrigger value="international">International</TabsTrigger>
+          {maySetCardHold ? <TabsTrigger value="card-hold">Card hold</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="ledger">
@@ -153,6 +159,16 @@ export default async function PaymentsPage({
             <ErrorState error={billing.error} what="the international exchange rate" />
           )}
         </TabsContent>
+
+        {maySetCardHold ? (
+          <TabsContent value="card-hold">
+            {billing.ok ? (
+              <CardHoldForm settings={billing.data} />
+            ) : (
+              <ErrorState error={billing.error} what="the card hold settings" />
+            )}
+          </TabsContent>
+        ) : null}
       </Tabs>
     </>
   );

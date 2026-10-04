@@ -83,6 +83,11 @@ test("canCallApi mirrors the API's PermissionMatrix, permission for permission",
     [["admin"], "/api/v1/admin/admin-users", false],
     [["finance"], "/api/v1/admin/admin-users", false],
     [["superAdmin"], "/api/v1/admin/admin-users", true],
+    // cardHold: {superAdmin}. A longer prefix than /finance, so finance cannot save it.
+    [["finance"], "/api/v1/admin/finance/card-hold", false],
+    [["admin"], "/api/v1/admin/finance/card-hold", false],
+    [["superAdmin"], "/api/v1/admin/finance/card-hold", true],
+    [["finance"], "/api/v1/admin/finance/billing", true],
     // audit vs auditExport
     [["support"], "/api/v1/admin/audit", true],
     [["support"], "/api/v1/admin/audit.csv", false],

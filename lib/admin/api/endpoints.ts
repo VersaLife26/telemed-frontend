@@ -59,6 +59,7 @@ export const endpoints = {
 
   finance: {
     billing: () => `${ADMIN}/finance/billing`,
+    cardHold: () => `${ADMIN}/finance/card-hold`,
     ledger: (q: URLSearchParams) => `${ADMIN}/finance/ledger?${q}`,
     ledgerExport: (q: URLSearchParams) => `${ADMIN}/finance/ledger.csv?${q}`,
     commission: () => `${ADMIN}/finance/commission`,
