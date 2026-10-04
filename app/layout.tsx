@@ -18,24 +18,35 @@ import "./globals.css";
  * load and needs AUTH_SECRET; a static import would evaluate that in the
  * patient and doctor builds too, and fail there for a module they never use.
  */
+const BRAND_ICON = "/assets/logo-small.svg";
+
+const SITE_ICONS: NonNullable<Metadata["icons"]> = {
+  icon: [{ url: BRAND_ICON, type: "image/svg+xml" }],
+  shortcut: BRAND_ICON,
+  apple: [{ url: BRAND_ICON, type: "image/svg+xml" }],
+};
+
 const META: Record<Surface, Metadata> = {
   admin: {
-    title: { default: "VersaLife Health · Admin", template: "%s · VersaLife Health" },
+    title: { default: "VersaLife Health Admin", template: "%s" },
     description: "Operations console for the telemedicine platform.",
     // This console must never appear in a search index, and it is not a mobile
     // web app anyone should be able to install from a phishing page.
     robots: { index: false, follow: false, nocache: true },
     applicationName: "VersaLife Health Admin",
+    icons: SITE_ICONS,
   },
   doctor: {
-    title: { default: "VersaLife Health · Doctor", template: "%s · VersaLife Health" },
+    title: { default: "VersaLife Health Doctor", template: "%s" },
     description: "Consult patients online — availability, queue and earnings in one place.",
     applicationName: "VersaLife Health",
+    icons: SITE_ICONS,
   },
   patient: {
-    title: { default: "VersaLife Health", template: "%s · VersaLife Health" },
+    title: { default: "VersaLife Health", template: "%s" },
     description: "Consult trusted doctors online — anytime, anywhere in Sri Lanka.",
     applicationName: "VersaLife Health",
+    icons: SITE_ICONS,
   },
 };
 
