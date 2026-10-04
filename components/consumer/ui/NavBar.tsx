@@ -69,6 +69,7 @@ export function NavBar({
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour={item.href.replace(/^\//, "")}
                 aria-current={active ? "page" : undefined}
                 className={cx(
                   "relative inline-flex min-h-10 items-center px-3 text-label",

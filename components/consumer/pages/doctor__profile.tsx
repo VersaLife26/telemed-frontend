@@ -32,6 +32,7 @@ import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
 import { formatMoney } from "@/lib/consumer/money";
 import { profilePhotoError } from "@/lib/consumer/features/profile";
 import { SignatureCard } from "@/components/consumer/signature-card";
+import { ReplayGuideButton } from "@/components/consumer/guide-tour";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
@@ -490,6 +491,7 @@ export default function ProfilePage() {
         {error ? <Alert tone="danger" className="mt-5">{error}</Alert> : null}
       </Card>
 
+      <ReplayGuideButton />
       <Button variant="ghost" fullWidth leading={<LogOut className="size-4" />} onClick={() => void logout()}>
         Sign out
       </Button>

@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { Ellipsis } from "lucide-react";
 import { LayoutGroup, MotionConfig, motion } from "motion/react";
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { cx } from "@/lib/consumer/cx";
 import { springSnappy } from "@/lib/consumer/motion";
@@ -30,6 +30,14 @@ export function TabBar({
   className?: string;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    function close() {
+      setMoreOpen(false);
+    }
+    window.addEventListener("telemed:close-more", close);
+    return () => window.removeEventListener("telemed:close-more", close);
+  }, []);
   const groupId = useId();
   const overflowActive = overflow.some((item) => isActivePath(pathname, item.href));
 
@@ -48,6 +56,7 @@ export function TabBar({
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  data-tour={item.href.replace(/^\//, "")}
                   aria-current={isActivePath(pathname, item.href) ? "page" : undefined}
                   className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 transition-[scale] duration-[var(--dur-press)] ease-out active:scale-[0.94]"
                 >
@@ -59,6 +68,7 @@ export function TabBar({
               <li>
                 <button
                   type="button"
+                  data-tour="more"
                   aria-haspopup="dialog"
                   aria-expanded={moreOpen}
                   onClick={() => setMoreOpen(true)}

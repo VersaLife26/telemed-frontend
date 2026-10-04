@@ -67,6 +67,7 @@ export function PatientHeader() {
       trailing={
         <Link
           href="/profile"
+          data-tour="profile"
           aria-label="Profile"
           aria-current={isActivePath(pathname, "/profile") ? "page" : undefined}
           className="flex min-h-10 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"

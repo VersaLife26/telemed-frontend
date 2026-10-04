@@ -24,6 +24,7 @@ import {
   type ProfileDraft,
 } from "@/lib/consumer/features/profile";
 import { SexField } from "@/components/consumer/sex-field";
+import { ReplayGuideButton } from "@/components/consumer/guide-tour";
 import { PageHero } from "@/components/consumer/ui/PageHero";
 import { HEROES } from "@/lib/consumer/heroes";
 
@@ -277,6 +278,7 @@ export default function ProfilePage() {
         </form>
       </Card>
 
+      <ReplayGuideButton />
       <Button
         variant="ghost"
         fullWidth

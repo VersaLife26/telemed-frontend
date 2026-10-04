@@ -344,6 +344,7 @@ export function CustomerCareWidget() {
       <button
         type="button"
         className="pointer-events-auto grid size-14 place-items-center rounded-full bg-[image:var(--gradient-cta)] text-on-brand shadow-brand can-hover:hover:brightness-[1.06] active:scale-[0.96]"
+        data-tour="care"
         aria-label={open ? "Hide customer care" : "Open customer care"}
         aria-expanded={open}
         onClick={() => (open ? closePanel() : setOpen(true))}

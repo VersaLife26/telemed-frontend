@@ -67,6 +67,7 @@ export function AppHeader({
       trailing={
         <Link
           href="/profile"
+          data-tour="profile"
           aria-label="Profile"
           className="flex min-h-10 items-center rounded-pill p-0.5 transition-transform duration-[160ms] ease-out active:scale-[0.96]"
         >

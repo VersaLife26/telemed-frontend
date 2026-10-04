@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { CustomerCareWidget } from "@/components/consumer/customer-care-widget";
+import { GuideTour } from "@/components/consumer/guide-tour";
 import { AppHeader, AppShell } from "@/components/consumer/layout/AppShell";
 import { PATIENT_NAV, PatientHeader } from "@/components/consumer/layout/PatientChrome";
 import { isActivePath } from "@/components/consumer/ui/NavBar";
@@ -99,6 +100,7 @@ export default function ConsumerShellLayout({ children }: { children: React.Reac
         </main>
         <TabBar items={PATIENT_NAV} pathname={pathname} />
         <CustomerCareWidget />
+        <GuideTour />
       </div>
     );
   }
@@ -118,6 +120,7 @@ export default function ConsumerShellLayout({ children }: { children: React.Reac
       </main>
       <TabBar items={DOCTOR_TAB_ITEMS} overflow={DOCTOR_MORE_ITEMS} pathname={pathname} />
       <CustomerCareWidget />
+      <GuideTour />
     </div>
   );
 }
