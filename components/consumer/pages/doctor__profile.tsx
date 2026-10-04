@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 
+import { ShareProfileCard } from "@/components/consumer/profile/share-profile-card";
+
 import { Card } from "@/components/consumer/ui/Card";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Badge } from "@/components/consumer/ui/Badge";
@@ -27,6 +29,7 @@ import {
   practiceProfileBody,
 } from "@/lib/consumer/features/practice";
 import { specialtyLabel } from "@/lib/consumer/features/doctor-search";
+import { formatMoney } from "@/lib/consumer/money";
 import { profilePhotoError } from "@/lib/consumer/features/profile";
 import { SignatureCard } from "@/components/consumer/signature-card";
 import { PageHero } from "@/components/consumer/ui/PageHero";
@@ -320,6 +323,19 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
+
+      {me?.id ? (
+        <ShareProfileCard
+          doctorId={me.id}
+          displayName={me.displayName || "Doctor"}
+          specialty={me.specialtyCode ? specialtyLabel(me.specialtyCode, specialties) : ""}
+          experienceYears={me.experienceYears ?? 0}
+          feeLabel={formatMoney(doctorFeeCents(me), me.currency || "LKR")}
+          bio={me.bio || ""}
+          photoSrc={photoSrc}
+          active={me.status !== "suspended"}
+        />
+      ) : null}
 
       <Card>
         <h2 className="text-h4 text-ink">Practice profile</h2>
