@@ -18,12 +18,13 @@ import "./globals.css";
  * load and needs AUTH_SECRET; a static import would evaluate that in the
  * patient and doctor builds too, and fail there for a module they never use.
  */
-const BRAND_ICON = "/assets/logo-small.svg";
-
 const SITE_ICONS: NonNullable<Metadata["icons"]> = {
-  icon: [{ url: BRAND_ICON, type: "image/svg+xml" }],
-  shortcut: BRAND_ICON,
-  apple: [{ url: BRAND_ICON, type: "image/svg+xml" }],
+  icon: [
+    { url: "/favicon.ico", sizes: "48x48" },
+    { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
+  ],
+  shortcut: "/favicon.ico",
+  apple: [{ url: "/apple-touch-icon.png", sizes: "192x192", type: "image/png" }],
 };
 
 const META: Record<Surface, Metadata> = {
