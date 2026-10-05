@@ -80,6 +80,6 @@ export const config = {
      * Note that RSC/data requests for a page DO match, and should: they need
      * the same checks as the initial document.
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|apple-icon\\.png|robots\\.txt).*)",
+    "/((?!_next/static|_next/image|signature-extractor|favicon\\.ico|icon\\.svg|apple-icon\\.png|robots\\.txt).*)",
   ],
 };

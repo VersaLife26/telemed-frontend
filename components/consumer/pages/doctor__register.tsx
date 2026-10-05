@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AuthFooterLink, AuthHeading, AuthLayout } from "@/components/consumer/layout/AuthLayout";
+import { SignaturePhotoPicker } from "@/components/consumer/signature-capture";
 import { Alert } from "@/components/consumer/ui/Alert";
 import { Button } from "@/components/consumer/ui/Button";
 import { Input } from "@/components/consumer/ui/Input";
@@ -502,22 +503,32 @@ export default function RegisterPage() {
               </Section>
 
               <Section title="Documents">
-                {APPLY_DOCUMENT_TYPES.map((doc) => (
-                  <label key={doc.type} className="flex w-full flex-col gap-2">
-                    <span className="text-label text-ink">{doc.label}</span>
-                    <input
-                      className={fileClass}
-                      type="file"
-                      required={!pendingDocs}
-                      accept={
-                        doc.type === "slmcCertificate"
-                          ? "image/png,image/jpeg,application/pdf"
-                          : "image/png,image/jpeg"
-                      }
-                      onChange={(e) => setFile(doc.type, e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                ))}
+                {APPLY_DOCUMENT_TYPES.map((doc) =>
+                  doc.type === "signature" ? (
+                    <div key={doc.type} className="flex w-full flex-col gap-2">
+                      <span className="text-label text-ink">{doc.label}</span>
+                      <SignaturePhotoPicker
+                        onDone={(png) => setFile("signature", new File([png], "signature.png", { type: "image/png" }))}
+                      />
+                      <SignatureFilePreview file={form.signature} />
+                    </div>
+                  ) : (
+                    <label key={doc.type} className="flex w-full flex-col gap-2">
+                      <span className="text-label text-ink">{doc.label}</span>
+                      <input
+                        className={fileClass}
+                        type="file"
+                        required={!pendingDocs}
+                        accept={
+                          doc.type === "slmcCertificate"
+                            ? "image/png,image/jpeg,application/pdf"
+                            : "image/png,image/jpeg"
+                        }
+                        onChange={(e) => setFile(doc.type, e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                  ),
+                )}
               </Section>
 
               <Section title="Practice">
@@ -586,5 +597,25 @@ export default function RegisterPage() {
         )}
       </div>
     </AuthLayout>
+  );
+}
+
+function SignatureFilePreview({ file }: { file: File | null }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setSrc(url);
+    return () => {
+      URL.revokeObjectURL(url);
+      setSrc(null);
+    };
+  }, [file]);
+  if (!src) return null;
+  return (
+    <div className="flex h-24 items-center justify-center rounded-md border border-border-subtle bg-surface p-2">
+      {/* eslint-disable-next-line @next/next/no-img-element -- local object URL */}
+      <img src={src} alt="Your signature" className="max-h-full max-w-full object-contain" />
+    </div>
   );
 }

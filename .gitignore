@@ -44,3 +44,6 @@ node_modules
 # Cloudflare Workers build output and local state.
 .open-next/
 .wrangler/
+
+# onnxruntime-web runtime, copied from node_modules by scripts/copy-ort.mjs
+/public/signature-extractor/ort*
