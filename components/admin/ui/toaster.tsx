@@ -4,26 +4,30 @@ import { useTheme } from "next-themes";
 import { Toaster as Sonner } from "sonner";
 
 /**
- * Toasts follow the app theme rather than the OS, and stay long enough to read
- * a request id out loud to a colleague — the default 4 seconds is not enough
- * for a 36-character UUID.
+ * Compact status cards in the top-right. They follow the console theme for the
+ * icon colour, and leave on their own after four seconds.
  */
 export function Toaster() {
   const { resolvedTheme } = useTheme();
   return (
     <Sonner
       theme={resolvedTheme === "dark" ? "dark" : "light"}
-      position="bottom-right"
-      duration={8000}
+      position="top-right"
+      duration={4000}
       closeButton
-      className="!z-[100]"
+      offset={16}
+      gap={10}
+      className="vl-toaster"
       toastOptions={{
         classNames: {
-          toast:
-            "group rounded-lg border border-border bg-popover text-popover-foreground shadow-lg",
-          description: "text-muted-foreground",
-          actionButton: "bg-primary text-primary-foreground",
-          cancelButton: "bg-muted text-muted-foreground",
+          toast: "vl-toast",
+          title: "vl-toast-title",
+          description: "vl-toast-desc",
+          closeButton: "vl-toast-close",
+          success: "vl-toast-success",
+          error: "vl-toast-error",
+          warning: "vl-toast-warning",
+          info: "vl-toast-info",
         },
       }}
     />
