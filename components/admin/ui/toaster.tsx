@@ -4,8 +4,8 @@ import { useTheme } from "next-themes";
 import { Toaster as Sonner } from "sonner";
 
 /**
- * Compact status cards in the top-right. They follow the console theme for the
- * icon colour, and leave on their own after four seconds.
+ * Status cards under the console header, top-right. They use admin surface
+ * colours and dismiss after four seconds.
  */
 export function Toaster() {
   const { resolvedTheme } = useTheme();
@@ -13,9 +13,12 @@ export function Toaster() {
     <Sonner
       theme={resolvedTheme === "dark" ? "dark" : "light"}
       position="top-right"
+      mobilePosition="top-right"
       duration={4000}
       closeButton
-      offset={16}
+      expand={false}
+      visibleToasts={3}
+      offset={{ top: "4.25rem", right: "1rem" }}
       gap={10}
       className="vl-toaster"
       toastOptions={{
