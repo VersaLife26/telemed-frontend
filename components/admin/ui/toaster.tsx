@@ -13,12 +13,11 @@ export function Toaster() {
     <Sonner
       theme={resolvedTheme === "dark" ? "dark" : "light"}
       position="top-right"
-      mobilePosition="top-right"
       duration={4000}
       closeButton
       expand={false}
       visibleToasts={3}
-      offset={{ top: "4.25rem", right: "1rem" }}
+      offset={16}
       gap={10}
       className="vl-toaster"
       toastOptions={{
