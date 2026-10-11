@@ -19,6 +19,9 @@ export const APPLY_DOCUMENT_TYPES = [
   { type: "slmcCertificate", label: "Copy of most recent SLMC certificate / latest SLMC renewal" },
 ] as const satisfies ReadonlyArray<{ type: DoctorDocumentType; label: string }>;
 
+export const DOCTOR_APPLY_DOCUMENT_HINT =
+  "You will need these documents to register as a doctor: a clear image of your signature, a clear image of your seal, and a copy of your most recent SLMC certificate or latest SLMC renewal.";
+
 export type ApplyDocumentType = (typeof APPLY_DOCUMENT_TYPES)[number]["type"];
 
 export const WEEKDAYS = [

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/consumer/ui/Textarea";
 import type { ConsultationLanguage, DoctorApplicationCreated, Specialty } from "@/lib/consumer/api/types";
 import {
   APPLY_DOCUMENT_TYPES,
+  DOCTOR_APPLY_DOCUMENT_HINT,
   LANGUAGE_OPTIONS,
   TERMS_HREF,
   WEEKDAYS,
@@ -247,9 +248,15 @@ export default function RegisterPage() {
         <AuthHeading
           title="Doctor registration"
           subtitle={
-            submitted
-              ? undefined
-              : "Tell us about your practice. Choose an email and password now — you will use them to sign in after approval."
+            submitted ? undefined : (
+              <>
+                <p className="text-body-lg text-muted">
+                  Tell us about your practice. Choose an email and password now — you will use them to sign in after
+                  approval.
+                </p>
+                <p className="text-body-lg text-muted">{DOCTOR_APPLY_DOCUMENT_HINT}</p>
+              </>
+            )
           }
         />
 

@@ -15,6 +15,7 @@ import {
   checkDoctorEligibility,
 } from "@/lib/consumer/features/doctor-eligibility";
 import { problemMessage } from "@/lib/consumer/api/errors";
+import { DOCTOR_APPLY_DOCUMENT_HINT } from "@/lib/consumer/features/doctor-apply";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -165,10 +166,7 @@ export default function LoginPage() {
           {error ? <Alert tone="danger">{error}</Alert> : null}
           <div className="flex w-full flex-col gap-2">
             <AuthFooterLink text="New here?" linkText="Register as a doctor" href="/register" />
-            <p className="w-full text-center text-body-sm text-muted">
-              You will need these documents to register as a doctor: a clear image of your signature, a clear image of
-              your seal, and a copy of your most recent SLMC certificate or latest SLMC renewal.
-            </p>
+            <p className="w-full text-center text-body-sm text-muted">{DOCTOR_APPLY_DOCUMENT_HINT}</p>
           </div>
         </Reveal>
       </div>

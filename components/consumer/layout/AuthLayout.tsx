@@ -44,11 +44,17 @@ export function AuthLayout({
   );
 }
 
-export function AuthHeading({ title, subtitle }: { title: ReactNode; subtitle?: string }) {
+export function AuthHeading({ title, subtitle }: { title: ReactNode; subtitle?: ReactNode }) {
   return (
     <Reveal className="flex w-full flex-col gap-3">
       <h1 className="text-h1 text-ink">{title}</h1>
-      {subtitle ? <p className="text-body-lg text-muted">{subtitle}</p> : null}
+      {subtitle ? (
+        typeof subtitle === "string" ? (
+          <p className="text-body-lg text-muted">{subtitle}</p>
+        ) : (
+          <div className="flex flex-col gap-2">{subtitle}</div>
+        )
+      ) : null}
     </Reveal>
   );
 }
