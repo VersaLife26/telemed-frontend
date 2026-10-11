@@ -14,7 +14,9 @@ import { ApiError } from "@/lib/consumer/api/errors";
 import type { Holiday, Schedule, ScheduleUpdated } from "@/lib/consumer/api/types";
 import { weekdayLabel } from "@/lib/consumer/features/availability";
 import {
+  DEFAULT_MAX_PER_DAY,
   DEFAULT_SLOT_MINUTES,
+  MAX_DAILY_APPOINTMENTS,
   flattenWorkingHours,
   groupWorkingHours,
   schedulePutBody,
@@ -47,7 +49,7 @@ export function AvailabilityEditor({
   const [available, setAvailable] = useState<Record<number, boolean>>(grouped.available);
   const [slot, setSlot] = useState(initialSchedule.slotDurationMinutes || DEFAULT_SLOT_MINUTES);
   const [buffer, setBuffer] = useState(initialSchedule.bufferMinutes ?? 0);
-  const [maxPerDay, setMaxPerDay] = useState(initialSchedule.maxPerDay ?? 1);
+  const [maxPerDay, setMaxPerDay] = useState(initialSchedule.maxPerDay ?? DEFAULT_MAX_PER_DAY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -235,9 +237,11 @@ export function AvailabilityEditor({
           label="Daily appointment cap"
           type="number"
           min={1}
-          max={200}
+          max={MAX_DAILY_APPOINTMENTS}
           value={maxPerDay}
-          onChange={(e) => setMaxPerDay(Math.max(1, Number(e.target.value) || 1))}
+          onChange={(e) =>
+            setMaxPerDay(Math.min(MAX_DAILY_APPOINTMENTS, Math.max(1, Number(e.target.value) || 1)))
+          }
         />
       </Card>
 

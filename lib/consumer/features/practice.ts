@@ -26,6 +26,9 @@ export const CREDENTIAL_DOC_TYPES: ReadonlyArray<{ value: DoctorDocumentType; la
 ];
 
 export const DEFAULT_SLOT_MINUTES = 30;
+/** Matches API schedule validator and PlatformPolicy.DefaultMaxPerDay. */
+export const MAX_DAILY_APPOINTMENTS = 200;
+export const DEFAULT_MAX_PER_DAY = MAX_DAILY_APPOINTMENTS;
 const DEFAULT_ADVANCE_DAYS = 30;
 const DEFAULT_TIMEZONE = "Asia/Colombo";
 
