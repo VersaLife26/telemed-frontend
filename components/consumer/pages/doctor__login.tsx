@@ -163,7 +163,13 @@ export default function LoginPage() {
           </form>
 
           {error ? <Alert tone="danger">{error}</Alert> : null}
-          <AuthFooterLink text="New here?" linkText="Register as a doctor" href="/register" />
+          <div className="flex w-full flex-col gap-2">
+            <AuthFooterLink text="New here?" linkText="Register as a doctor" href="/register" />
+            <p className="w-full text-center text-body-sm text-muted">
+              You will need these documents to register as a doctor: a clear image of your signature, a clear image of
+              your seal, and a copy of your most recent SLMC certificate or latest SLMC renewal.
+            </p>
+          </div>
         </Reveal>
       </div>
     </AuthLayout>

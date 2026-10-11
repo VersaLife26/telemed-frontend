@@ -99,7 +99,7 @@ const emptyForm: DoctorApplyForm = {
   pgimBoardCertified: null,
   medicalSchool: "",
   qualifications: "",
-  consultationMinutes: "30",
+  consultationMinutes: "",
   feeLkr: "",
   availableDays: [1, 2, 3, 4, 5],
   availableStart: "09:00",
@@ -387,7 +387,8 @@ export default function RegisterPage() {
                   step={5}
                   value={form.consultationMinutes}
                   onChange={(e) => patch({ consultationMinutes: e.target.value })}
-                  placeholder="How long each consultation takes (minutes)"
+                  label="How long each consultation takes"
+                  placeholder="Minutes (5–240)"
                 />
                 <Input
                   type="number"
